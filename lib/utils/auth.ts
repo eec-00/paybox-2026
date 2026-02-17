@@ -170,47 +170,29 @@ export async function createUser({
   role?: UserRole
   permissions?: UserPermissions
 }): Promise<{ success: boolean; userId?: string; error?: string }> {
-  const supabase = createClient()
-
   try {
-    // Usar auth.admin.createUser para crear usuario con email confirmado
-    const { data, error: createError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // ✅ true = NO requiere verificación de email
-      user_metadata: {
-        full_name: fullName
-      }
+    // Llamar al API route que tiene privilegios de admin
+    const response = await fetch('/api/users/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        fullName,
+        role,
+        permissions
+      })
     })
 
-    if (createError) {
-      return { success: false, error: createError.message }
+    const result = await response.json()
+
+    if (!response.ok) {
+      return { success: false, error: result.error || 'Error al crear usuario' }
     }
 
-    if (!data.user) {
-      return { success: false, error: 'No se pudo crear el usuario' }
-    }
-
-    // Crear el perfil en user_profiles con el rol y permisos
-    const { error: profileError } = await supabase
-      .from('user_profiles')
-      .insert({
-        id: data.user.id,
-        email: data.user.email!,
-        full_name: fullName,
-        role,
-        can_create: role === 'admin' ? true : permissions.can_create,
-        can_edit: role === 'admin' ? true : permissions.can_edit,
-        can_delete: role === 'admin' ? true : permissions.can_delete
-      })
-
-    if (profileError) {
-      // Si falla la creación del perfil, intentar eliminar el usuario de auth
-      await supabase.auth.admin.deleteUser(data.user.id)
-      return { success: false, error: `Error al crear perfil: ${profileError.message}` }
-    }
-
-    return { success: true, userId: data.user.id }
+    return { success: true, userId: result.userId }
   } catch (err: any) {
     return { success: false, error: err.message || 'Error desconocido al crear usuario' }
   }
