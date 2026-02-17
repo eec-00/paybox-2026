@@ -193,8 +193,13 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
         throw new Error(`Faltan campos obligatorios: ${camposFaltantes.join(', ')}`)
       }
 
+      // Convertir la fecha local a timestamp con zona horaria de Perú (UTC-5)
+      // El datetime-local devuelve "YYYY-MM-DDTHH:mm" sin info de zona horaria
+      // Necesitamos agregarlo para que Supabase lo guarde correctamente
+      const fechaConZonaHoraria = fechaYHoraPago ? `${fechaYHoraPago}:00-05:00` : null
+
       const { error } = await supabase.from('registros').insert({
-        fecha_y_hora_pago: fechaYHoraPago,
+        fecha_y_hora_pago: fechaConZonaHoraria,
         beneficiario,
         monto: parseFloat(monto),
         metodo_pago: metodoPago,
