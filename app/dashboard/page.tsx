@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Dashboard } from '@/components/Dashboard'
 import { PaymentForm } from '@/components/PaymentForm'
 import { PaymentsTable } from '@/components/PaymentsTable'
@@ -25,7 +24,7 @@ export default function DashboardPage() {
   const [refresh, setRefresh] = useState(0)
   const [activeSection, setActiveSection] = useState<Section>('dashboard')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false)
+  const [showNewPaymentForm, setShowNewPaymentForm] = useState(false)
   const [isDeveloper, setIsDeveloper] = useState(false)
   const [isAdminUser, setIsAdminUser] = useState(false)
   const [canCreate, setCanCreate] = useState(false)
@@ -69,7 +68,7 @@ export default function DashboardPage() {
 
   const handleSuccess = () => {
     setRefresh(prev => prev + 1)
-    setShowNewPaymentDialog(false)
+    setShowNewPaymentForm(false)
   }
 
   if (!user) {
@@ -169,9 +168,9 @@ export default function DashboardPage() {
                       <p className="text-muted-foreground">Visualiza y gestiona todos los registros de pagos</p>
                     </div>
                   </div>
-                  {canCreate && (
+                  {canCreate && !showNewPaymentForm && (
                     <Button 
-                      onClick={() => setShowNewPaymentDialog(true)}
+                      onClick={() => setShowNewPaymentForm(true)}
                       size="lg"
                       className="shadow-md hover:shadow-lg transition-shadow"
                     >
@@ -180,6 +179,27 @@ export default function DashboardPage() {
                     </Button>
                   )}
                 </div>
+
+                {/* Formulario de nuevo pago embebido */}
+                {showNewPaymentForm && canCreate && (
+                  <div className="bg-card border rounded-lg p-6 shadow-md">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-xl font-semibold text-primary">Nuevo Registro de Pago</h3>
+                        <p className="text-sm text-muted-foreground">Complete el formulario para registrar un nuevo pago</p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setShowNewPaymentForm(false)}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                    <PaymentForm onSuccess={handleSuccess} />
+                  </div>
+                )}
+
+                {/* Tabla de pagos */}
                 <PaymentsTable refresh={refresh} />
               </div>
             )}
@@ -272,19 +292,6 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
-
-      {/* Modal de Nuevo Pago */}
-      <Dialog open={showNewPaymentDialog} onOpenChange={setShowNewPaymentDialog}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl text-primary">Nuevo Registro de Pago</DialogTitle>
-            <DialogDescription className="text-base">
-              Complete el formulario para registrar un nuevo pago
-            </DialogDescription>
-          </DialogHeader>
-          <PaymentForm onSuccess={handleSuccess} />
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
