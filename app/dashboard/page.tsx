@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Dashboard } from '@/components/Dashboard'
 import { PaymentForm } from '@/components/PaymentForm'
 import { PaymentsTable } from '@/components/PaymentsTable'
@@ -13,7 +14,7 @@ import { VehiclesList } from '@/components/VehiclesList'
 import { TutorialsList } from '@/components/TutorialsList'
 import { Sidebar, type Section } from '@/components/Sidebar'
 import { isAdmin, getUserPermissions } from '@/lib/utils/auth'
-import { LogOut, Shield, Car, PlayCircle, Menu, X } from 'lucide-react'
+import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText } from 'lucide-react'
 import Image from 'next/image'
 
 export default function DashboardPage() {
@@ -21,6 +22,7 @@ export default function DashboardPage() {
   const [refresh, setRefresh] = useState(0)
   const [activeSection, setActiveSection] = useState<Section>('dashboard')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -45,8 +47,7 @@ export default function DashboardPage() {
 
   const handleSuccess = () => {
     setRefresh(prev => prev + 1)
-    // Cambiar a la sección de registros después de guardar
-    setActiveSection('registros')
+    setShowNewPaymentDialog(false)
   }
 
   if (!user) {
@@ -135,21 +136,26 @@ export default function DashboardPage() {
           <div className="max-w-7xl mx-auto">
             {activeSection === 'dashboard' && <Dashboard />}
 
-            {activeSection === 'nuevo-pago' && (
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-primary mb-2">Nuevo Registro de Pago</h2>
-                  <p className="text-muted-foreground">Complete el formulario para registrar un nuevo pago</p>
-                </div>
-                <PaymentForm onSuccess={handleSuccess} />
-              </div>
-            )}
-
-            {activeSection === 'registros' && (
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-primary mb-2">Historial de Registros</h2>
-                  <p className="text-muted-foreground">Visualiza y gestiona todos tus registros de pagos</p>
+            {activeSection === 'pagos' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-6 w-6 text-primary" />
+                    <div>
+                      <h2 className="text-2xl font-bold text-primary">Pagos</h2>
+                      <p className="text-muted-foreground">Visualiza y gestiona todos los registros de pagos</p>
+                    </div>
+                  </div>
+                  {getUserPermissions(user).can_create && (
+                    <Button 
+                      onClick={() => setShowNewPaymentDialog(true)}
+                      size="lg"
+                      className="shadow-md hover:shadow-lg transition-shadow"
+                    >
+                      <PlusCircle className="h-5 w-5 mr-2" />
+                      Nuevo pago
+                    </Button>
+                  )}
                 </div>
                 <PaymentsTable refresh={refresh} />
               </div>
@@ -213,6 +219,19 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
+
+      {/* Modal de Nuevo Pago */}
+      <Dialog open={showNewPaymentDialog} onOpenChange={setShowNewPaymentDialog}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl text-primary">Nuevo Registro de Pago</DialogTitle>
+            <DialogDescription className="text-base">
+              Complete el formulario para registrar un nuevo pago
+            </DialogDescription>
+          </DialogHeader>
+          <PaymentForm onSuccess={handleSuccess} />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
