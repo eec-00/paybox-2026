@@ -46,23 +46,29 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
   }, [])
 
   const initializeForm = () => {
-    // Convertir fecha ISO a formato datetime-local
+    // Convertir fecha de Supabase a formato datetime-local
+    // La fecha viene en formato ISO con zona horaria, necesitamos convertirla a local
     const fecha = new Date(registro.fecha_y_hora_pago)
-    const fechaLocal = new Date(fecha.getTime() - fecha.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16)
+    // Formatear a YYYY-MM-DDTHH:mm para el input datetime-local
+    const year = fecha.getFullYear()
+    const month = String(fecha.getMonth() + 1).padStart(2, '0')
+    const day = String(fecha.getDate()).padStart(2, '0')
+    const hours = String(fecha.getHours()).padStart(2, '0')
+    const minutes = String(fecha.getMinutes()).padStart(2, '0')
+    const fechaLocal = `${year}-${month}-${day}T${hours}:${minutes}`
 
     setFechaYHoraPago(fechaLocal)
     setBeneficiario(registro.beneficiario)
     setMonto(registro.monto.toString())
-    setMetodoPago(registro.metodo_pago)
+    // Asegurar que el método de pago coincida exactamente con los valores del Select
+    setMetodoPago(registro.metodo_pago || '')
     setBancoCuenta(registro.banco_cuenta || '')
-    setMoneda(registro.moneda)
+    setMoneda(registro.moneda || 'soles')
     setImageUrls(registro.comprobantes || [])
     setDatosDinamicos(registro.datos_dinamicos || {})
     
     // Inicializar nuevos campos OCR con validación de tipos
-    const tipoDoc = registro.tipo_documento
+    const tipoDoc = registro.tipo_documento?.toLowerCase()
     if (tipoDoc === 'factura' || tipoDoc === 'comprobante') {
       setTipoDocumento(tipoDoc)
     } else {
@@ -156,10 +162,13 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
     setLoading(true)
 
     try {
+      // Convertir la fecha local a timestamp con zona horaria de Perú (UTC-5)
+      const fechaConZonaHoraria = fechaYHoraPago ? `${fechaYHoraPago}:00-05:00` : null
+
       const { error } = await supabase
         .from('registros')
         .update({
-          fecha_y_hora_pago: fechaYHoraPago,
+          fecha_y_hora_pago: fechaConZonaHoraria,
           beneficiario,
           monto: parseFloat(monto),
           metodo_pago: metodoPago,
@@ -265,8 +274,8 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
 
           <div className="space-y-2">
             <Label htmlFor="metodo">Método de Pago *</Label>
-            <Select value={metodoPago} onValueChange={setMetodoPago} required disabled={loading}>
-              <SelectTrigger className="w-full">
+            <Select key={`metodo-${metodoPago}`} value={metodoPago} onValueChange={setMetodoPago} required disabled={loading}>
+              <SelectTrigger id="metodo" className="w-full">
                 <SelectValue placeholder="Selecciona un método" />
               </SelectTrigger>
               <SelectContent>
@@ -293,7 +302,7 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
 
           <div className="space-y-2">
             <Label htmlFor="tipoDocumento">Tipo de Documento</Label>
-            <Select value={tipoDocumento} onValueChange={(val) => setTipoDocumento(val as 'factura' | 'comprobante' | '')} disabled={loading}>
+            <Select key={`tipo-${tipoDocumento}`} value={tipoDocumento} onValueChange={(val) => setTipoDocumento(val as 'factura' | 'comprobante' | '')} disabled={loading}>
               <SelectTrigger id="tipoDocumento" className="w-full">
                 <SelectValue placeholder="Selecciona tipo" />
               </SelectTrigger>

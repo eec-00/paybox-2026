@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dashboard } from '@/components/Dashboard'
 import { PaymentForm } from '@/components/PaymentForm'
 import { PaymentsTable } from '@/components/PaymentsTable'
 import { UserManagement } from '@/components/UserManagement'
@@ -11,13 +13,22 @@ import { UsersList } from '@/components/UsersList'
 import { VehiclesList } from '@/components/VehiclesList'
 import { TutorialsList } from '@/components/TutorialsList'
 import { Sidebar, type Section } from '@/components/Sidebar'
-import { isAdmin, getUserPermissions } from '@/lib/utils/auth'
-import { LogOut, Shield, Car, PlayCircle } from 'lucide-react'
+import { UpdatesNotification } from '@/components/UpdatesNotification'
+import { UpdatesManagement } from '@/components/UpdatesManagement'
+import { UpdatesList } from '@/components/UpdatesList'
+import { isAdmin, getUserPermissions, getCurrentUserProfile } from '@/lib/utils/auth'
+import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText, Megaphone } from 'lucide-react'
+import Image from 'next/image'
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
   const [refresh, setRefresh] = useState(0)
-  const [activeSection, setActiveSection] = useState<Section>('registros')
+  const [activeSection, setActiveSection] = useState<Section>('dashboard')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false)
+  const [isDeveloper, setIsDeveloper] = useState(false)
+  const [isAdminUser, setIsAdminUser] = useState(false)
+  const [canCreate, setCanCreate] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -28,6 +39,18 @@ export default function DashboardPage() {
         router.push('/login')
       } else {
         setUser(user)
+        
+        // Verificar si es developer
+        const profile = await getCurrentUserProfile()
+        setIsDeveloper(profile?.role === 'developer')
+        
+        // Verificar admin
+        const adminStatus = await isAdmin()
+        setIsAdminUser(adminStatus)
+        
+        // Obtener permisos
+        const permissions = await getUserPermissions()
+        setCanCreate(permissions.can_create)
       }
     }
 
@@ -40,10 +63,13 @@ export default function DashboardPage() {
     router.refresh()
   }
 
+  const handleSectionChange = (section: Section) => {
+    setActiveSection(section)
+  }
+
   const handleSuccess = () => {
     setRefresh(prev => prev + 1)
-    // Cambiar a la sección de registros después de guardar
-    setActiveSection('registros')
+    setShowNewPaymentDialog(false)
   }
 
   if (!user) {
@@ -56,19 +82,64 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Header mejorado con gradiente */}
+      {/* Header reorganizado */}
       <header className="border-b bg-gradient-to-r from-primary via-primary to-primary/95 shadow-lg sticky top-0 z-10">
-        <div className="px-6 py-4 flex items-center justify-between">
-          <div>
-            <p className="text-sm text-white/70">Bienvenido</p>
-            <p className="text-base font-semibold text-white">
-              {user.user_metadata?.full_name || user.email}
-            </p>
+        <div className="px-6 py-3.5 flex items-center justify-between">
+          {/* Logo y nombre de la empresa */}
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              {/* Botón de colapsar sidebar */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="h-8 w-8 bg-white/10 hover:bg-white/20 text-white rounded-md transition-all hover:scale-110"
+                title={sidebarCollapsed ? "Expandir menú" : "Contraer menú"}
+              >
+                {sidebarCollapsed ? (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                ) : (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </Button>
+              
+              <div className="relative w-10 h-10">
+                <Image
+                  src="/logo.png"
+                  alt="Logo"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+              <div>
+                <h1 className="font-bold text-xl text-white font-[family-name:var(--font-montserrat)]">PayBox</h1>
+                <p className="text-xs text-white/70">Eemerson SAC</p>
+              </div>
+            </div>
+            
+            {/* Separador y mensaje de bienvenida */}
+            <div className="flex items-center gap-4">
+              <div className="h-8 w-px bg-white/30"></div>
+              <div>
+                <p className="text-sm text-white font-medium">
+                  Bienvenido, {user.user_metadata?.full_name || user.email}
+                </p>
+              </div>
+            </div>
           </div>
-          <Button variant="secondary" onClick={handleLogout} className="shadow-md hover:shadow-lg transition-shadow">
-            <LogOut className="h-4 w-4 mr-2" />
-            Cerrar Sesión
-          </Button>
+
+          {/* Botón de cerrar sesión */}
+          <div className="flex items-center gap-3">
+            <UpdatesNotification />
+            <Button variant="secondary" onClick={handleLogout} className="shadow-md hover:shadow-lg transition-shadow">
+              <LogOut className="h-4 w-4 mr-2" />
+              Cerrar Sesión
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -77,29 +148,37 @@ export default function DashboardPage() {
         {/* Sidebar */}
         <Sidebar
           activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          isAdmin={isAdmin(user)}
-          canCreate={getUserPermissions(user).can_create}
+          onSectionChange={handleSectionChange}
+          isAdmin={isAdminUser}
+          canCreate={canCreate}
+          collapsed={sidebarCollapsed}
         />
 
         {/* Main Content */}
         <main className="flex-1 p-8 overflow-auto">
           <div className="max-w-7xl mx-auto">
-            {activeSection === 'nuevo-pago' && (
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-primary mb-2">Nuevo Registro de Pago</h2>
-                  <p className="text-muted-foreground">Complete el formulario para registrar un nuevo pago</p>
-                </div>
-                <PaymentForm onSuccess={handleSuccess} />
-              </div>
-            )}
+            {activeSection === 'dashboard' && <Dashboard />}
 
-            {activeSection === 'registros' && (
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-primary mb-2">Historial de Registros</h2>
-                  <p className="text-muted-foreground">Visualiza y gestiona todos tus registros de pagos</p>
+            {activeSection === 'pagos' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-6 w-6 text-primary" />
+                    <div>
+                      <h2 className="text-2xl font-bold text-primary">Pagos</h2>
+                      <p className="text-muted-foreground">Visualiza y gestiona todos los registros de pagos</p>
+                    </div>
+                  </div>
+                  {canCreate && (
+                    <Button 
+                      onClick={() => setShowNewPaymentDialog(true)}
+                      size="lg"
+                      className="shadow-md hover:shadow-lg transition-shadow"
+                    >
+                      <PlusCircle className="h-5 w-5 mr-2" />
+                      Nuevo pago
+                    </Button>
+                  )}
                 </div>
                 <PaymentsTable refresh={refresh} />
               </div>
@@ -131,9 +210,39 @@ export default function DashboardPage() {
               </div>
             )}
 
+            {activeSection === 'updates' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Megaphone className="h-6 w-6 text-primary" />
+                    <div>
+                      <h2 className="text-2xl font-bold text-primary">Actualizaciones del Sistema</h2>
+                      <p className="text-muted-foreground">Mantente informado sobre las mejoras y nuevas funcionalidades</p>
+                    </div>
+                  </div>
+                  {isDeveloper && (
+                    <Button onClick={() => {
+                      // Trigger new update dialog from UpdatesManagement
+                      const event = new CustomEvent('openUpdateDialog')
+                      window.dispatchEvent(event)
+                    }}>
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Nueva Actualización
+                    </Button>
+                  )}
+                </div>
+
+                {/* Panel de gestión solo para developers */}
+                {isDeveloper && <UpdatesManagement />}
+
+                {/* Lista de actualizaciones para todos */}
+                <UpdatesList />
+              </div>
+            )}
+
             {activeSection === 'administracion' && (
               <div className="space-y-6">
-                {isAdmin(user) ? (
+                {(isAdminUser || isDeveloper) ? (
                   <>
                     <div className="flex items-center gap-2">
                       <Shield className="h-6 w-6 text-secondary" />
@@ -154,7 +263,7 @@ export default function DashboardPage() {
                     <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-foreground mb-2">Acceso Restringido</h3>
                     <p className="text-muted-foreground">
-                      Solo los administradores pueden acceder a esta sección
+                      Solo los administradores y developers pueden acceder a esta sección
                     </p>
                   </div>
                 )}
@@ -163,6 +272,19 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
+
+      {/* Modal de Nuevo Pago */}
+      <Dialog open={showNewPaymentDialog} onOpenChange={setShowNewPaymentDialog}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl text-primary">Nuevo Registro de Pago</DialogTitle>
+            <DialogDescription className="text-base">
+              Complete el formulario para registrar un nuevo pago
+            </DialogDescription>
+          </DialogHeader>
+          <PaymentForm onSuccess={handleSuccess} />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

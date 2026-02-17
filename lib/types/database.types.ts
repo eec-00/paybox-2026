@@ -22,8 +22,8 @@ export interface Registro {
   categoria?: Categoria
   datos_dinamicos: Record<string, any>
   comprobantes?: string[] // URLs de las imágenes en Storage
-  creado_por: string
-  subido_por?: string // Nombre completo del usuario que creó el registro
+  creado_por: string // UUID del usuario que creó el registro
+  nombre_usuario?: string // Nombre obtenido dinámicamente desde user_profiles
   created_at?: string
   // Campos OCR
   tipo_documento?: string

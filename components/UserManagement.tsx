@@ -6,12 +6,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { UserPlus, Check } from 'lucide-react'
+import { createUser } from '@/lib/utils/auth'
+import { UserRole } from '@/lib/types/user-profile.types'
 
 export function UserManagement() {
   const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
+  const [role, setRole] = useState<UserRole>('user')
   const [permissions, setPermissions] = useState({
     can_create: false,
     can_edit: false,
@@ -30,6 +34,16 @@ export function UserManagement() {
     }))
   }
 
+  const handleRoleChange = (newRole: UserRole) => {
+    setRole(newRole)
+    // Si es admin o viewer, ajustar permisos automáticamente
+    if (newRole === 'admin') {
+      setPermissions({ can_create: true, can_edit: true, can_delete: true })
+    } else if (newRole === 'viewer') {
+      setPermissions({ can_create: false, can_edit: false, can_delete: false })
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -37,64 +51,43 @@ export function UserManagement() {
     setLoading(true)
 
     try {
-      // Crear usuario usando signUp con permisos en app_metadata
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      // Validaciones básicas
+      if (!email || !displayName || !password) {
+        throw new Error('Todos los campos son obligatorios')
+      }
+
+      if (password.length < 6) {
+        throw new Error('La contraseña debe tener al menos 6 caracteres')
+      }
+
+      // Crear usuario con email pre-verificado usando la nueva función
+      const result = await createUser({
         email,
         password,
-        options: {
-          data: {
-            full_name: displayName
-          },
-          emailRedirectTo: `${window.location.origin}/dashboard`
-        }
+        fullName: displayName,
+        role,
+        permissions
       })
 
-      if (signUpError) throw signUpError
-
-      if (!data.user) {
-        throw new Error('No se pudo crear el usuario')
+      if (!result.success) {
+        throw new Error(result.error || 'Error al crear usuario')
       }
 
-      // Ahora actualizar los permisos usando la Edge Function
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session) {
-        throw new Error('No hay sesión de admin activa')
-      }
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/update-user-permissions`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({
-            user_id: data.user.id,
-            permissions
-          })
-        }
-      )
-
-      const permData = await response.json()
-
-      if (!response.ok) {
-        // El usuario se creó pero falló asignar permisos
-        throw new Error(`Usuario creado pero error al asignar permisos: ${permData.error}`)
-      }
-
-      setSuccess('Usuario creado exitosamente. Se ha enviado un correo de confirmación.')
+      setSuccess('✅ Usuario creado exitosamente. Ya puede iniciar sesión sin verificar email.')
 
       // Limpiar formulario
       setEmail('')
       setDisplayName('')
       setPassword('')
+      setRole('user')
       setPermissions({
         can_create: false,
         can_edit: false,
         can_delete: false
       })
+
+      // Limpiar mensaje de éxito después de 5 segundos
+      setTimeout(() => setSuccess(null), 5000)
 
     } catch (error: any) {
       setError(error.message || 'Error al crear usuario')
@@ -156,15 +149,45 @@ export function UserManagement() {
                 minLength={6}
                 disabled={loading}
               />
-              <p className="text-xs text-muted-foreground">
-                El usuario recibirá un correo para confirmar su cuenta
+              <p className="text-xs text-green-600">
+                ✓ El usuario podrá acceder inmediatamente sin verificar email
               </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="role">Rol del usuario *</Label>
+              <Select value={role} onValueChange={(value) => handleRoleChange(value as UserRole)} disabled={loading}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un rol" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="viewer">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Visualizador</span>
+                      <span className="text-xs text-muted-foreground">Solo puede ver registros</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="user">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Usuario</span>
+                      <span className="text-xs text-muted-foreground">Permisos personalizados</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="admin">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Administrador</span>
+                      <span className="text-xs text-muted-foreground">Acceso total al sistema</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          {/* Permisos */}
+          {/* Permisos (solo si el rol es 'user') */}
+          {role === 'user' && (
           <div className="space-y-3 border-t pt-4">
-            <Label>Permisos del usuario</Label>
+            <Label>Permisos específicos</Label>
             <div className="space-y-2">
               <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors">
                 <input
@@ -230,6 +253,20 @@ export function UserManagement() {
               </label>
             </div>
           </div>
+          )}
+
+          {/* Mensaje informativo para admin/viewer */}
+          {role === 'admin' && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg text-sm">
+              <strong>Administrador:</strong> Tiene acceso completo a todas las funciones del sistema.
+            </div>
+          )}
+          
+          {role === 'viewer' && (
+            <div className="p-3 bg-gray-50 dark:bg-gray-900 border rounded-lg text-sm text-muted-foreground">
+              <strong>Visualizador:</strong> Solo puede ver registros, sin permisos de modificación.
+            </div>
+          )}
 
           {/* Mensajes */}
           {error && (

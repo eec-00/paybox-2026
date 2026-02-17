@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: false, // false = envía el email de confirmación
+      email_confirm: true, // ✅ true = NO requiere verificación de email (usuario puede acceder inmediatamente)
       user_metadata: {
         full_name: displayName
       },
@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
           full_name: displayName,
           created_at: newUser.user.created_at
         },
-        message: 'Usuario creado exitosamente. Se ha enviado un correo de confirmación.'
+        message: '✅ Usuario creado exitosamente. Ya puede iniciar sesión sin verificar email.'
       }),
       {
         status: 200,
