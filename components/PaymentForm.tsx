@@ -54,7 +54,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
   const checkPermissions = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const permissions = getUserPermissions(user)
+      const permissions = await getUserPermissions()
       setCanCreate(permissions.can_create)
     } catch (error) {
       console.error('Error checking permissions:', error)

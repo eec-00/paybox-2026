@@ -13,8 +13,11 @@ import { UsersList } from '@/components/UsersList'
 import { VehiclesList } from '@/components/VehiclesList'
 import { TutorialsList } from '@/components/TutorialsList'
 import { Sidebar, type Section } from '@/components/Sidebar'
-import { isAdmin, getUserPermissions } from '@/lib/utils/auth'
-import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText } from 'lucide-react'
+import { UpdatesNotification } from '@/components/UpdatesNotification'
+import { UpdatesManagement } from '@/components/UpdatesManagement'
+import { UpdatesList } from '@/components/UpdatesList'
+import { isAdmin, getUserPermissions, getCurrentUserProfile } from '@/lib/utils/auth'
+import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText, Megaphone } from 'lucide-react'
 import Image from 'next/image'
 
 export default function DashboardPage() {
@@ -23,6 +26,9 @@ export default function DashboardPage() {
   const [activeSection, setActiveSection] = useState<Section>('dashboard')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showNewPaymentDialog, setShowNewPaymentDialog] = useState(false)
+  const [isDeveloper, setIsDeveloper] = useState(false)
+  const [isAdminUser, setIsAdminUser] = useState(false)
+  const [canCreate, setCanCreate] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -33,6 +39,18 @@ export default function DashboardPage() {
         router.push('/login')
       } else {
         setUser(user)
+        
+        // Verificar si es developer
+        const profile = await getCurrentUserProfile()
+        setIsDeveloper(profile?.role === 'developer')
+        
+        // Verificar admin
+        const adminStatus = await isAdmin()
+        setIsAdminUser(adminStatus)
+        
+        // Obtener permisos
+        const permissions = await getUserPermissions()
+        setCanCreate(permissions.can_create)
       }
     }
 
@@ -43,6 +61,10 @@ export default function DashboardPage() {
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
+  }
+
+  const handleSectionChange = (section: Section) => {
+    setActiveSection(section)
   }
 
   const handleSuccess = () => {
@@ -111,7 +133,8 @@ export default function DashboardPage() {
           </div>
 
           {/* Botón de cerrar sesión */}
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
+            <UpdatesNotification />
             <Button variant="secondary" onClick={handleLogout} className="shadow-md hover:shadow-lg transition-shadow">
               <LogOut className="h-4 w-4 mr-2" />
               Cerrar Sesión
@@ -125,9 +148,9 @@ export default function DashboardPage() {
         {/* Sidebar */}
         <Sidebar
           activeSection={activeSection}
-          onSectionChange={setActiveSection}
-          isAdmin={isAdmin(user)}
-          canCreate={getUserPermissions(user).can_create}
+          onSectionChange={handleSectionChange}
+          isAdmin={isAdminUser}
+          canCreate={canCreate}
           collapsed={sidebarCollapsed}
         />
 
@@ -146,7 +169,7 @@ export default function DashboardPage() {
                       <p className="text-muted-foreground">Visualiza y gestiona todos los registros de pagos</p>
                     </div>
                   </div>
-                  {getUserPermissions(user).can_create && (
+                  {canCreate && (
                     <Button 
                       onClick={() => setShowNewPaymentDialog(true)}
                       size="lg"
@@ -187,9 +210,39 @@ export default function DashboardPage() {
               </div>
             )}
 
+            {activeSection === 'updates' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Megaphone className="h-6 w-6 text-primary" />
+                    <div>
+                      <h2 className="text-2xl font-bold text-primary">Actualizaciones del Sistema</h2>
+                      <p className="text-muted-foreground">Mantente informado sobre las mejoras y nuevas funcionalidades</p>
+                    </div>
+                  </div>
+                  {isDeveloper && (
+                    <Button onClick={() => {
+                      // Trigger new update dialog from UpdatesManagement
+                      const event = new CustomEvent('openUpdateDialog')
+                      window.dispatchEvent(event)
+                    }}>
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Nueva Actualización
+                    </Button>
+                  )}
+                </div>
+
+                {/* Panel de gestión solo para developers */}
+                {isDeveloper && <UpdatesManagement />}
+
+                {/* Lista de actualizaciones para todos */}
+                <UpdatesList />
+              </div>
+            )}
+
             {activeSection === 'administracion' && (
               <div className="space-y-6">
-                {isAdmin(user) ? (
+                {(isAdminUser || isDeveloper) ? (
                   <>
                     <div className="flex items-center gap-2">
                       <Shield className="h-6 w-6 text-secondary" />
@@ -210,7 +263,7 @@ export default function DashboardPage() {
                     <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-foreground mb-2">Acceso Restringido</h3>
                     <p className="text-muted-foreground">
-                      Solo los administradores pueden acceder a esta sección
+                      Solo los administradores y developers pueden acceder a esta sección
                     </p>
                   </div>
                 )}

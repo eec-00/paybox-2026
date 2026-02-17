@@ -1,9 +1,9 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { FileText, UserCog, Car, LayoutDashboard } from 'lucide-react'
+import { FileText, UserCog, Car, LayoutDashboard, Megaphone } from 'lucide-react'
 
-export type Section = 'dashboard' | 'pagos' | 'vehiculos' | 'tutoriales' | 'administracion'
+export type Section = 'dashboard' | 'pagos' | 'vehiculos' | 'tutoriales' | 'administracion' | 'updates'
 
 interface SidebarProps {
   activeSection: Section
@@ -42,6 +42,14 @@ export function Sidebar({
       label: 'Vehículos',
       icon: Car,
       description: 'Flota GPS Navitel',
+      adminOnly: false,
+      requiresCreate: false
+    },
+    {
+      id: 'updates' as Section,
+      label: 'Actualizaciones',
+      icon: Megaphone,
+      description: 'Novedades del sistema',
       adminOnly: false,
       requiresCreate: false
     },

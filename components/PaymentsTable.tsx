@@ -24,6 +24,7 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
   const [selectedRegistro, setSelectedRegistro] = useState<Registro | null>(null)
   const [editingRegistro, setEditingRegistro] = useState<Registro | null>(null)
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [isAdminUser, setIsAdminUser] = useState(false)
   const [permissions, setPermissions] = useState({ can_create: false, can_edit: false, can_delete: false })
   const [deleting, setDeleting] = useState<number | null>(null)
   const [filtroExportacion, setFiltroExportacion] = useState<'todos' | 'pendientes' | 'exportados'>('todos')
@@ -41,7 +42,10 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       setCurrentUser(user)
-      setPermissions(getUserPermissions(user))
+      const perms = await getUserPermissions()
+      setPermissions(perms)
+      const adminStatus = await isAdmin()
+      setIsAdminUser(adminStatus)
     } catch (error) {
       console.error('Error loading user:', error)
     }
@@ -174,13 +178,13 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
 
   const canEditRegistro = (registro: Registro) => {
     if (!currentUser) return false
-    if (isAdmin(currentUser)) return true
+    if (isAdminUser) return true
     return permissions.can_edit && registro.creado_por === currentUser.id
   }
 
   const canDeleteRegistro = (registro: Registro) => {
     if (!currentUser) return false
-    if (isAdmin(currentUser)) return true
+    if (isAdminUser) return true
     return permissions.can_delete && registro.creado_por === currentUser.id
   }
 
