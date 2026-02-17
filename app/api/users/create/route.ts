@@ -74,24 +74,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Crear el perfil en user_profiles con el rol y permisos
-    const { error: profileInsertError } = await adminClient
+    // El trigger handle_new_user() ya creó el perfil automáticamente
+    // Solo necesitamos actualizarlo con el rol y permisos correctos
+    const { error: profileUpdateError } = await adminClient
       .from('user_profiles')
-      .insert({
-        id: newUser.user.id,
-        email: newUser.user.email!,
+      .update({
         full_name: fullName,
         role: role || 'user',
         can_create: role === 'admin' || role === 'developer' ? true : (permissions?.can_create || false),
         can_edit: role === 'admin' || role === 'developer' ? true : (permissions?.can_edit || false),
         can_delete: role === 'admin' || role === 'developer' ? true : (permissions?.can_delete || false)
       })
+      .eq('id', newUser.user.id)
 
-    if (profileInsertError) {
-      // Si falla la creación del perfil, eliminar el usuario de auth
+    if (profileUpdateError) {
+      // Si falla la actualización del perfil, eliminar el usuario de auth
       await adminClient.auth.admin.deleteUser(newUser.user.id)
       return NextResponse.json(
-        { error: `Error al crear perfil: ${profileInsertError.message}` },
+        { error: `Error al actualizar perfil: ${profileUpdateError.message}` },
         { status: 500 }
       )
     }
