@@ -54,35 +54,72 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
   const loadRegistros = async () => {
     setLoading(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      console.log('🔄 Cargando registros...')
+      
+      // Consultar directamente a Supabase sin Edge Functions
+      const { data: registros, error } = await supabase
+        .from('registros')
+        .select(`
+          *,
+          categoria:categoria_id (
+            id,
+            categoria_id_texto,
+            categoria_nombre,
+            ejes_obligatorios
+          )
+        `)
+        .order('created_at', { ascending: false })
 
-      if (!session) {
-        throw new Error('No hay sesión activa')
+      if (error) {
+        console.error('❌ Error en query de registros:', error)
+        throw error
       }
 
-      // Construir URL con filtro de exportación
-      let url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/get-registros-with-users`
-      if (filtroExportacion !== 'todos') {
-        url += `?exportado=${filtroExportacion === 'exportados' ? 'true' : 'false'}`
-      }
+      console.log('✅ Registros cargados:', registros?.length || 0)
 
-      // Usar Edge Function para obtener registros con nombres de usuarios
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
+      // Obtener nombres desde user_profiles usando creado_por
+      if (registros && registros.length > 0) {
+        const userIds = [...new Set(registros.map(r => r.creado_por))]
+        console.log('👥 Consultando perfiles para:', userIds.length, 'usuarios')
+        
+        const { data: profiles, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('id, full_name')
+          .in('id', userIds)
+        
+        if (profileError) {
+          console.error('⚠️ Error al cargar perfiles (continuando sin nombres):', profileError)
+          // Continuar sin nombres en lugar de fallar
+          const registrosSinNombres = registros.map(r => ({
+            ...r,
+            nombre_usuario: 'Usuario desconocido'
+          }))
+          setRegistros(registrosSinNombres)
+          return
         }
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al cargar registros')
+        
+        console.log('✅ Perfiles cargados:', profiles?.length || 0)
+        
+        if (profiles) {
+          const profileMap = new Map(profiles.map(p => [p.id, p.full_name]))
+          
+          const registrosConNombres = registros.map(r => ({
+            ...r,
+            nombre_usuario: profileMap.get(r.creado_por) || 'Usuario desconocido'
+          }))
+          
+          setRegistros(registrosConNombres)
+          console.log('✅ Registros con nombres asignados')
+          return
+        }
       }
 
-      setRegistros(data.registros || [])
+      console.log('ℹ️ No hay registros o están vacíos')
+      setRegistros(registros || [])
     } catch (error: any) {
-      console.error('Error al cargar registros:', error)
+      console.error('❌ Error al cargar registros:', error)
+      console.error('❌ Stack:', error?.stack)
+      console.error('❌ Message:', error?.message)
     } finally {
       setLoading(false)
     }
@@ -266,7 +303,7 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
                 registros.map((registro) => (
                   <TableRow key={registro.id}>
                     <TableCell>
-                      <span className="font-medium text-sm">{registro.subido_por || 'Usuario desconocido'}</span>
+                      <span className="font-medium text-sm">{registro.nombre_usuario || 'Usuario desconocido'}</span>
                     </TableCell>
                     <TableCell className="font-medium">
                       {formatDateTime(registro.fecha_y_hora_pago)}
@@ -327,7 +364,7 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                                     <div className="space-y-1">
                                       <span className="text-xs text-muted-foreground uppercase tracking-wide">Subido por</span>
-                                      <p className="font-semibold text-base">{selectedRegistro.subido_por || 'Usuario desconocido'}</p>
+                                      <p className="font-semibold text-base">{selectedRegistro.nombre_usuario || 'Usuario desconocido'}</p>
                                     </div>
                                     <div className="space-y-1">
                                       <span className="text-xs text-muted-foreground uppercase tracking-wide">Fecha y Hora de Pago</span>
