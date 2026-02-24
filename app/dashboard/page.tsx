@@ -158,8 +158,8 @@ export default function DashboardPage() {
         />
 
         {/* Main Content */}
-        <main className="flex-1 p-8 overflow-auto">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 p-4 md:p-8 overflow-auto">
+          <div className="w-full max-w-[1600px] mx-auto">
             {activeSection === 'dashboard' && <Dashboard />}
 
             {activeSection === 'pagos' && (
@@ -210,49 +210,24 @@ export default function DashboardPage() {
 
             {activeSection === 'trailers' && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Car className="h-6 w-6 text-primary" />
-                    <div>
-                      <h2 className="text-2xl font-bold text-primary">Gestión de Trailers</h2>
-                      <p className="text-muted-foreground">Visualiza y gestiona los servicios de trailers y contenedores</p>
-                    </div>
+                <div className="flex items-center gap-2 mb-6">
+                  <Car className="h-6 w-6 text-primary" />
+                  <div>
+                    <h2 className="text-2xl font-bold text-primary">Gestión de Trailers</h2>
+                    <p className="text-muted-foreground">Visualiza y gestiona los servicios de trailers y contenedores</p>
                   </div>
-                  {canCreate && !showNewTrailerForm && (
-                    <Button
-                      onClick={() => setShowNewTrailerForm(true)}
-                      size="lg"
-                      className="shadow-md hover:shadow-lg transition-shadow"
-                    >
-                      <PlusCircle className="h-5 w-5 mr-2" />
-                      Nuevo servicio
-                    </Button>
-                  )}
                 </div>
 
                 {(showNewTrailerForm || trailerToEdit) && canCreate && (
-                  <div className="bg-card border rounded-lg p-6 shadow-md mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-xl font-semibold text-primary">
-                          {trailerToEdit ? 'Editar Servicio de Trailer' : 'Nuevo Servicio de Trailer'}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">Complete todos los datos logísticos y de servicio</p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setShowNewTrailerForm(false)
-                          setTrailerToEdit(null)
-                        }}
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
+                  <div className="bg-card border rounded-lg p-6 shadow-md mb-6 pt-4">
                     <TrailerForm
                       initialData={trailerToEdit}
                       onSuccess={() => {
                         setRefresh(prev => prev + 1)
+                        setShowNewTrailerForm(false)
+                        setTrailerToEdit(null)
+                      }}
+                      onCancel={() => {
                         setShowNewTrailerForm(false)
                         setTrailerToEdit(null)
                       }}
@@ -267,6 +242,30 @@ export default function DashboardPage() {
                       setTrailerToEdit(record)
                       window.scrollTo({ top: 0, behavior: 'smooth' })
                     }}
+                    onCopy={(record) => {
+                      const { id, created_at, ...rest } = record
+
+                      // Get current Peru date YYYY-MM-DD
+                      const d = new Date().toLocaleString("en-US", { timeZone: "America/Lima" })
+                      const localDate = new Date(d)
+                      const peruDate = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`
+
+                      setTrailerToEdit({ ...rest, fecha: peruDate })
+                      setShowNewTrailerForm(true)
+                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
+                    headerAction={
+                      canCreate ? (
+                        <Button
+                          onClick={() => setShowNewTrailerForm(true)}
+                          size="sm"
+                          className="h-8 shadow-sm"
+                        >
+                          <PlusCircle className="h-4 w-4 mr-2" />
+                          Nuevo servicio
+                        </Button>
+                      ) : null
+                    }
                   />
                 )}
               </div>

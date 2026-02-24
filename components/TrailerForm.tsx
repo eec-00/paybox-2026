@@ -51,7 +51,7 @@ const trailerSchema = z.object({
 
 type TrailerFormValues = z.infer<typeof trailerSchema>
 
-export function TrailerForm({ onSuccess, initialData }: { onSuccess: () => void, initialData?: any }) {
+export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: () => void, initialData?: any, onCancel?: () => void }) {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState('general')
@@ -187,6 +187,7 @@ export function TrailerForm({ onSuccess, initialData }: { onSuccess: () => void,
         // Convert string empty values to null for foreign keys if necessary
         const parseNumber = (val: string | undefined) => val ? parseFloat(val) : null
         const parseFk = (val: string | undefined | null) => val ? val : null
+        const parseTime = (val: string | undefined | null) => (val && val.trim() !== '') ? val : null
 
         const payload = {
             ...data,
@@ -203,6 +204,14 @@ export function TrailerForm({ onSuccess, initialData }: { onSuccess: () => void,
             peajes: parseNumber(data.peajes),
             adicionales: parseNumber(data.adicionales),
             pago_conductor: parseNumber(data.pago_conductor),
+            hora_cita: parseTime(data.hora_cita),
+            hora_devolucion: parseTime(data.hora_devolucion),
+            llegada_almacen_retiro: parseTime(data.llegada_almacen_retiro),
+            salida_almacen_retiro: parseTime(data.salida_almacen_retiro),
+            llegada_cliente: parseTime(data.llegada_cliente),
+            ingreso_planta: parseTime(data.ingreso_planta),
+            inicio_carga: parseTime(data.inicio_carga),
+            termino_descarga: parseTime(data.termino_descarga),
         }
 
         let saveError;
@@ -236,15 +245,20 @@ export function TrailerForm({ onSuccess, initialData }: { onSuccess: () => void,
         onSuccess()
     }
 
-    const tabClasses = (tab: string) => `px-4 py-2 font-medium rounded-t-lg transition-colors border-b-2 ${activeTab === tab ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-muted-foreground hover:bg-muted'}`
-
     return (
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="flex border-b mb-6 overflow-x-auto">
-                <button type="button" onClick={() => setActiveTab('general')} className={tabClasses('general')}>General</button>
-                <button type="button" onClick={() => setActiveTab('logistica')} className={tabClasses('logistica')}>Logística</button>
-                <button type="button" onClick={() => setActiveTab('tiempos')} className={tabClasses('tiempos')}>Tiempos</button>
-                <button type="button" onClick={() => setActiveTab('cierre')} className={tabClasses('cierre')}>Costos y Cierre</button>
+            <div className="flex items-center justify-between border-b border-primary/20 mb-6">
+                <div className="flex overflow-x-auto gap-4 px-2">
+                    <button type="button" onClick={() => setActiveTab('general')} className={`px-4 py-3 text-sm font-semibold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'general' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>General</button>
+                    <button type="button" onClick={() => setActiveTab('logistica')} className={`px-4 py-3 text-sm font-semibold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'logistica' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>Logística</button>
+                    <button type="button" onClick={() => setActiveTab('tiempos')} className={`px-4 py-3 text-sm font-semibold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'tiempos' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>Tiempos</button>
+                    <button type="button" onClick={() => setActiveTab('cierre')} className={`px-4 py-3 text-sm font-semibold transition-colors border-b-2 whitespace-nowrap ${activeTab === 'cierre' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>Costos y Cierre</button>
+                </div>
+                {onCancel && (
+                    <Button type="button" variant="ghost" size="sm" onClick={onCancel} className="mb-2 mr-2 text-muted-foreground hover:text-foreground">
+                        Cancelar
+                    </Button>
+                )}
             </div>
 
             {error && (
