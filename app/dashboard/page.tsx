@@ -11,6 +11,8 @@ import { UserManagement } from '@/components/UserManagement'
 import { UsersList } from '@/components/UsersList'
 import { VehiclesList } from '@/components/VehiclesList'
 import { TutorialsList } from '@/components/TutorialsList'
+import { TrailersTable } from '@/components/TrailersTable'
+import { TrailerForm } from '@/components/TrailerForm'
 import { Sidebar, type Section } from '@/components/Sidebar'
 import { UpdatesNotification } from '@/components/UpdatesNotification'
 import { UpdatesManagement } from '@/components/UpdatesManagement'
@@ -25,6 +27,8 @@ export default function DashboardPage() {
   const [activeSection, setActiveSection] = useState<Section>('dashboard')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showNewPaymentForm, setShowNewPaymentForm] = useState(false)
+  const [showNewTrailerForm, setShowNewTrailerForm] = useState(false)
+  const [trailerToEdit, setTrailerToEdit] = useState<any>(null)
   const [isDeveloper, setIsDeveloper] = useState(false)
   const [isAdminUser, setIsAdminUser] = useState(false)
   const [canCreate, setCanCreate] = useState(false)
@@ -38,15 +42,15 @@ export default function DashboardPage() {
         router.push('/login')
       } else {
         setUser(user)
-        
+
         // Verificar si es developer
         const profile = await getCurrentUserProfile()
         setIsDeveloper(profile?.role === 'developer')
-        
+
         // Verificar admin
         const adminStatus = await isAdmin()
         setIsAdminUser(adminStatus)
-        
+
         // Obtener permisos
         const permissions = await getUserPermissions()
         setCanCreate(permissions.can_create)
@@ -105,7 +109,7 @@ export default function DashboardPage() {
                   </svg>
                 )}
               </Button>
-              
+
               <div className="relative w-10 h-10">
                 <Image
                   src="/logo.png"
@@ -119,7 +123,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-white/70">Eemerson SAC</p>
               </div>
             </div>
-            
+
             {/* Separador y mensaje de bienvenida */}
             <div className="flex items-center gap-4">
               <div className="h-8 w-px bg-white/30"></div>
@@ -169,7 +173,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   {canCreate && !showNewPaymentForm && (
-                    <Button 
+                    <Button
                       onClick={() => setShowNewPaymentForm(true)}
                       size="lg"
                       className="shadow-md hover:shadow-lg transition-shadow"
@@ -188,8 +192,8 @@ export default function DashboardPage() {
                         <h3 className="text-xl font-semibold text-primary">Nuevo Registro de Pago</h3>
                         <p className="text-sm text-muted-foreground">Complete el formulario para registrar un nuevo pago</p>
                       </div>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         onClick={() => setShowNewPaymentForm(false)}
                       >
                         Cancelar
@@ -201,6 +205,70 @@ export default function DashboardPage() {
 
                 {/* Tabla de pagos */}
                 <PaymentsTable refresh={refresh} />
+              </div>
+            )}
+
+            {activeSection === 'trailers' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Car className="h-6 w-6 text-primary" />
+                    <div>
+                      <h2 className="text-2xl font-bold text-primary">Gestión de Trailers</h2>
+                      <p className="text-muted-foreground">Visualiza y gestiona los servicios de trailers y contenedores</p>
+                    </div>
+                  </div>
+                  {canCreate && !showNewTrailerForm && (
+                    <Button
+                      onClick={() => setShowNewTrailerForm(true)}
+                      size="lg"
+                      className="shadow-md hover:shadow-lg transition-shadow"
+                    >
+                      <PlusCircle className="h-5 w-5 mr-2" />
+                      Nuevo servicio
+                    </Button>
+                  )}
+                </div>
+
+                {(showNewTrailerForm || trailerToEdit) && canCreate && (
+                  <div className="bg-card border rounded-lg p-6 shadow-md mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-xl font-semibold text-primary">
+                          {trailerToEdit ? 'Editar Servicio de Trailer' : 'Nuevo Servicio de Trailer'}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">Complete todos los datos logísticos y de servicio</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowNewTrailerForm(false)
+                          setTrailerToEdit(null)
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                    <TrailerForm
+                      initialData={trailerToEdit}
+                      onSuccess={() => {
+                        setRefresh(prev => prev + 1)
+                        setShowNewTrailerForm(false)
+                        setTrailerToEdit(null)
+                      }}
+                    />
+                  </div>
+                )}
+
+                {!showNewTrailerForm && !trailerToEdit && (
+                  <TrailersTable
+                    refresh={refresh}
+                    onEdit={(record) => {
+                      setTrailerToEdit(record)
+                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
+                  />
+                )}
               </div>
             )}
 
