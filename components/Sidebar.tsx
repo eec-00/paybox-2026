@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils'
 import { FileText, UserCog, Car, LayoutDashboard, Megaphone } from 'lucide-react'
 
-export type Section = 'dashboard' | 'pagos' | 'vehiculos' | 'tutoriales' | 'administracion' | 'updates'
+export type Section = 'dashboard' | 'pagos' | 'trailers' | 'vehiculos' | 'tutoriales' | 'administracion' | 'updates'
 
 interface SidebarProps {
   activeSection: Section
@@ -13,10 +13,10 @@ interface SidebarProps {
   collapsed?: boolean
 }
 
-export function Sidebar({ 
-  activeSection, 
-  onSectionChange, 
-  isAdmin = false, 
+export function Sidebar({
+  activeSection,
+  onSectionChange,
+  isAdmin = false,
   canCreate = true,
   collapsed = false
 }: SidebarProps) {
@@ -34,6 +34,14 @@ export function Sidebar({
       label: 'Pagos',
       icon: FileText,
       description: 'Ver y registrar pagos',
+      adminOnly: false,
+      requiresCreate: false
+    },
+    {
+      id: 'trailers' as Section,
+      label: 'Trailers',
+      icon: Car,
+      description: 'Gestión de Trailers',
       adminOnly: false,
       requiresCreate: false
     },
@@ -102,11 +110,11 @@ export function Sidebar({
               )}
             >
               <Icon className={cn(
-                "h-5 w-5 shrink-0", 
+                "h-5 w-5 shrink-0",
                 !collapsed && "mt-0",
                 isActive && "text-secondary-foreground"
               )} />
-              
+
               {!collapsed && (
                 <div className="text-left">
                   <div className={cn("font-medium text-sm", isActive && "text-secondary-foreground")}>
