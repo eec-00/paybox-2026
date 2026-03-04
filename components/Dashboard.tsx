@@ -7,38 +7,50 @@ import { FileText, DollarSign, TrendingUp, Calendar, CreditCard, User, PieChart 
 
 interface DashboardStats {
   totalPayments: number
-  totalAmount: number
-  monthlyTotal: number
+  // Soles
+  totalAmountSoles: number
+  monthlyTotalSoles: number
+  userAmountSoles: number
+  // Dólares
+  totalAmountDolares: number
+  monthlyTotalDolares: number
+  userAmountDolares: number
+  // Counts
   userPayments: number
-  userAmount: number
   todayPayments: number
 }
 
 interface PaymentsByMethod {
   method: string
   count: number
-  amount: number
+  amountSoles: number
+  amountDolares: number
 }
 
 interface PaymentsByCategory {
   category: string
   count: number
-  amount: number
+  amountSoles: number
+  amountDolares: number
 }
 
 interface DailyTrend {
   date: string
   count: number
-  amount: number
+  amountSoles: number
+  amountDolares: number
 }
 
 export function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     totalPayments: 0,
-    totalAmount: 0,
-    monthlyTotal: 0,
+    totalAmountSoles: 0,
+    monthlyTotalSoles: 0,
+    userAmountSoles: 0,
+    totalAmountDolares: 0,
+    monthlyTotalDolares: 0,
+    userAmountDolares: 0,
     userPayments: 0,
-    userAmount: 0,
     todayPayments: 0
   })
   const [paymentsByMethod, setPaymentsByMethod] = useState<PaymentsByMethod[]>([])
@@ -49,14 +61,11 @@ export function Dashboard() {
 
   const fetchStats = useCallback(async () => {
     try {
-      // Obtener usuario actual
       const { data: { user } } = await supabase.auth.getUser()
 
-      // Fecha actual e inicio del mes
       const today = new Date().toISOString().split('T')[0]
       const currentMonth = new Date().toISOString().slice(0, 7)
 
-      // Obtener todos los pagos
       const { data: payments, error: paymentsError } = await supabase
         .from('registros')
         .select('*')
@@ -67,7 +76,6 @@ export function Dashboard() {
         throw paymentsError
       }
 
-      // Obtener todas las categorías
       const { data: categories, error: categoriesError } = await supabase
         .from('categorias')
         .select('*')
@@ -76,72 +84,96 @@ export function Dashboard() {
         console.error('Error en consulta de categorías:', categoriesError)
       }
 
-      // Crear mapa de categorías para lookup rápido
       const categoriesMap = new Map(
         categories?.map(c => [c.id, c.categoria_nombre]) || []
       )
 
-      // Enriquecer payments con nombre de categoría
       const enrichedPayments = payments?.map(p => ({
         ...p,
         categoria_nombre: categoriesMap.get(p.categoria_id) || 'Sin categoría'
       })) || []
 
-      // Calcular estadísticas generales
-      const totalAmount = enrichedPayments.reduce((sum, p) => sum + (p.monto || 0), 0)
-      const monthlyPayments = enrichedPayments.filter(p => 
+      // Helper: separar monto por moneda
+      const isSoles = (p: any) => !p.moneda || p.moneda === 'soles'
+      const isDolares = (p: any) => p.moneda === 'dolares'
+
+      // Totales globales
+      const totalAmountSoles = enrichedPayments
+        .filter(isSoles)
+        .reduce((sum, p) => sum + (p.monto || 0), 0)
+      const totalAmountDolares = enrichedPayments
+        .filter(isDolares)
+        .reduce((sum, p) => sum + (p.monto || 0), 0)
+
+      // Totales mensuales
+      const monthlyPayments = enrichedPayments.filter(p =>
         p.fecha_y_hora_pago?.startsWith(currentMonth)
       )
-      const monthlyTotal = monthlyPayments.reduce((sum, p) => sum + (p.monto || 0), 0)
-      
+      const monthlyTotalSoles = monthlyPayments
+        .filter(isSoles)
+        .reduce((sum, p) => sum + (p.monto || 0), 0)
+      const monthlyTotalDolares = monthlyPayments
+        .filter(isDolares)
+        .reduce((sum, p) => sum + (p.monto || 0), 0)
+
       // Estadísticas del usuario actual
       const userPayments = enrichedPayments.filter(p => p.creado_por === user?.id)
-      const userAmount = userPayments.reduce((sum, p) => sum + (p.monto || 0), 0)
-      
+      const userAmountSoles = userPayments
+        .filter(isSoles)
+        .reduce((sum, p) => sum + (p.monto || 0), 0)
+      const userAmountDolares = userPayments
+        .filter(isDolares)
+        .reduce((sum, p) => sum + (p.monto || 0), 0)
+
       // Pagos de hoy
-      const todayPaymentsCount = enrichedPayments.filter(p => 
+      const todayPaymentsCount = enrichedPayments.filter(p =>
         p.fecha_y_hora_pago?.startsWith(today)
       ).length
 
       setStats({
         totalPayments: enrichedPayments.length,
-        totalAmount,
-        monthlyTotal,
+        totalAmountSoles,
+        monthlyTotalSoles,
+        userAmountSoles,
+        totalAmountDolares,
+        monthlyTotalDolares,
+        userAmountDolares,
         userPayments: userPayments.length,
-        userAmount,
         todayPayments: todayPaymentsCount
       })
 
-      // Agrupar por método de pago
-      const methodsMap = new Map<string, { count: number; amount: number }>()
+      // Agrupar por método de pago (separando monedas)
+      const methodsMap = new Map<string, { count: number; amountSoles: number; amountDolares: number }>()
       enrichedPayments.forEach(p => {
         const method = p.metodo_pago || 'Sin especificar'
-        const current = methodsMap.get(method) || { count: 0, amount: 0 }
+        const current = methodsMap.get(method) || { count: 0, amountSoles: 0, amountDolares: 0 }
         methodsMap.set(method, {
           count: current.count + 1,
-          amount: current.amount + (p.monto || 0)
+          amountSoles: current.amountSoles + (isSoles(p) ? (p.monto || 0) : 0),
+          amountDolares: current.amountDolares + (isDolares(p) ? (p.monto || 0) : 0),
         })
       })
       setPaymentsByMethod(
         Array.from(methodsMap.entries())
           .map(([method, data]) => ({ method, ...data }))
-          .sort((a, b) => b.amount - a.amount)
+          .sort((a, b) => (b.amountSoles + b.amountDolares) - (a.amountSoles + a.amountDolares))
       )
 
-      // Top 5 categorías
-      const categoriesAmountMap = new Map<string, { count: number; amount: number }>()
+      // Top 5 categorías (separando monedas)
+      const categoriesAmountMap = new Map<string, { count: number; amountSoles: number; amountDolares: number }>()
       enrichedPayments.forEach(p => {
         const category = p.categoria_nombre
-        const current = categoriesAmountMap.get(category) || { count: 0, amount: 0 }
+        const current = categoriesAmountMap.get(category) || { count: 0, amountSoles: 0, amountDolares: 0 }
         categoriesAmountMap.set(category, {
           count: current.count + 1,
-          amount: current.amount + (p.monto || 0)
+          amountSoles: current.amountSoles + (isSoles(p) ? (p.monto || 0) : 0),
+          amountDolares: current.amountDolares + (isDolares(p) ? (p.monto || 0) : 0),
         })
       })
       setTopCategories(
         Array.from(categoriesAmountMap.entries())
           .map(([category, data]) => ({ category, ...data }))
-          .sort((a, b) => b.amount - a.amount)
+          .sort((a, b) => (b.amountSoles + b.amountDolares) - (a.amountSoles + a.amountDolares))
           .slice(0, 3)
       )
 
@@ -153,13 +185,14 @@ export function Dashboard() {
       })
 
       const trends = last7Days.map(date => {
-        const dayPayments = enrichedPayments.filter(p => 
+        const dayPayments = enrichedPayments.filter(p =>
           p.fecha_y_hora_pago?.startsWith(date)
         )
         return {
           date,
           count: dayPayments.length,
-          amount: dayPayments.reduce((sum, p) => sum + (p.monto || 0), 0)
+          amountSoles: dayPayments.filter(isSoles).reduce((sum, p) => sum + (p.monto || 0), 0),
+          amountDolares: dayPayments.filter(isDolares).reduce((sum, p) => sum + (p.monto || 0), 0),
         }
       })
       setWeeklyTrend(trends)
@@ -199,6 +232,8 @@ export function Dashboard() {
     )
   }
 
+  const hasDolares = stats.totalAmountDolares > 0
+
   return (
     <div className="space-y-6">
       <div>
@@ -206,50 +241,54 @@ export function Dashboard() {
         <p className="text-muted-foreground">Resumen general del sistema de gestión de pagos</p>
       </div>
 
-      {/* Grid de tarjetas estadísticas principales - Solo las más importantes */}
+      {/* Tarjetas principales */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* Total de Registros */}
         <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-primary">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Registros
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Total Registros</CardTitle>
             <FileText className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalPayments}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              En el sistema
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">En el sistema</p>
           </CardContent>
         </Card>
 
-        {/* Monto Total */}
+        {/* Monto Total en Soles */}
         <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-green-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Monto Total
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Monto Total</CardTitle>
             <DollarSign className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">S/ {stats.totalAmount.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Todos los pagos
-            </p>
+            <div className="text-2xl font-bold">
+              S/ {stats.totalAmountSoles.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            {hasDolares && (
+              <div className="text-sm font-semibold text-amber-600 mt-1">
+                $ {stats.totalAmountDolares.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">Todos los pagos</p>
           </CardContent>
         </Card>
 
-        {/* Total del Mes */}
+        {/* Mes Actual */}
         <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Mes Actual
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Mes Actual</CardTitle>
             <Calendar className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">S/ {stats.monthlyTotal.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-2xl font-bold">
+              S/ {stats.monthlyTotalSoles.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            {hasDolares && stats.monthlyTotalDolares > 0 && (
+              <div className="text-sm font-semibold text-amber-600 mt-1">
+                $ {stats.monthlyTotalDolares.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground mt-1">
               {new Date().toLocaleDateString('es-PE', { month: 'long' })}
             </p>
@@ -259,21 +298,24 @@ export function Dashboard() {
         {/* Mis Registros */}
         <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-secondary">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Mis Registros
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Mis Registros</CardTitle>
             <User className="h-4 w-4 text-secondary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.userPayments}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              S/ {stats.userAmount.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
+              S/ {stats.userAmountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
+              {hasDolares && stats.userAmountDolares > 0 && (
+                <span className="text-amber-600 ml-1">
+                  · $ {stats.userAmountDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
+                </span>
+              )}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Grid de información detallada - Simplificado */}
+      {/* Grid de información detallada */}
       <div className="grid gap-6 md:grid-cols-2">
         {/* Distribución por Método de Pago */}
         <Card>
@@ -289,31 +331,53 @@ export function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {paymentsByMethod.slice(0, 5).map((method, index) => {
-                const maxAmount = paymentsByMethod[0]?.amount || 1
-                const percentage = (method.amount / maxAmount) * 100
-                
+                const maxSoles = paymentsByMethod[0]?.amountSoles || 1
+                const maxDolares = Math.max(...paymentsByMethod.map(m => m.amountDolares), 1)
+                const percentageSoles = (method.amountSoles / maxSoles) * 100
+                const percentageDolares = (method.amountDolares / maxDolares) * 100
+
+                const barColors = [
+                  'bg-primary',
+                  'bg-secondary',
+                  'bg-green-500',
+                  'bg-blue-500',
+                  'bg-purple-500',
+                ]
+
                 return (
-                  <div key={index} className="space-y-2">
+                  <div key={index} className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">{method.method}</span>
                       <span className="text-muted-foreground">{method.count} pagos</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-muted rounded-full h-2">
-                        <div 
-                          className={`h-2 rounded-full transition-all ${
-                            index === 0 ? 'bg-primary' :
-                            index === 1 ? 'bg-secondary' :
-                            index === 2 ? 'bg-green-500' :
-                            index === 3 ? 'bg-blue-500' : 'bg-purple-500'
-                          }`}
-                          style={{ width: `${percentage}%` }}
-                        ></div>
+                    {/* Barra soles */}
+                    {method.amountSoles > 0 && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-muted rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${barColors[index]}`}
+                            style={{ width: `${percentageSoles}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-bold min-w-[5rem] text-right">
+                          S/ {method.amountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
+                        </span>
                       </div>
-                      <span className="text-sm font-bold min-w-20 text-right">
-                        S/ {method.amount.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
-                      </span>
-                    </div>
+                    )}
+                    {/* Barra dólares */}
+                    {method.amountDolares > 0 && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-muted rounded-full h-2">
+                          <div
+                            className="h-2 rounded-full transition-all bg-amber-400"
+                            style={{ width: `${percentageDolares}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-bold min-w-[5rem] text-right text-amber-600">
+                          $ {method.amountDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -323,6 +387,20 @@ export function Dashboard() {
                 </p>
               )}
             </div>
+
+            {/* Leyenda de monedas */}
+            {hasDolares && (
+              <div className="flex items-center gap-4 mt-4 pt-3 border-t text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded-full bg-primary"></span>
+                  Soles (S/)
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded-full bg-amber-400"></span>
+                  Dólares ($)
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -340,11 +418,13 @@ export function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {topCategories.map((cat, index) => {
-                const maxAmount = topCategories[0]?.amount || 1
-                const percentage = (cat.amount / maxAmount) * 100
-                
+                const maxSoles = topCategories[0]?.amountSoles || 1
+                const maxDolares = Math.max(...topCategories.map(c => c.amountDolares), 1)
+                const percentageSoles = (cat.amountSoles / maxSoles) * 100
+                const percentageDolares = (cat.amountDolares / maxDolares) * 100
+
                 return (
-                  <div key={index} className="space-y-2">
+                  <div key={index} className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <span className="text-xs font-bold text-muted-foreground">#{index + 1}</span>
@@ -354,17 +434,34 @@ export function Dashboard() {
                       </div>
                       <span className="text-muted-foreground whitespace-nowrap ml-2">{cat.count} registros</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-muted rounded-full h-2">
-                        <div 
-                          className="bg-linear-to-r from-primary to-secondary h-2 rounded-full transition-all"
-                          style={{ width: `${percentage}%` }}
-                        ></div>
+                    {/* Barra soles */}
+                    {cat.amountSoles > 0 && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-muted rounded-full h-2">
+                          <div
+                            className="bg-linear-to-r from-primary to-secondary h-2 rounded-full transition-all"
+                            style={{ width: `${percentageSoles}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-bold min-w-[5rem] text-right">
+                          S/ {cat.amountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
+                        </span>
                       </div>
-                      <span className="text-sm font-bold min-w-20 text-right">
-                        S/ {cat.amount.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
-                      </span>
-                    </div>
+                    )}
+                    {/* Barra dólares */}
+                    {cat.amountDolares > 0 && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-muted rounded-full h-2">
+                          <div
+                            className="h-2 rounded-full transition-all bg-amber-400"
+                            style={{ width: `${percentageDolares}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-bold min-w-[5rem] text-right text-amber-600">
+                          $ {cat.amountDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -374,11 +471,25 @@ export function Dashboard() {
                 </p>
               )}
             </div>
+
+            {/* Leyenda de monedas */}
+            {hasDolares && (
+              <div className="flex items-center gap-4 mt-4 pt-3 border-t text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded-full bg-primary"></span>
+                  Soles (S/)
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded-full bg-amber-400"></span>
+                  Dólares ($)
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Tendencia Semanal - Simplificada y más compacta */}
+      {/* Tendencia Semanal */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -395,19 +506,22 @@ export function Dashboard() {
               const date = new Date(day.date)
               const dayName = date.toLocaleDateString('es-PE', { weekday: 'short' })
               const dayNum = date.getDate()
-              const maxAmount = Math.max(...weeklyTrend.map(d => d.amount), 1)
-              const heightPercentage = (day.amount / maxAmount) * 100
-              
+              const maxAmount = Math.max(...weeklyTrend.map(d => d.amountSoles + d.amountDolares), 1)
+              const totalDay = day.amountSoles + day.amountDolares
+              const heightPercentage = (totalDay / maxAmount) * 100
+
               return (
                 <div key={index} className="flex flex-col items-center gap-2">
                   <div className="h-32 w-full flex items-end justify-center">
-                    <div 
+                    <div
                       className="w-full bg-linear-to-r from-primary to-secondary rounded-t-md transition-all hover:opacity-80 relative group"
                       style={{ height: `${Math.max(heightPercentage, 8)}%` }}
-                      title={`${day.count} pagos - S/ ${day.amount.toLocaleString('es-PE', { maximumFractionDigits: 0 })}`}
+                      title={`${day.count} pagos · S/ ${day.amountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}${day.amountDolares > 0 ? ` · $ ${day.amountDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}` : ''}`}
                     >
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-                        {day.count} pagos
+                      <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                        <div>{day.count} pagos</div>
+                        {day.amountSoles > 0 && <div>S/ {day.amountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}</div>}
+                        {day.amountDolares > 0 && <div className="text-amber-300">$ {day.amountDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}</div>}
                       </div>
                     </div>
                   </div>
