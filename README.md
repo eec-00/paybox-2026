@@ -1,4 +1,4 @@
-# PayBox - Sistema de Gestión de Gastos
+# PayBox - Sistema de Gestión de Gastos.
 
 ## 🆕 NUEVA FUNCIONALIDAD: Sistema OCR con Soporte para PDFs
 
