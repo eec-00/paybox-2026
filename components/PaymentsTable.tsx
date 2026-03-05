@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { Eye, Pencil, Trash2, Download, Filter } from 'lucide-react'
+import { Eye, Pencil, Trash2, Download, Filter, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { getUserPermissions, isAdmin } from '@/lib/utils/auth'
 import type { Registro } from '@/lib/types/database.types'
 import { format } from 'date-fns'
@@ -30,13 +31,20 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
   const [filtroExportacion, setFiltroExportacion] = useState<'todos' | 'pendientes' | 'exportados'>('todos')
   const [exporting, setExporting] = useState(false)
   const [estadisticas, setEstadisticas] = useState({ pendientes: 0, exportados: 0, total: 0 })
+
+  // Estados para paginación y filtros
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const PAGE_SIZE = 20
   const supabase = createClient()
 
   useEffect(() => {
     loadUser()
     loadRegistros()
     loadEstadisticas()
-  }, [refresh, filtroExportacion])
+  }, [refresh, filtroExportacion, currentPage, startDate, endDate])
 
   const loadUser = async () => {
     try {
@@ -54,10 +62,12 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
   const loadRegistros = async () => {
     setLoading(true)
     try {
-      console.log('🔄 Cargando registros...')
-      
-      // Consultar directamente a Supabase sin Edge Functions
-      const { data: registros, error } = await supabase
+      console.log('🔄 Cargando registros (Página:', currentPage, ')...')
+
+      const from = (currentPage - 1) * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
+
+      let query = supabase
         .from('registros')
         .select(`
           *,
@@ -67,59 +77,58 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
             categoria_nombre,
             ejes_obligatorios
           )
-        `)
-        .order('created_at', { ascending: false })
+        `, { count: 'exact' })
+
+      // Aplicar filtros de exportación
+      if (filtroExportacion === 'pendientes') {
+        query = query.or('exportado_a_odoo.eq.false,exportado_a_odoo.is.null')
+      } else if (filtroExportacion === 'exportados') {
+        query = query.eq('exportado_a_odoo', true)
+      }
+
+      // Aplicar filtros de fecha
+      if (startDate) {
+        query = query.gte('fecha_y_hora_pago', startDate)
+      }
+      if (endDate) {
+        // Añadir 23:59:59 a la fecha final para incluir todo el día
+        query = query.lte('fecha_y_hora_pago', `${endDate}T23:59:59`)
+      }
+
+      const { data: registros, error, count } = await query
+        .order('fecha_y_hora_pago', { ascending: false })
+        .range(from, to)
 
       if (error) {
         console.error('❌ Error en query de registros:', error)
         throw error
       }
 
-      console.log('✅ Registros cargados:', registros?.length || 0)
+      setTotalRecords(count || 0)
+      console.log('✅ Registros cargados:', registros?.length || 0, 'Total:', count)
 
       // Obtener nombres desde user_profiles usando creado_por
       if (registros && registros.length > 0) {
         const userIds = [...new Set(registros.map(r => r.creado_por))]
-        console.log('👥 Consultando perfiles para:', userIds.length, 'usuarios')
-        
+
         const { data: profiles, error: profileError } = await supabase
           .from('user_profiles')
           .select('id, full_name')
           .in('id', userIds)
-        
-        if (profileError) {
-          console.error('⚠️ Error al cargar perfiles (continuando sin nombres):', profileError)
-          // Continuar sin nombres en lugar de fallar
-          const registrosSinNombres = registros.map(r => ({
-            ...r,
-            nombre_usuario: 'Usuario desconocido'
-          }))
-          setRegistros(registrosSinNombres)
-          return
-        }
-        
-        console.log('✅ Perfiles cargados:', profiles?.length || 0)
-        
-        if (profiles) {
-          const profileMap = new Map(profiles.map(p => [p.id, p.full_name]))
-          
-          const registrosConNombres = registros.map(r => ({
-            ...r,
-            nombre_usuario: profileMap.get(r.creado_por) || 'Usuario desconocido'
-          }))
-          
-          setRegistros(registrosConNombres)
-          console.log('✅ Registros con nombres asignados')
-          return
-        }
-      }
 
-      console.log('ℹ️ No hay registros o están vacíos')
-      setRegistros(registros || [])
+        const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || [])
+
+        const registrosConNombres = registros.map(r => ({
+          ...r,
+          nombre_usuario: profileMap.get(r.creado_por) || 'Usuario desconocido'
+        }))
+
+        setRegistros(registrosConNombres)
+      } else {
+        setRegistros([])
+      }
     } catch (error: any) {
       console.error('❌ Error al cargar registros:', error)
-      console.error('❌ Stack:', error?.stack)
-      console.error('❌ Message:', error?.message)
     } finally {
       setLoading(false)
     }
@@ -250,27 +259,75 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
               )}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 bg-secondary/5 p-1 rounded-md border">
+              <div className="flex items-center gap-1 px-2">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Desde:</span>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value)
+                    setCurrentPage(1)
+                  }}
+                  className="h-8 w-[130px] text-xs"
+                />
+              </div>
+              <div className="h-6 w-[1px] bg-border" />
+              <div className="flex items-center gap-1 px-2">
+                <span className="text-xs font-medium text-muted-foreground">Hasta:</span>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value)
+                    setCurrentPage(1)
+                  }}
+                  className="h-8 w-[130px] text-xs"
+                />
+              </div>
+              {(startDate || endDate) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setStartDate('')
+                    setEndDate('')
+                    setCurrentPage(1)
+                  }}
+                  className="h-8 px-2 text-xs"
+                >
+                  Limpiar
+                </Button>
+              )}
+            </div>
+
             <Select value={filtroExportacion} onValueChange={(value) => {
               if (value === 'todos' || value === 'pendientes' || value === 'exportados') {
                 setFiltroExportacion(value)
+                setCurrentPage(1)
               }
             }}>
-              <SelectTrigger className="w-[180px]">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue />
+              <SelectTrigger className="w-[150px] h-9">
+                <div className="flex items-center">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue />
+                </div>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="pendientes">Pendientes</SelectItem>
+                <SelectItem value="todos">Todos los estados</SelectItem>
+                <SelectItem value="pendientes">Pendientes exportar</SelectItem>
                 <SelectItem value="exportados">Exportados</SelectItem>
               </SelectContent>
             </Select>
-            <Button 
-              onClick={handleExport} 
+
+            <Button
+              onClick={handleExport}
               disabled={exporting || !estadisticas || estadisticas.pendientes === 0}
               variant="outline"
               size="sm"
+              className="h-9"
             >
               <Download className="h-4 w-4 mr-2" />
               {exporting ? 'Exportando...' : 'Exportar a Odoo'}
@@ -345,175 +402,175 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="max-w-[95vw] lg:max-w-[1400px] max-h-[95vh] overflow-y-auto">
-                          <DialogHeader className="pb-4 border-b">
-                            <DialogTitle className="text-2xl text-primary">Detalles del Registro</DialogTitle>
-                            <DialogDescription className="text-base">
-                              Información completa del comprobante
-                            </DialogDescription>
-                          </DialogHeader>
-                          {selectedRegistro && (
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-4">
-                              {/* Columna Izquierda: Información del registro */}
-                              <div className="lg:col-span-2 space-y-6">
-                                {/* Datos Generales */}
-                                <div className="bg-secondary/5 rounded-lg p-6">
-                                  <h3 className="font-semibold text-lg text-secondary mb-4 flex items-center gap-2">
-                                    <span className="w-1 h-6 bg-secondary rounded"></span>
-                                    Datos Generales
-                                  </h3>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                                    <div className="space-y-1">
-                                      <span className="text-xs text-muted-foreground uppercase tracking-wide">Subido por</span>
-                                      <p className="font-semibold text-base">{selectedRegistro.nombre_usuario || 'Usuario desconocido'}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <span className="text-xs text-muted-foreground uppercase tracking-wide">Fecha y Hora de Pago</span>
-                                      <p className="font-semibold text-base">{formatDateTime(selectedRegistro.fecha_y_hora_pago)}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <span className="text-xs text-muted-foreground uppercase tracking-wide">Beneficiario</span>
-                                      <p className="font-semibold text-base">{selectedRegistro.beneficiario}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <span className="text-xs text-muted-foreground uppercase tracking-wide">Monto</span>
-                                      <p className="font-bold text-2xl text-primary">
-                                        {formatCurrency(selectedRegistro.monto, selectedRegistro.moneda)}
-                                      </p>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <span className="text-xs text-muted-foreground uppercase tracking-wide">Método de Pago</span>
-                                      <p className="font-semibold text-base">{selectedRegistro.metodo_pago}</p>
-                                    </div>
-                                    {selectedRegistro.banco_cuenta && (
-                                      <div className="space-y-1">
-                                        <span className="text-xs text-muted-foreground uppercase tracking-wide">Banco/Cuenta</span>
-                                        <p className="font-semibold text-base">{selectedRegistro.banco_cuenta}</p>
-                                      </div>
-                                    )}
-                                    {selectedRegistro.tipo_documento && (
-                                      <div className="space-y-1">
-                                        <span className="text-xs text-muted-foreground uppercase tracking-wide">Tipo de Documento</span>
-                                        <p className="font-semibold text-base capitalize">
-                                          {selectedRegistro.tipo_documento}
-                                        </p>
-                                      </div>
-                                    )}
-                                    {selectedRegistro.numero_documento && (
-                                      <div className="space-y-1">
-                                        <span className="text-xs text-muted-foreground uppercase tracking-wide">Número de Documento</span>
-                                        <p className="font-semibold text-base">{selectedRegistro.numero_documento}</p>
-                                      </div>
-                                    )}
-                                    {selectedRegistro.ruc && (
-                                      <div className="space-y-1">
-                                        <span className="text-xs text-muted-foreground uppercase tracking-wide">RUC del Emisor</span>
-                                        <p className="font-semibold text-base font-mono">{selectedRegistro.ruc}</p>
-                                      </div>
-                                    )}
-                                    <div className="space-y-1">
-                                      <span className="text-xs text-muted-foreground uppercase tracking-wide">Categoría</span>
-                                      <p className="font-semibold text-base text-secondary">
-                                        {selectedRegistro.categoria?.categoria_id_texto}
-                                      </p>
-                                      <p className="text-sm text-muted-foreground">{selectedRegistro.categoria?.categoria_nombre}</p>
-                                    </div>
-                                    {selectedRegistro.descripcion && (
-                                      <div className="md:col-span-2 space-y-1">
-                                        <span className="text-xs text-muted-foreground uppercase tracking-wide">Descripción / Concepto</span>
-                                        <p className="font-medium text-base leading-relaxed p-3 bg-white rounded border">
-                                          {selectedRegistro.descripcion}
-                                        </p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Datos Dinámicos */}
-                                {selectedRegistro.datos_dinamicos && Object.keys(selectedRegistro.datos_dinamicos).length > 0 && (
-                                  <div className="bg-primary/5 rounded-lg p-6">
-                                    <h3 className="font-semibold text-lg text-primary mb-4 flex items-center gap-2">
-                                      <span className="w-1 h-6 bg-primary rounded"></span>
-                                      Datos Específicos de la Categoría
-                                    </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                                      {Object.entries(selectedRegistro.datos_dinamicos).map(([key, value]) => (
-                                        <div key={key} className="space-y-1">
-                                          <span className="text-xs text-muted-foreground uppercase tracking-wide">{key}</span>
-                                          <p className="font-semibold text-base">{String(value)}</p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Metadata */}
-                                <div className="bg-muted/30 rounded-lg p-4">
-                                  <h3 className="font-semibold text-muted-foreground mb-2 text-sm uppercase tracking-wide">
-                                    Información del Sistema
-                                  </h3>
-                                  <div className="text-sm text-muted-foreground space-y-1">
-                                    <p className="flex items-center gap-2">
-                                      <span className="font-medium">ID:</span> 
-                                      <span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedRegistro.id}</span>
-                                    </p>
-                                    {selectedRegistro.created_at && (
-                                      <p className="flex items-center gap-2">
-                                        <span className="font-medium">Creado:</span>
-                                        <span>{format(new Date(selectedRegistro.created_at), 'dd/MM/yyyy HH:mm')}</span>
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Columna Derecha: Comprobantes */}
-                              <div className="lg:col-span-1">
-                                {selectedRegistro.comprobantes && selectedRegistro.comprobantes.length > 0 && (
-                                  <div className="bg-white rounded-lg border shadow-sm p-6 sticky top-4">
+                            <DialogHeader className="pb-4 border-b">
+                              <DialogTitle className="text-2xl text-primary">Detalles del Registro</DialogTitle>
+                              <DialogDescription className="text-base">
+                                Información completa del comprobante
+                              </DialogDescription>
+                            </DialogHeader>
+                            {selectedRegistro && (
+                              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 py-4">
+                                {/* Columna Izquierda: Información del registro */}
+                                <div className="lg:col-span-2 space-y-6">
+                                  {/* Datos Generales */}
+                                  <div className="bg-secondary/5 rounded-lg p-6">
                                     <h3 className="font-semibold text-lg text-secondary mb-4 flex items-center gap-2">
                                       <span className="w-1 h-6 bg-secondary rounded"></span>
-                                      Comprobantes
+                                      Datos Generales
                                     </h3>
-                                    <div className="space-y-4">
-                                      {selectedRegistro.comprobantes.map((url, index) => (
-                                        <div key={index} className="relative group">
-                                          <div className="relative overflow-hidden rounded-lg border-2 border-secondary/20 shadow-md hover:shadow-xl transition-all hover:border-secondary/40">
-                                            <div className="aspect-[3/4] relative">
-                                              <img
-                                                src={url}
-                                                alt={`Comprobante ${index + 1}`}
-                                                className="w-full h-full object-contain bg-gray-50 transition-transform group-hover:scale-105"
-                                                onError={(e) => {
-                                                  const target = e.target as HTMLImageElement
-                                                  target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23f5f5f5" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em" font-size="12"%3EImagen no disponible%3C/text%3E%3C/svg%3E'
-                                                }}
-                                              />
-                                            </div>
-                                            {index === 0 && (
-                                              <div className="absolute top-3 left-3 bg-gradient-to-r from-secondary to-secondary/80 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
-                                                📄 Principal
-                                              </div>
-                                            )}
-                                          </div>
-                                          <a
-                                            href={url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="mt-3 flex items-center justify-center gap-2 text-sm text-secondary hover:text-secondary/80 font-semibold hover:underline transition-colors"
-                                          >
-                                            <Eye className="h-4 w-4" />
-                                            Ver en tamaño completo
-                                          </a>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                      <div className="space-y-1">
+                                        <span className="text-xs text-muted-foreground uppercase tracking-wide">Subido por</span>
+                                        <p className="font-semibold text-base">{selectedRegistro.nombre_usuario || 'Usuario desconocido'}</p>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <span className="text-xs text-muted-foreground uppercase tracking-wide">Fecha y Hora de Pago</span>
+                                        <p className="font-semibold text-base">{formatDateTime(selectedRegistro.fecha_y_hora_pago)}</p>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <span className="text-xs text-muted-foreground uppercase tracking-wide">Beneficiario</span>
+                                        <p className="font-semibold text-base">{selectedRegistro.beneficiario}</p>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <span className="text-xs text-muted-foreground uppercase tracking-wide">Monto</span>
+                                        <p className="font-bold text-2xl text-primary">
+                                          {formatCurrency(selectedRegistro.monto, selectedRegistro.moneda)}
+                                        </p>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <span className="text-xs text-muted-foreground uppercase tracking-wide">Método de Pago</span>
+                                        <p className="font-semibold text-base">{selectedRegistro.metodo_pago}</p>
+                                      </div>
+                                      {selectedRegistro.banco_cuenta && (
+                                        <div className="space-y-1">
+                                          <span className="text-xs text-muted-foreground uppercase tracking-wide">Banco/Cuenta</span>
+                                          <p className="font-semibold text-base">{selectedRegistro.banco_cuenta}</p>
                                         </div>
-                                      ))}
+                                      )}
+                                      {selectedRegistro.tipo_documento && (
+                                        <div className="space-y-1">
+                                          <span className="text-xs text-muted-foreground uppercase tracking-wide">Tipo de Documento</span>
+                                          <p className="font-semibold text-base capitalize">
+                                            {selectedRegistro.tipo_documento}
+                                          </p>
+                                        </div>
+                                      )}
+                                      {selectedRegistro.numero_documento && (
+                                        <div className="space-y-1">
+                                          <span className="text-xs text-muted-foreground uppercase tracking-wide">Número de Documento</span>
+                                          <p className="font-semibold text-base">{selectedRegistro.numero_documento}</p>
+                                        </div>
+                                      )}
+                                      {selectedRegistro.ruc && (
+                                        <div className="space-y-1">
+                                          <span className="text-xs text-muted-foreground uppercase tracking-wide">RUC del Emisor</span>
+                                          <p className="font-semibold text-base font-mono">{selectedRegistro.ruc}</p>
+                                        </div>
+                                      )}
+                                      <div className="space-y-1">
+                                        <span className="text-xs text-muted-foreground uppercase tracking-wide">Categoría</span>
+                                        <p className="font-semibold text-base text-secondary">
+                                          {selectedRegistro.categoria?.categoria_id_texto}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">{selectedRegistro.categoria?.categoria_nombre}</p>
+                                      </div>
+                                      {selectedRegistro.descripcion && (
+                                        <div className="md:col-span-2 space-y-1">
+                                          <span className="text-xs text-muted-foreground uppercase tracking-wide">Descripción / Concepto</span>
+                                          <p className="font-medium text-base leading-relaxed p-3 bg-white rounded border">
+                                            {selectedRegistro.descripcion}
+                                          </p>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
-                                )}
+
+                                  {/* Datos Dinámicos */}
+                                  {selectedRegistro.datos_dinamicos && Object.keys(selectedRegistro.datos_dinamicos).length > 0 && (
+                                    <div className="bg-primary/5 rounded-lg p-6">
+                                      <h3 className="font-semibold text-lg text-primary mb-4 flex items-center gap-2">
+                                        <span className="w-1 h-6 bg-primary rounded"></span>
+                                        Datos Específicos de la Categoría
+                                      </h3>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                        {Object.entries(selectedRegistro.datos_dinamicos).map(([key, value]) => (
+                                          <div key={key} className="space-y-1">
+                                            <span className="text-xs text-muted-foreground uppercase tracking-wide">{key}</span>
+                                            <p className="font-semibold text-base">{String(value)}</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Metadata */}
+                                  <div className="bg-muted/30 rounded-lg p-4">
+                                    <h3 className="font-semibold text-muted-foreground mb-2 text-sm uppercase tracking-wide">
+                                      Información del Sistema
+                                    </h3>
+                                    <div className="text-sm text-muted-foreground space-y-1">
+                                      <p className="flex items-center gap-2">
+                                        <span className="font-medium">ID:</span>
+                                        <span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedRegistro.id}</span>
+                                      </p>
+                                      {selectedRegistro.created_at && (
+                                        <p className="flex items-center gap-2">
+                                          <span className="font-medium">Creado:</span>
+                                          <span>{format(new Date(selectedRegistro.created_at), 'dd/MM/yyyy HH:mm')}</span>
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Columna Derecha: Comprobantes */}
+                                <div className="lg:col-span-1">
+                                  {selectedRegistro.comprobantes && selectedRegistro.comprobantes.length > 0 && (
+                                    <div className="bg-white rounded-lg border shadow-sm p-6 sticky top-4">
+                                      <h3 className="font-semibold text-lg text-secondary mb-4 flex items-center gap-2">
+                                        <span className="w-1 h-6 bg-secondary rounded"></span>
+                                        Comprobantes
+                                      </h3>
+                                      <div className="space-y-4">
+                                        {selectedRegistro.comprobantes.map((url, index) => (
+                                          <div key={index} className="relative group">
+                                            <div className="relative overflow-hidden rounded-lg border-2 border-secondary/20 shadow-md hover:shadow-xl transition-all hover:border-secondary/40">
+                                              <div className="aspect-[3/4] relative">
+                                                <img
+                                                  src={url}
+                                                  alt={`Comprobante ${index + 1}`}
+                                                  className="w-full h-full object-contain bg-gray-50 transition-transform group-hover:scale-105"
+                                                  onError={(e) => {
+                                                    const target = e.target as HTMLImageElement
+                                                    target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23f5f5f5" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em" font-size="12"%3EImagen no disponible%3C/text%3E%3C/svg%3E'
+                                                  }}
+                                                />
+                                              </div>
+                                              {index === 0 && (
+                                                <div className="absolute top-3 left-3 bg-gradient-to-r from-secondary to-secondary/80 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
+                                                  📄 Principal
+                                                </div>
+                                              )}
+                                            </div>
+                                            <a
+                                              href={url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="mt-3 flex items-center justify-center gap-2 text-sm text-secondary hover:text-secondary/80 font-semibold hover:underline transition-colors"
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                              Ver en tamaño completo
+                                            </a>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </DialogContent>
-                      </Dialog>
+                            )}
+                          </DialogContent>
+                        </Dialog>
 
                         {canEditRegistro(registro) && (
                           <Dialog open={editingRegistro?.id === registro.id} onOpenChange={(open) => {
@@ -582,6 +639,61 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
             </TableBody>
           </Table>
         </div>
+
+        {/* Paginación */}
+        {totalRecords > 0 && (
+          <div className="flex items-center justify-between mt-6 border-t pt-4">
+            <div className="text-sm text-muted-foreground">
+              Mostrando <span className="font-medium text-foreground">{(currentPage - 1) * PAGE_SIZE + 1}</span> a{' '}
+              <span className="font-medium text-foreground">
+                {Math.min(currentPage * PAGE_SIZE, totalRecords)}
+              </span> de{' '}
+              <span className="font-medium text-foreground">{totalRecords}</span> registros
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1 || loading}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Anterior
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, Math.ceil(totalRecords / PAGE_SIZE)) }, (_, i) => {
+                  const pageNum = i + 1
+                  // Lógica simple para mostrar páginas cerca de la actual si hay muchas
+                  // Por ahora solo mostramos hasta 5 páginas para mantenerlo simple
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className="w-9"
+                      disabled={loading}
+                    >
+                      {pageNum}
+                    </Button>
+                  )
+                })}
+                {Math.ceil(totalRecords / PAGE_SIZE) > 5 && (
+                  <span className="text-muted-foreground px-2">...</span>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalRecords / PAGE_SIZE), prev + 1))}
+                disabled={currentPage >= Math.ceil(totalRecords / PAGE_SIZE) || loading}
+              >
+                Siguiente
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
