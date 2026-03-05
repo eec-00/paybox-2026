@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Dashboard } from '@/components/Dashboard'
 import { PaymentForm } from '@/components/PaymentForm'
 import { PaymentsTable } from '@/components/PaymentsTable'
+import { ExportExcelModal } from '@/components/ExportExcelModal'
 import { UserManagement } from '@/components/UserManagement'
 import { UsersList } from '@/components/UsersList'
 import { VehiclesList } from '@/components/VehiclesList'
@@ -19,7 +20,9 @@ import { UpdatesNotification } from '@/components/UpdatesNotification'
 import { UpdatesManagement } from '@/components/UpdatesManagement'
 import { UpdatesList } from '@/components/UpdatesList'
 import { isAdmin, getUserPermissions, getCurrentUserProfile } from '@/lib/utils/auth'
-import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText, Megaphone } from 'lucide-react'
+import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText, Megaphone, Calendar as CalendarIcon, Filter, Search, XCircle } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import Image from 'next/image'
 
 export default function DashboardPage() {
@@ -33,8 +36,45 @@ export default function DashboardPage() {
   const [isDeveloper, setIsDeveloper] = useState(false)
   const [isAdminUser, setIsAdminUser] = useState(false)
   const [canCreate, setCanCreate] = useState(false)
+
+  // Estados de filtros para Pagos
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [catSearch, setCatSearch] = useState('')
+  const [docSearch, setDocSearch] = useState('')
+  const [appliedFilters, setAppliedFilters] = useState({
+    startDate: '',
+    endDate: '',
+    catSearch: '',
+    docSearch: ''
+  })
+
   const router = useRouter()
   const supabase = createClient()
+
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      startDate,
+      endDate,
+      catSearch,
+      docSearch
+    })
+    setRefresh(prev => prev + 1)
+  }
+
+  const handleClearFilters = () => {
+    setStartDate('')
+    setEndDate('')
+    setCatSearch('')
+    setDocSearch('')
+    setAppliedFilters({
+      startDate: '',
+      endDate: '',
+      catSearch: '',
+      docSearch: ''
+    })
+    setRefresh(prev => prev + 1)
+  }
 
   useEffect(() => {
     const checkUser = async () => {
@@ -165,24 +205,100 @@ export default function DashboardPage() {
 
             {activeSection === 'pagos' && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-6 w-6 text-primary" />
+                <div className="flex flex-wrap items-center justify-between gap-4 bg-card/40 p-4 rounded-xl border border-border/50 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <FileText className="h-6 w-6 text-primary" />
+                    </div>
                     <div>
-                      <h2 className="text-2xl font-bold text-primary">Pagos</h2>
-                      <p className="text-muted-foreground">Visualiza y gestiona todos los registros de pagos</p>
+                      <h2 className="text-2xl font-bold text-primary tracking-tight">Pagos</h2>
+                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Historial y gestión de registros</p>
                     </div>
                   </div>
-                  {canCreate && !showNewPaymentForm && (
-                    <Button
-                      onClick={() => setShowNewPaymentForm(true)}
-                      size="lg"
-                      className="shadow-md hover:shadow-lg transition-shadow"
-                    >
-                      <PlusCircle className="h-5 w-5 mr-2" />
-                      Nuevo pago
-                    </Button>
-                  )}
+
+                  {/* ESPACIO APROVECHADO: Filtros integrados */}
+                  <div className="flex-1 flex flex-wrap items-center justify-center gap-3 px-4">
+                    <div className="flex items-center gap-2 bg-background p-1 rounded-lg border border-border shadow-sm">
+                      <div className="flex items-center gap-1.5 px-2">
+                        <CalendarIcon className="h-3.5 w-3.5 text-primary/70" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Desde</span>
+                        <Input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="h-8 w-[125px] text-xs bg-transparent border-none shadow-none focus-visible:ring-0"
+                        />
+                      </div>
+                      <div className="h-4 w-[1px] bg-border/60" />
+                      <div className="flex items-center gap-1.5 px-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Hasta</span>
+                        <Input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="h-8 w-[125px] text-xs bg-transparent border-none shadow-none focus-visible:ring-0"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-background p-1 rounded-lg border border-border shadow-sm">
+                      <div className="flex items-center gap-1.5 px-3">
+                        <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar Categoría..."
+                          value={catSearch}
+                          onChange={(e) => setCatSearch(e.target.value)}
+                          className="h-8 w-[160px] text-xs bg-transparent border-none shadow-none focus-visible:ring-0"
+                        />
+                      </div>
+                      <div className="h-4 w-[1px] bg-border/60" />
+                      <div className="flex items-center gap-1.5 px-3">
+                        <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          placeholder="Tipo Documento..."
+                          value={docSearch}
+                          onChange={(e) => setDocSearch(e.target.value)}
+                          className="h-8 w-[140px] text-xs bg-transparent border-none shadow-none focus-visible:ring-0"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        onClick={handleApplyFilters}
+                        size="sm"
+                        className="h-9 px-4 bg-primary hover:bg-primary/90 text-white font-bold text-xs rounded-lg transition-all shadow-md active:scale-95"
+                      >
+                        <Search className="h-3.5 w-3.5 mr-1.5" />
+                        Filtrar
+                      </Button>
+                      {(startDate || endDate || catSearch || docSearch) && (
+                        <Button
+                          onClick={handleClearFilters}
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
+                          title="Limpiar filtros"
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <ExportExcelModal buttonVariant="outline" buttonSize="sm" buttonClass="h-9 px-4 bg-emerald-50 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 border-emerald-200 shadow-sm font-semibold text-xs rounded-lg" />
+                    {canCreate && !showNewPaymentForm && (
+                      <Button
+                        onClick={() => setShowNewPaymentForm(true)}
+                        size="sm"
+                        className="h-9 px-5 shadow-md hover:shadow-lg transition-all font-bold text-xs rounded-lg bg-[#1a2332] hover:bg-[#2c3a4f]"
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Nuevo pago
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Formulario de nuevo pago embebido */}
@@ -205,7 +321,13 @@ export default function DashboardPage() {
                 )}
 
                 {/* Tabla de pagos */}
-                <PaymentsTable refresh={refresh} />
+                <PaymentsTable
+                  refresh={refresh}
+                  externalCatSearch={appliedFilters.catSearch}
+                  externalDocSearch={appliedFilters.docSearch}
+                  externalStartDate={appliedFilters.startDate}
+                  externalEndDate={appliedFilters.endDate}
+                />
               </div>
             )}
 

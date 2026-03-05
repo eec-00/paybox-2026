@@ -17,9 +17,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ExportExcelModal } from './ExportExcelModal'
 interface PaymentsTableProps {
   refresh?: number
+  externalCatSearch?: string
+  externalDocSearch?: string
+  externalStartDate?: string
+  externalEndDate?: string
 }
 
-export function PaymentsTable({ refresh }: PaymentsTableProps) {
+export function PaymentsTable({
+  refresh,
+  externalCatSearch,
+  externalDocSearch,
+  externalStartDate,
+  externalEndDate
+}: PaymentsTableProps) {
   const [registros, setRegistros] = useState<Registro[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedRegistro, setSelectedRegistro] = useState<Registro | null>(null)
@@ -28,33 +38,19 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
   const [isAdminUser, setIsAdminUser] = useState(false)
   const [permissions, setPermissions] = useState({ can_create: false, can_edit: false, can_delete: false })
   const [deleting, setDeleting] = useState<number | null>(null)
-  const [filtroExportacion, setFiltroExportacion] = useState<'todos' | 'pendientes' | 'exportados'>('todos')
   const [exporting, setExporting] = useState(false)
   const [estadisticas, setEstadisticas] = useState({ pendientes: 0, exportados: 0, total: 0 })
 
   const [currentPage, setCurrentPage] = useState(1)
   const [totalRecords, setTotalRecords] = useState(0)
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [debouncedStartDate, setDebouncedStartDate] = useState('')
-  const [debouncedEndDate, setDebouncedEndDate] = useState('')
   const PAGE_SIZE = 20
   const supabase = createClient()
-
-  // Efecto para debounce de fechas
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedStartDate(startDate)
-      setDebouncedEndDate(endDate)
-    }, 600) // 600ms de espera para que sea fluido
-    return () => clearTimeout(timer)
-  }, [startDate, endDate])
 
   useEffect(() => {
     loadUser()
     loadRegistros()
     loadEstadisticas()
-  }, [refresh, filtroExportacion, currentPage, debouncedStartDate, debouncedEndDate])
+  }, [refresh, externalCatSearch, externalDocSearch, currentPage, externalStartDate, externalEndDate])
 
   const loadUser = async () => {
     try {
@@ -89,20 +85,24 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
           )
         `, { count: 'exact' })
 
-      // Aplicar filtros de exportación
-      if (filtroExportacion === 'pendientes') {
-        query = query.or('exportado_a_odoo.eq.false,exportado_a_odoo.is.null')
-      } else if (filtroExportacion === 'exportados') {
-        query = query.eq('exportado_a_odoo', true)
+      // Aplicar filtros de búsqueda de categoría (en la relación)
+      if (externalCatSearch) {
+        // Filtramos por el nombre de la categoría en la tabla relacionada
+        query = query.ilike('categoria.categoria_nombre', `%${externalCatSearch}%`)
       }
 
-      // Aplicar filtros de fecha debounced
-      if (debouncedStartDate) {
-        query = query.gte('fecha_y_hora_pago', debouncedStartDate)
+      // Aplicar filtros de búsqueda por tipo de documento
+      if (externalDocSearch) {
+        query = query.ilike('tipo_documento', `%${externalDocSearch}%`)
       }
-      if (debouncedEndDate) {
+
+      // Aplicar filtros de fecha externos
+      if (externalStartDate) {
+        query = query.gte('fecha_y_hora_pago', externalStartDate)
+      }
+      if (externalEndDate) {
         // Añadir 23:59:59 a la fecha final para incluir todo el día
-        query = query.lte('fecha_y_hora_pago', `${debouncedEndDate}T23:59:59`)
+        query = query.lte('fecha_y_hora_pago', `${externalEndDate}T23:59:59`)
       }
 
       const { data: registros, error, count } = await query
@@ -259,103 +259,18 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
       <CardHeader>
         <div className="flex items-center justify-between gap-4">
           <div>
-            <CardTitle className="text-primary">Registros de Pagos</CardTitle>
-            <CardDescription>
-              {registros.length} {registros.length === 1 ? 'registro' : 'registros'} en total
-              {estadisticas && (
-                <span className="ml-2 text-amber-600 font-medium">
-                  • {estadisticas.pendientes} pendientes de exportar
+            <CardTitle className="text-primary/80 font-bold">Resumen de Registros</CardTitle>
+            <CardDescription className="flex items-center gap-2 mt-1">
+              <span>{totalRecords} registros encontrados</span>
+              {estadisticas && estadisticas.pendientes > 0 && (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold border border-amber-100 uppercase tracking-tighter">
+                  <div className="w-1 h-1 bg-amber-500 rounded-full animate-pulse" />
+                  {estadisticas.pendientes} pendientes de Odoo
                 </span>
               )}
             </CardDescription>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Filtros de Fecha */}
-            <div className="flex items-center gap-2 bg-muted/40 p-1 rounded-lg border border-border shadow-sm">
-              <div className="flex items-center gap-1.5 px-2">
-                <CalendarIcon className="h-3.5 w-3.5 text-primary/70" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Desde</span>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                  className="h-8 w-[125px] text-xs bg-background border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary/20"
-                />
-              </div>
-              <div className="h-4 w-[1px] bg-border/60" />
-              <div className="flex items-center gap-1.5 px-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Hasta</span>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => {
-                    setEndDate(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                  className="h-8 w-[125px] text-xs bg-background border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary/20"
-                />
-              </div>
-              {(startDate || endDate) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setStartDate('')
-                    setEndDate('')
-                    setCurrentPage(1)
-                  }}
-                  className="h-7 px-2 text-[11px] hover:bg-destructive/10 hover:text-destructive font-bold uppercase"
-                >
-                  Limpiar
-                </Button>
-              )}
-            </div>
 
-            <div className="flex items-center gap-2">
-              <Select value={filtroExportacion} onValueChange={(value) => {
-                if (value === 'todos' || value === 'pendientes' || value === 'exportados') {
-                  setFiltroExportacion(value)
-                  setCurrentPage(1)
-                }
-              }}>
-                <SelectTrigger className="w-[160px] h-9 bg-background shadow-sm border-border">
-                  <div className="flex items-center text-xs font-medium">
-                    <Filter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-                    <SelectValue />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="text-xs">
-                  <SelectItem value="todos">Todos los estados</SelectItem>
-                  <SelectItem value="pendientes">Pendientes exportar</SelectItem>
-                  <SelectItem value="exportados">Exportados</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <div className="h-6 w-[1px] bg-border/40 mx-1" />
-
-              <div className="flex items-center gap-2">
-                <ExportExcelModal
-                  buttonVariant="outline"
-                  buttonSize="sm"
-                  buttonClass="h-9 px-4 bg-emerald-50 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 border-emerald-200 shadow-sm font-semibold text-xs transition-all"
-                />
-
-                <Button
-                  onClick={handleExport}
-                  disabled={exporting || !estadisticas || estadisticas.pendientes === 0}
-                  variant="default"
-                  size="sm"
-                  className="h-9 px-4 shadow-sm font-semibold text-xs bg-[#1a2332] hover:bg-[#2c3a4f] transition-all"
-                >
-                  <Download className="h-3.5 w-3.5 mr-2" />
-                  {exporting ? 'Exportando...' : 'Exportar a Odoo'}
-                </Button>
-              </div>
-            </div>
-          </div>
         </div>
       </CardHeader>
       <CardContent>
