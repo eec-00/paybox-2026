@@ -10,6 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Checkbox } from '@/components/ui/checkbox'
 import { Calendar as CalendarIcon, List, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react'
 import { CalendarioPago } from '@/lib/types/database.types'
@@ -28,6 +38,13 @@ export function CalendarSection() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [error, setError] = useState<string | null>(null)
+
+    // Delete Modal State
+    const [deleteConfig, setDeleteConfig] = useState<{ open: boolean, payment: CalendarioPago | null, isRecurring: boolean }>({
+        open: false,
+        payment: null,
+        isRecurring: false
+    })
 
     // Form State
     const [formData, setFormData] = useState({
@@ -93,6 +110,8 @@ export function CalendarSection() {
             const newPagos = []
             let safeCount = 0
 
+            const grupoId = crypto.randomUUID()
+
             // Generator loop
             while (currentDate <= endLimit && safeCount < 100) {
                 newPagos.push({
@@ -105,7 +124,8 @@ export function CalendarSection() {
                     frecuencia: formData.frecuencia,
                     monto_variable: formData.monto_variable,
                     fecha_limite: formData.fecha_limite || null,
-                    creado_por: user.id
+                    creado_por: user.id,
+                    grupo_id: grupoId
                 })
 
                 if (formData.frecuencia === 'unica') break
@@ -150,16 +170,46 @@ export function CalendarSection() {
         }
     }
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('¿Está seguro de eliminar este pago programado?')) return
+    const handleDeleteClick = (pagoRef: CalendarioPago) => {
+        const isRecurring = !!(pagoRef.grupo_id || pagoRef.frecuencia !== 'unica');
+        setDeleteConfig({ open: true, payment: pagoRef, isRecurring });
+    }
+
+    const confirmDelete = async (deleteGroup: boolean) => {
+        const pagoRef = deleteConfig.payment;
+        if (!pagoRef) return;
+
+        setDeleteConfig({ open: false, payment: null, isRecurring: false });
 
         try {
-            const { error } = await supabase
-                .from('calendario_pagos')
-                .delete()
-                .eq('id', id)
-
-            if (error) throw error
+            if (deleteGroup && (pagoRef.grupo_id || pagoRef.frecuencia !== 'unica')) {
+                if (pagoRef.grupo_id) {
+                    // Delete by grupo_id (modern way)
+                    const { error } = await supabase
+                        .from('calendario_pagos')
+                        .delete()
+                        .eq('grupo_id', pagoRef.grupo_id)
+                    if (error) throw error
+                } else {
+                    // Legacy bulk delete (for older payments without grupo_id)
+                    const { error } = await supabase
+                        .from('calendario_pagos')
+                        .delete()
+                        .eq('nombre_pago', pagoRef.nombre_pago)
+                        .eq('monto', pagoRef.monto)
+                        .eq('moneda', pagoRef.moneda)
+                        .eq('frecuencia', pagoRef.frecuencia)
+                        .eq('monto_variable', pagoRef.monto_variable)
+                    if (error) throw error
+                }
+            } else {
+                // Delete only this specific one
+                const { error } = await supabase
+                    .from('calendario_pagos')
+                    .delete()
+                    .eq('id', pagoRef.id)
+                if (error) throw error
+            }
             fetchPagos()
         } catch (err) {
             console.error('Error deleting payment:', err)
@@ -303,7 +353,7 @@ export function CalendarSection() {
                         ) : (
                             pagos.map(pago => (
                                 <TableRow key={pago.id}>
-                                    <TableCell className="font-medium">{new Date(pago.fecha).toLocaleDateString('es-PE')}</TableCell>
+                                    <TableCell className="font-medium">{new Date(pago.fecha + 'T12:00:00').toLocaleDateString('es-PE')}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-1">
                                             {pago.nombre_pago}
@@ -332,7 +382,7 @@ export function CalendarSection() {
                                                 variant="ghost"
                                                 size="sm"
                                                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                onClick={() => handleDelete(pago.id)}
+                                                onClick={() => handleDeleteClick(pago)}
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </Button>
@@ -571,6 +621,40 @@ export function CalendarSection() {
                     )}
                 </CardContent>
             </Card>
+
+            <AlertDialog open={deleteConfig.open} onOpenChange={(open) => setDeleteConfig(prev => ({ ...prev, open }))}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            {deleteConfig.isRecurring ? 'Eliminar pago recurrente' : 'Eliminar pago programado'}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {deleteConfig.isRecurring
+                                ? 'Este pago es parte de una serie repetitiva. ¿Qué deseas eliminar?'
+                                : '¿Estás seguro de que deseas eliminar este pago programado? Esta acción no se puede deshacer.'}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="sm:justify-between items-center sm:flex-row flex-col gap-3 mt-4">
+                        <AlertDialogCancel className="w-full sm:w-auto m-0">Cancelar</AlertDialogCancel>
+                        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                            {deleteConfig.isRecurring && (
+                                <AlertDialogAction
+                                    className="w-full sm:w-auto bg-destructive hover:bg-destructive/90"
+                                    onClick={() => confirmDelete(true)}
+                                >
+                                    Eliminar todos
+                                </AlertDialogAction>
+                            )}
+                            <AlertDialogAction
+                                className="w-full sm:w-auto bg-primary hover:bg-primary/90"
+                                onClick={() => confirmDelete(false)}
+                            >
+                                {deleteConfig.isRecurring ? 'Eliminar solo este' : 'Eliminar'}
+                            </AlertDialogAction>
+                        </div>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

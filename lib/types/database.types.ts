@@ -24,6 +24,7 @@ export interface CalendarioPago {
   monto_variable: boolean
   fecha_limite?: string
   creado_por?: string
+  grupo_id?: string | null
   created_at?: string
 }
 

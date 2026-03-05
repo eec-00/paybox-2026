@@ -365,7 +365,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
                   <SelectItem value="none">No vincular a ningún pago</SelectItem>
                   {pagosProgramados.map(pago => (
                     <SelectItem key={pago.id} value={pago.id}>
-                      {new Date(pago.fecha).toLocaleDateString('es-PE')} - {pago.nombre_pago} ({pago.monto_variable ? 'Variable' : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`})
+                      {new Date(pago.fecha + 'T12:00:00').toLocaleDateString('es-PE')} - {pago.nombre_pago} ({pago.monto_variable ? 'Variable' : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`})
                     </SelectItem>
                   ))}
                 </SelectContent>
