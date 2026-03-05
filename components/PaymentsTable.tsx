@@ -14,7 +14,7 @@ import type { Registro } from '@/lib/types/database.types'
 import { format } from 'date-fns'
 import EditPaymentForm from './EditPaymentForm'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-
+import { ExportExcelModal } from './ExportExcelModal'
 interface PaymentsTableProps {
   refresh?: number
 }
@@ -32,19 +32,29 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
   const [exporting, setExporting] = useState(false)
   const [estadisticas, setEstadisticas] = useState({ pendientes: 0, exportados: 0, total: 0 })
 
-  // Estados para paginación y filtros
   const [currentPage, setCurrentPage] = useState(1)
   const [totalRecords, setTotalRecords] = useState(0)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [debouncedStartDate, setDebouncedStartDate] = useState('')
+  const [debouncedEndDate, setDebouncedEndDate] = useState('')
   const PAGE_SIZE = 20
   const supabase = createClient()
+
+  // Efecto para debounce de fechas
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedStartDate(startDate)
+      setDebouncedEndDate(endDate)
+    }, 600) // 600ms de espera para que sea fluido
+    return () => clearTimeout(timer)
+  }, [startDate, endDate])
 
   useEffect(() => {
     loadUser()
     loadRegistros()
     loadEstadisticas()
-  }, [refresh, filtroExportacion, currentPage, startDate, endDate])
+  }, [refresh, filtroExportacion, currentPage, debouncedStartDate, debouncedEndDate])
 
   const loadUser = async () => {
     try {
@@ -86,13 +96,13 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
         query = query.eq('exportado_a_odoo', true)
       }
 
-      // Aplicar filtros de fecha
-      if (startDate) {
-        query = query.gte('fecha_y_hora_pago', startDate)
+      // Aplicar filtros de fecha debounced
+      if (debouncedStartDate) {
+        query = query.gte('fecha_y_hora_pago', debouncedStartDate)
       }
-      if (endDate) {
+      if (debouncedEndDate) {
         // Añadir 23:59:59 a la fecha final para incluir todo el día
-        query = query.lte('fecha_y_hora_pago', `${endDate}T23:59:59`)
+        query = query.lte('fecha_y_hora_pago', `${debouncedEndDate}T23:59:59`)
       }
 
       const { data: registros, error, count } = await query
@@ -260,10 +270,11 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 bg-secondary/5 p-1 rounded-md border">
-              <div className="flex items-center gap-1 px-2">
-                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">Desde:</span>
+            {/* Filtros de Fecha */}
+            <div className="flex items-center gap-2 bg-muted/40 p-1 rounded-lg border border-border shadow-sm">
+              <div className="flex items-center gap-1.5 px-2">
+                <CalendarIcon className="h-3.5 w-3.5 text-primary/70" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Desde</span>
                 <Input
                   type="date"
                   value={startDate}
@@ -271,12 +282,12 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
                     setStartDate(e.target.value)
                     setCurrentPage(1)
                   }}
-                  className="h-8 w-[130px] text-xs"
+                  className="h-8 w-[125px] text-xs bg-background border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary/20"
                 />
               </div>
-              <div className="h-6 w-[1px] bg-border" />
-              <div className="flex items-center gap-1 px-2">
-                <span className="text-xs font-medium text-muted-foreground">Hasta:</span>
+              <div className="h-4 w-[1px] bg-border/60" />
+              <div className="flex items-center gap-1.5 px-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Hasta</span>
                 <Input
                   type="date"
                   value={endDate}
@@ -284,7 +295,7 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
                     setEndDate(e.target.value)
                     setCurrentPage(1)
                   }}
-                  className="h-8 w-[130px] text-xs"
+                  className="h-8 w-[125px] text-xs bg-background border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary/20"
                 />
               </div>
               {(startDate || endDate) && (
@@ -296,42 +307,54 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
                     setEndDate('')
                     setCurrentPage(1)
                   }}
-                  className="h-8 px-2 text-xs"
+                  className="h-7 px-2 text-[11px] hover:bg-destructive/10 hover:text-destructive font-bold uppercase"
                 >
                   Limpiar
                 </Button>
               )}
             </div>
 
-            <Select value={filtroExportacion} onValueChange={(value) => {
-              if (value === 'todos' || value === 'pendientes' || value === 'exportados') {
-                setFiltroExportacion(value)
-                setCurrentPage(1)
-              }
-            }}>
-              <SelectTrigger className="w-[150px] h-9">
-                <div className="flex items-center">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos los estados</SelectItem>
-                <SelectItem value="pendientes">Pendientes exportar</SelectItem>
-                <SelectItem value="exportados">Exportados</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select value={filtroExportacion} onValueChange={(value) => {
+                if (value === 'todos' || value === 'pendientes' || value === 'exportados') {
+                  setFiltroExportacion(value)
+                  setCurrentPage(1)
+                }
+              }}>
+                <SelectTrigger className="w-[160px] h-9 bg-background shadow-sm border-border">
+                  <div className="flex items-center text-xs font-medium">
+                    <Filter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                    <SelectValue />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="text-xs">
+                  <SelectItem value="todos">Todos los estados</SelectItem>
+                  <SelectItem value="pendientes">Pendientes exportar</SelectItem>
+                  <SelectItem value="exportados">Exportados</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Button
-              onClick={handleExport}
-              disabled={exporting || !estadisticas || estadisticas.pendientes === 0}
-              variant="outline"
-              size="sm"
-              className="h-9"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {exporting ? 'Exportando...' : 'Exportar a Odoo'}
-            </Button>
+              <div className="h-6 w-[1px] bg-border/40 mx-1" />
+
+              <div className="flex items-center gap-2">
+                <ExportExcelModal
+                  buttonVariant="outline"
+                  buttonSize="sm"
+                  buttonClass="h-9 px-4 bg-emerald-50 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 border-emerald-200 shadow-sm font-semibold text-xs transition-all"
+                />
+
+                <Button
+                  onClick={handleExport}
+                  disabled={exporting || !estadisticas || estadisticas.pendientes === 0}
+                  variant="default"
+                  size="sm"
+                  className="h-9 px-4 shadow-sm font-semibold text-xs bg-[#1a2332] hover:bg-[#2c3a4f] transition-all"
+                >
+                  <Download className="h-3.5 w-3.5 mr-2" />
+                  {exporting ? 'Exportando...' : 'Exportar a Odoo'}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -661,26 +684,42 @@ export function PaymentsTable({ refresh }: PaymentsTableProps) {
                 Anterior
               </Button>
               <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, Math.ceil(totalRecords / PAGE_SIZE)) }, (_, i) => {
-                  const pageNum = i + 1
-                  // Lógica simple para mostrar páginas cerca de la actual si hay muchas
-                  // Por ahora solo mostramos hasta 5 páginas para mantenerlo simple
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={currentPage === pageNum ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(pageNum)}
-                      className="w-9"
-                      disabled={loading}
-                    >
-                      {pageNum}
-                    </Button>
-                  )
-                })}
-                {Math.ceil(totalRecords / PAGE_SIZE) > 5 && (
-                  <span className="text-muted-foreground px-2">...</span>
-                )}
+                {(() => {
+                  const totalPages = Math.ceil(totalRecords / PAGE_SIZE);
+                  let pages: (number | string)[] = [];
+
+                  if (totalPages <= 7) {
+                    pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+                  } else {
+                    if (currentPage <= 4) {
+                      pages = [1, 2, 3, 4, 5, '...', totalPages];
+                    } else if (currentPage >= totalPages - 3) {
+                      pages = [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+                    } else {
+                      pages = [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+                    }
+                  }
+
+                  return pages.map((page, idx) => {
+                    if (page === '...') {
+                      return <span key={`ellipsis-${idx}`} className="text-muted-foreground px-2">...</span>;
+                    }
+
+                    const pageNum = page as number;
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className="w-9"
+                        disabled={loading}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  });
+                })()}
               </div>
               <Button
                 variant="outline"
