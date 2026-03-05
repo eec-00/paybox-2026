@@ -1,9 +1,9 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { FileText, UserCog, Car, LayoutDashboard, Megaphone } from 'lucide-react'
+import { FileText, UserCog, Car, LayoutDashboard, Megaphone, Calendar } from 'lucide-react'
 
-export type Section = 'dashboard' | 'pagos' | 'trailers' | 'vehiculos' | 'tutoriales' | 'administracion' | 'updates'
+export type Section = 'dashboard' | 'pagos' | 'calendario' | 'trailers' | 'vehiculos' | 'tutoriales' | 'administracion' | 'updates'
 
 interface SidebarProps {
   activeSection: Section
@@ -34,6 +34,14 @@ export function Sidebar({
       label: 'Pagos',
       icon: FileText,
       description: 'Ver y registrar pagos',
+      adminOnly: false,
+      requiresCreate: false
+    },
+    {
+      id: 'calendario' as Section,
+      label: 'Calendario',
+      icon: Calendar,
+      description: 'Pagos recurrentes',
       adminOnly: false,
       requiresCreate: false
     },

@@ -14,6 +14,7 @@ import { TutorialsList } from '@/components/TutorialsList'
 import { TrailersTable } from '@/components/TrailersTable'
 import { TrailerForm } from '@/components/TrailerForm'
 import { Sidebar, type Section } from '@/components/Sidebar'
+import { CalendarSection } from '@/components/CalendarSection'
 import { UpdatesNotification } from '@/components/UpdatesNotification'
 import { UpdatesManagement } from '@/components/UpdatesManagement'
 import { UpdatesList } from '@/components/UpdatesList'
@@ -206,6 +207,10 @@ export default function DashboardPage() {
                 {/* Tabla de pagos */}
                 <PaymentsTable refresh={refresh} />
               </div>
+            )}
+
+            {activeSection === 'calendario' && (
+              <CalendarSection />
             )}
 
             {activeSection === 'trailers' && (

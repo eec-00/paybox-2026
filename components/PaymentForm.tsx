@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ImageUploader, OCRData } from '@/components/ImageUploader'
 import { getUserPermissions } from '@/lib/utils/auth'
 import { Shield } from 'lucide-react'
-import type { Categoria } from '@/lib/types/database.types'
+import type { Categoria, CalendarioPago } from '@/lib/types/database.types'
 
 interface PaymentFormProps {
   onSuccess?: () => void
@@ -31,7 +31,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
   const [metodoPago, setMetodoPago] = useState('')
   const [bancoCuenta, setBancoCuenta] = useState('')
   const [moneda, setMoneda] = useState<'soles' | 'dolares'>('soles')
-  
+
   // Nuevos campos OCR
   const [tipoDocumento, setTipoDocumento] = useState<'factura' | 'comprobante' | ''>('')
   const [numeroDocumento, setNumeroDocumento] = useState('')
@@ -44,12 +44,39 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
   // Imágenes
   const [imageUrls, setImageUrls] = useState<string[]>([])
 
+  // Pagos Programados (Calendario)
+  const [pagosProgramados, setPagosProgramados] = useState<CalendarioPago[]>([])
+  const [selectedPagoProgramado, setSelectedPagoProgramado] = useState<string>('none')
+
   const supabase = createClient()
 
   useEffect(() => {
     checkPermissions()
     loadCategorias()
+    loadPagosProgramados()
   }, [])
+
+  const loadPagosProgramados = async () => {
+    try {
+      // Get current Peru date YYYY-MM-DD
+      const d = new Date().toLocaleString("en-US", { timeZone: "America/Lima" })
+      const localDate = new Date(d)
+      const peruDate = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`
+
+      const { data, error } = await supabase
+        .from('calendario_pagos')
+        .select('*')
+        .eq('estado', 'pendiente')
+        .lte('fecha', peruDate)
+        .order('fecha', { ascending: true })
+
+      if (!error && data) {
+        setPagosProgramados(data)
+      }
+    } catch (err) {
+      console.error('Error cargando pagos programados:', err)
+    }
+  }
 
   const checkPermissions = async () => {
     try {
@@ -84,6 +111,29 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
     setDatosDinamicos({})
   }
 
+  const handlePagoProgramadoChange = (val: string) => {
+    setSelectedPagoProgramado(val)
+    if (val !== 'none') {
+      const pago = pagosProgramados.find(p => p.id === val)
+      if (pago) {
+        setBeneficiario(pago.nombre_pago)
+        if (!pago.monto_variable) {
+          setMonto(pago.monto.toString())
+        } else {
+          setMonto('') // Monto variable, que lo llenen al pagar
+        }
+        setMoneda(pago.moneda)
+        if (pago.numero_factura) {
+          setTipoDocumento('factura')
+          setNumeroDocumento(pago.numero_factura)
+        }
+        if (pago.descripcion) {
+          setDescripcion(pago.descripcion)
+        }
+      }
+    }
+  }
+
   const handleDinamicoChange = (campo: string, valor: string) => {
     setDatosDinamicos(prev => ({
       ...prev,
@@ -113,19 +163,19 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
     if (data.metodo_pago) {
       setMetodoPago(data.metodo_pago)
     }
-    
+
     if (data.tipo_documento) {
       setTipoDocumento(data.tipo_documento)
     }
-    
+
     if (data.numero_documento) {
       setNumeroDocumento(data.numero_documento)
     }
-    
+
     if (data.descripcion) {
       setDescripcion(data.descripcion)
     }
-    
+
     if (data.ruc) {
       setRuc(data.ruc)
     }
@@ -144,13 +194,13 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
 
     // Mostrar información según el tipo de documento
     let message = '✅ Datos extraídos exitosamente.\n\n'
-    
+
     if (data.tipo_documento === 'factura') {
       message += '📄 Documento detectado: FACTURA ELECTRÓNICA\n'
       if (data.ruc) message += `🏢 RUC del emisor: ${data.ruc}\n`
       if (data.numero_documento) message += `📋 Número: ${data.numero_documento}\n`
       if (data.descripcion) message += `📝 Descripción: ${data.descripcion}\n`
-      
+
       // Advertencia si el RUC es de EEMERSON SAC (error común)
       if (data.ruc === '20523380347') {
         message += '\n⚠️ ADVERTENCIA: El RUC detectado es de EEMERSON SAC (cliente).\n'
@@ -162,9 +212,9 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
       if (data.numero_documento) message += `🔢 Operación: ${data.numero_documento}\n`
       if (data.descripcion) message += `📝 Concepto: ${data.descripcion}\n`
     }
-    
+
     message += '\nPor favor verifica la información antes de guardar.'
-    
+
     alert(message)
   }
 
@@ -198,7 +248,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
       // Necesitamos agregarlo para que Supabase lo guarde correctamente
       const fechaConZonaHoraria = fechaYHoraPago ? `${fechaYHoraPago}:00-05:00` : null
 
-      const { error } = await supabase.from('registros').insert({
+      const { data: insertedRegistro, error } = await supabase.from('registros').insert({
         fecha_y_hora_pago: fechaConZonaHoraria,
         beneficiario,
         monto: parseFloat(monto),
@@ -213,9 +263,19 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
         datos_dinamicos: datosDinamicos,
         comprobantes: imageUrls.length > 0 ? imageUrls : null,
         creado_por: user.id
-      })
+      }).select('id').single()
 
       if (error) throw error
+
+      if (selectedPagoProgramado && selectedPagoProgramado !== 'none') {
+        const { error: updateError } = await supabase.from('calendario_pagos')
+          .update({ estado: 'pagado', registro_id: insertedRegistro.id })
+          .eq('id', selectedPagoProgramado)
+
+        if (updateError) {
+          console.error('No se pudo actualizar el pago programado:', updateError)
+        }
+      }
 
       // Limpiar formulario
       setFechaYHoraPago('')
@@ -231,6 +291,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
       setSelectedCategoria(null)
       setDatosDinamicos({})
       setImageUrls([])
+      setSelectedPagoProgramado('none')
 
       if (onSuccess) onSuccess()
     } catch (error: any) {
@@ -287,6 +348,33 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
               maxImages={4}
             />
           </div>
+
+          {/* Vinculación con Calendario */}
+          {pagosProgramados.length > 0 && (
+            <div className="space-y-2 pb-4 border-b">
+              <Label htmlFor="pagoProgramado">Vincular a Pago Programado (Opcional)</Label>
+              <Select
+                value={selectedPagoProgramado}
+                onValueChange={handlePagoProgramadoChange}
+                disabled={loading}
+              >
+                <SelectTrigger id="pagoProgramado">
+                  <SelectValue placeholder="Seleccione un pago" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No vincular a ningún pago</SelectItem>
+                  {pagosProgramados.map(pago => (
+                    <SelectItem key={pago.id} value={pago.id}>
+                      {new Date(pago.fecha).toLocaleDateString('es-PE')} - {pago.nombre_pago} ({pago.monto_variable ? 'Variable' : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Al seleccionar un pago programado, se autocompletarán los datos y se marcará como pagado al guardar.
+              </p>
+            </div>
+          )}
 
           {/* Datos Fijos */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
