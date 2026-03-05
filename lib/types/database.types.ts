@@ -10,6 +10,24 @@ export interface Categoria {
   created_at?: string
 }
 
+export interface CalendarioPago {
+  id: string
+  fecha: string
+  nombre_pago: string
+  monto: number
+  moneda: 'soles' | 'dolares'
+  numero_factura?: string
+  descripcion?: string
+  estado: 'pendiente' | 'pagado'
+  registro_id?: string
+  frecuencia: 'unica' | 'semanal' | 'quincenal' | 'mensual' | 'anual'
+  monto_variable: boolean
+  fecha_limite?: string
+  creado_por?: string
+  grupo_id?: string | null
+  created_at?: string
+}
+
 export interface Registro {
   id: number
   fecha_y_hora_pago: string // timestamp con fecha y hora
