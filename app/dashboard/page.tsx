@@ -20,7 +20,7 @@ import { UpdatesNotification } from '@/components/UpdatesNotification'
 import { UpdatesManagement } from '@/components/UpdatesManagement'
 import { UpdatesList } from '@/components/UpdatesList'
 import { isAdmin, getUserPermissions, getCurrentUserProfile } from '@/lib/utils/auth'
-import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText, Megaphone, Calendar as CalendarIcon, Filter, Search, XCircle } from 'lucide-react'
+import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText, Megaphone, Calendar as CalendarIcon, Filter, Search, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import Image from 'next/image'
@@ -42,11 +42,24 @@ export default function DashboardPage() {
   const [endDate, setEndDate] = useState('')
   const [catSearch, setCatSearch] = useState('')
   const [docSearch, setDocSearch] = useState('')
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [minAmount, setMinAmount] = useState('')
+  const [maxAmount, setMaxAmount] = useState('')
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [currency, setCurrency] = useState('all')
+  const [paymentType, setPaymentType] = useState('all')
+  const [categorias, setCategorias] = useState<any[]>([])
+
   const [appliedFilters, setAppliedFilters] = useState({
     startDate: '',
     endDate: '',
     catSearch: '',
-    docSearch: ''
+    docSearch: '',
+    minAmount: '',
+    maxAmount: '',
+    selectedCategories: [] as string[],
+    currency: 'all',
+    paymentType: 'all'
   })
 
   const router = useRouter()
@@ -57,7 +70,12 @@ export default function DashboardPage() {
       startDate,
       endDate,
       catSearch,
-      docSearch
+      docSearch,
+      minAmount,
+      maxAmount,
+      selectedCategories,
+      currency,
+      paymentType
     })
     setRefresh(prev => prev + 1)
   }
@@ -67,11 +85,21 @@ export default function DashboardPage() {
     setEndDate('')
     setCatSearch('')
     setDocSearch('')
+    setMinAmount('')
+    setMaxAmount('')
+    setSelectedCategories([])
+    setCurrency('all')
+    setPaymentType('all')
     setAppliedFilters({
       startDate: '',
       endDate: '',
       catSearch: '',
-      docSearch: ''
+      docSearch: '',
+      minAmount: '',
+      maxAmount: '',
+      selectedCategories: [],
+      currency: 'all',
+      paymentType: 'all'
     })
     setRefresh(prev => prev + 1)
   }
@@ -98,7 +126,13 @@ export default function DashboardPage() {
       }
     }
 
+    const fetchCategorias = async () => {
+      const { data } = await supabase.from('categorias').select('id, categoria_nombre').order('categoria_nombre')
+      if (data) setCategorias(data)
+    }
+
     checkUser()
+    fetchCategorias()
   }, [router, supabase])
 
   const handleLogout = async () => {
@@ -205,100 +239,187 @@ export default function DashboardPage() {
 
             {activeSection === 'pagos' && (
               <div className="space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-4 bg-card/40 p-4 rounded-xl border border-border/50 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <FileText className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-primary tracking-tight">Pagos</h2>
-                      <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Historial y gestión de registros</p>
-                    </div>
-                  </div>
-
-                  {/* ESPACIO APROVECHADO: Filtros integrados */}
-                  <div className="flex-1 flex flex-wrap items-center justify-center gap-3 px-4">
-                    <div className="flex items-center gap-2 bg-background p-1 rounded-lg border border-border shadow-sm">
-                      <div className="flex items-center gap-1.5 px-2">
-                        <CalendarIcon className="h-3.5 w-3.5 text-primary/70" />
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Desde</span>
-                        <Input
-                          type="date"
-                          value={startDate}
-                          onChange={(e) => setStartDate(e.target.value)}
-                          className="h-8 w-[125px] text-xs bg-transparent border-none shadow-none focus-visible:ring-0"
-                        />
+                <div className="flex flex-col gap-4 bg-card/40 p-4 rounded-xl border border-border/50 shadow-sm">
+                  {/* Fila Superior: Título, Filtros, Botones de Acción */}
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <FileText className="h-6 w-6 text-primary" />
                       </div>
-                      <div className="h-4 w-[1px] bg-border/60" />
-                      <div className="flex items-center gap-1.5 px-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Hasta</span>
-                        <Input
-                          type="date"
-                          value={endDate}
-                          onChange={(e) => setEndDate(e.target.value)}
-                          className="h-8 w-[125px] text-xs bg-transparent border-none shadow-none focus-visible:ring-0"
-                        />
+                      <div>
+                        <h2 className="text-2xl font-bold text-primary tracking-tight">Pagos</h2>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Historial y gestión de registros</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-background p-1 rounded-lg border border-border shadow-sm">
-                      <div className="flex items-center gap-1.5 px-3">
-                        <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                          placeholder="Buscar Categoría..."
-                          value={catSearch}
-                          onChange={(e) => setCatSearch(e.target.value)}
-                          className="h-8 w-[160px] text-xs bg-transparent border-none shadow-none focus-visible:ring-0"
-                        />
+                    <div className="flex-1 flex flex-wrap items-center justify-center gap-3 px-2">
+                      <div className="flex items-center gap-2 bg-background p-1 rounded-lg border border-border shadow-sm">
+                        <div className="flex items-center gap-1.5 px-2">
+                          <CalendarIcon className="h-3.5 w-3.5 text-primary/70" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Desde</span>
+                          <Input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="h-8 w-[125px] text-xs bg-transparent border-none shadow-none focus-visible:ring-0"
+                          />
+                        </div>
+                        <div className="h-4 w-[1px] bg-border/60" />
+                        <div className="flex items-center gap-1.5 px-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Hasta</span>
+                          <Input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="h-8 w-[125px] text-xs bg-transparent border-none shadow-none focus-visible:ring-0"
+                          />
+                        </div>
                       </div>
-                      <div className="h-4 w-[1px] bg-border/60" />
-                      <div className="flex items-center gap-1.5 px-3">
-                        <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                          placeholder="Tipo Documento..."
-                          value={docSearch}
-                          onChange={(e) => setDocSearch(e.target.value)}
-                          className="h-8 w-[140px] text-xs bg-transparent border-none shadow-none focus-visible:ring-0"
-                        />
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        onClick={handleApplyFilters}
-                        size="sm"
-                        className="h-9 px-4 bg-primary hover:bg-primary/90 text-white font-bold text-xs rounded-lg transition-all shadow-md active:scale-95"
-                      >
-                        <Search className="h-3.5 w-3.5 mr-1.5" />
-                        Filtrar
-                      </Button>
-                      {(startDate || endDate || catSearch || docSearch) && (
+
+                      <div className="flex items-center gap-1.5">
                         <Button
-                          onClick={handleClearFilters}
-                          variant="ghost"
+                          onClick={handleApplyFilters}
                           size="sm"
-                          className="h-9 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
-                          title="Limpiar filtros"
+                          className="h-9 px-4 bg-primary hover:bg-primary/90 text-white font-bold text-xs rounded-lg transition-all shadow-md active:scale-95"
                         >
-                          <XCircle className="h-4 w-4" />
+                          <Search className="h-3.5 w-3.5 mr-1.5" />
+                          Filtrar
+                        </Button>
+                        <Button
+                          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                          variant={showAdvancedFilters ? "default" : "outline"}
+                          size="sm"
+                          className={`h-9 px-3 text-xs font-semibold ${showAdvancedFilters ? "bg-muted text-foreground hover:bg-muted-foreground/10" : "bg-background hover:bg-muted/50"}`}
+                        >
+                          Avanzados
+                          {showAdvancedFilters ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
+                        </Button>
+                        {(startDate || endDate || selectedCategories.length > 0 || minAmount || maxAmount || currency !== 'all' || paymentType !== 'all' || docSearch) && (
+                          <Button
+                            onClick={handleClearFilters}
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
+                            title="Limpiar filtros"
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <ExportExcelModal buttonVariant="outline" buttonSize="sm" buttonClass="h-9 px-4 bg-emerald-50 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 border-emerald-200 shadow-sm font-semibold text-xs rounded-lg" />
+                      {canCreate && !showNewPaymentForm && (
+                        <Button
+                          onClick={() => setShowNewPaymentForm(true)}
+                          size="sm"
+                          className="h-9 px-5 shadow-md hover:shadow-lg transition-all font-bold text-xs rounded-lg bg-[#1a2332] hover:bg-[#2c3a4f]"
+                        >
+                          <PlusCircle className="h-4 w-4 mr-2" />
+                          Nuevo pago
                         </Button>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <ExportExcelModal buttonVariant="outline" buttonSize="sm" buttonClass="h-9 px-4 bg-emerald-50 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 border-emerald-200 shadow-sm font-semibold text-xs rounded-lg" />
-                    {canCreate && !showNewPaymentForm && (
-                      <Button
-                        onClick={() => setShowNewPaymentForm(true)}
-                        size="sm"
-                        className="h-9 px-5 shadow-md hover:shadow-lg transition-all font-bold text-xs rounded-lg bg-[#1a2332] hover:bg-[#2c3a4f]"
-                      >
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Nuevo pago
-                      </Button>
-                    )}
-                  </div>
+                  {/* Filtros Avanzados */}
+                  {showAdvancedFilters && (
+                    <div className="bg-background border rounded-lg p-5 shadow-sm animate-in fade-in slide-in-from-top-2 text-sm mt-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {/* Monto Mínimo y Máximo */}
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Rango de Monto</label>
+                          <div className="flex items-center gap-2">
+                            <Input placeholder="Mínimo" type="number" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} className="h-9 text-xs focus-visible:ring-1" />
+                            <span className="text-muted-foreground">-</span>
+                            <Input placeholder="Máximo" type="number" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} className="h-9 text-xs focus-visible:ring-1" />
+                          </div>
+                        </div>
+
+                        {/* Moneda */}
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Tipo de Moneda</label>
+                          <Select value={currency} onValueChange={setCurrency}>
+                            <SelectTrigger className="h-9 text-xs">
+                              <SelectValue placeholder="Todas las monedas" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Todas las monedas</SelectItem>
+                              <SelectItem value="soles">Soles (S/)</SelectItem>
+                              <SelectItem value="dolares">Dólares ($)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Tipo de Pago */}
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Método de Pago</label>
+                          <Select value={paymentType} onValueChange={setPaymentType}>
+                            <SelectTrigger className="h-9 text-xs">
+                              <SelectValue placeholder="Todos los métodos" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Todos los métodos</SelectItem>
+                              <SelectItem value="Efectivo">Efectivo</SelectItem>
+                              <SelectItem value="Transferencia">Transferencia</SelectItem>
+                              <SelectItem value="Yape">Yape</SelectItem>
+                              <SelectItem value="Plin">Plin</SelectItem>
+                              <SelectItem value="Tarjeta">Tarjeta</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Tipo de Documento */}
+                        <div className="space-y-2">
+                          <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Tipo de Documento</label>
+                          <Select value={docSearch || "all"} onValueChange={(val) => setDocSearch(val === "all" ? "" : val)}>
+                            <SelectTrigger className="h-9 text-xs">
+                              <SelectValue placeholder="Todos los documentos" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Todos los documentos</SelectItem>
+                              <SelectItem value="factura">Factura</SelectItem>
+                              <SelectItem value="comprobante">Comprobante</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* Categorías (Multiple) */}
+                      <div className="mt-6 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Por Categorías (Haz clic para seleccionar varias)</label>
+                          {selectedCategories.length > 0 && (
+                            <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded-full">{selectedCategories.length} seleccionadas</span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2 max-h-[160px] overflow-y-auto p-4 border rounded-md bg-muted/5">
+                          {categorias.map(cat => (
+                            <label key={cat.id} className={`flex items-center gap-2 border px-3 py-1.5 rounded-md cursor-pointer transition-all select-none shadow-sm ${selectedCategories.includes(cat.id.toString()) ? 'bg-primary/10 border-primary/50 text-primary' : 'bg-background hover:bg-muted/50 hover:border-border'}`}>
+                              <input
+                                type="checkbox"
+                                checked={selectedCategories.includes(cat.id.toString())}
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedCategories([...selectedCategories, cat.id.toString()])
+                                  else setSelectedCategories(selectedCategories.filter(id => id !== cat.id.toString()))
+                                }}
+                                className="hidden"
+                              />
+                              <div className={`w-4 h-4 rounded-sm border flex items-center justify-center ${selectedCategories.includes(cat.id.toString()) ? 'bg-primary border-primary text-white' : 'border-input bg-transparent'}`}>
+                                {selectedCategories.includes(cat.id.toString()) && <svg width="10" height="10" viewBox="0 0 15 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 7L6 11L13 2" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                              </div>
+                              <span className="text-xs font-medium">{cat.categoria_nombre}</span>
+                            </label>
+                          ))}
+                          {categorias.length === 0 && (
+                            <span className="text-xs text-muted-foreground italic">Cargando categorías...</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Formulario de nuevo pago embebido */}
@@ -320,13 +441,17 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Tabla de pagos */}
                 <PaymentsTable
                   refresh={refresh}
                   externalCatSearch={appliedFilters.catSearch}
                   externalDocSearch={appliedFilters.docSearch}
                   externalStartDate={appliedFilters.startDate}
                   externalEndDate={appliedFilters.endDate}
+                  externalMinAmount={appliedFilters.minAmount}
+                  externalMaxAmount={appliedFilters.maxAmount}
+                  externalCategories={appliedFilters.selectedCategories}
+                  externalCurrency={appliedFilters.currency}
+                  externalPaymentType={appliedFilters.paymentType}
                 />
               </div>
             )}

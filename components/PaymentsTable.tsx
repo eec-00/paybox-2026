@@ -21,6 +21,11 @@ interface PaymentsTableProps {
   externalDocSearch?: string
   externalStartDate?: string
   externalEndDate?: string
+  externalMinAmount?: string
+  externalMaxAmount?: string
+  externalCategories?: string[]
+  externalCurrency?: string
+  externalPaymentType?: string
 }
 
 export function PaymentsTable({
@@ -28,7 +33,12 @@ export function PaymentsTable({
   externalCatSearch,
   externalDocSearch,
   externalStartDate,
-  externalEndDate
+  externalEndDate,
+  externalMinAmount,
+  externalMaxAmount,
+  externalCategories,
+  externalCurrency,
+  externalPaymentType
 }: PaymentsTableProps) {
   const [registros, setRegistros] = useState<Registro[]>([])
   const [loading, setLoading] = useState(true)
@@ -103,6 +113,23 @@ export function PaymentsTable({
       if (externalEndDate) {
         // Añadir 23:59:59 a la fecha final para incluir todo el día
         query = query.lte('fecha_y_hora_pago', `${externalEndDate}T23:59:59`)
+      }
+
+      // Filtros avanzados
+      if (externalMinAmount && !isNaN(Number(externalMinAmount))) {
+        query = query.gte('monto', Number(externalMinAmount))
+      }
+      if (externalMaxAmount && !isNaN(Number(externalMaxAmount))) {
+        query = query.lte('monto', Number(externalMaxAmount))
+      }
+      if (externalCategories && externalCategories.length > 0) {
+        query = query.in('categoria_id', externalCategories)
+      }
+      if (externalCurrency && externalCurrency !== 'all') {
+        query = query.eq('moneda', externalCurrency)
+      }
+      if (externalPaymentType && externalPaymentType !== 'all') {
+        query = query.eq('metodo_pago', externalPaymentType)
       }
 
       const { data: registros, error, count } = await query
