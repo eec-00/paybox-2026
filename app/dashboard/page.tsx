@@ -65,6 +65,10 @@ export default function DashboardPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  useEffect(() => {
+    if (window.innerWidth < 768) setSidebarCollapsed(true)
+  }, [])
+
   const handleApplyFilters = () => {
     setAppliedFilters({
       startDate,
@@ -143,6 +147,7 @@ export default function DashboardPage() {
 
   const handleSectionChange = (section: Section) => {
     setActiveSection(section)
+    if (window.innerWidth < 768) setSidebarCollapsed(true)
   }
 
   const handleSuccess = () => {
@@ -161,11 +166,11 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header reorganizado */}
-      <header className="border-b bg-gradient-to-r from-primary via-primary to-primary/95 shadow-lg sticky top-0 z-10">
-        <div className="px-6 py-3.5 flex items-center justify-between">
+      <header className="border-b bg-gradient-to-r from-primary via-primary to-primary/95 shadow-lg sticky top-0 z-50">
+        <div className="px-3 sm:px-6 py-3 sm:py-3.5 flex items-center justify-between gap-2">
           {/* Logo y nombre de la empresa */}
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-6 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               {/* Botón de colapsar sidebar */}
               <Button
                 variant="ghost"
@@ -185,7 +190,7 @@ export default function DashboardPage() {
                 )}
               </Button>
 
-              <div className="relative w-10 h-10">
+              <div className="relative w-8 h-8 sm:w-10 sm:h-10 shrink-0">
                 <Image
                   src="/logo.png"
                   alt="Logo"
@@ -194,13 +199,13 @@ export default function DashboardPage() {
                 />
               </div>
               <div>
-                <h1 className="font-bold text-xl text-white font-[family-name:var(--font-montserrat)]">PayBox</h1>
-                <p className="text-xs text-white/70">Eemerson SAC</p>
+                <h1 className="font-bold text-base sm:text-xl text-white font-[family-name:var(--font-montserrat)]">PayBox</h1>
+                <p className="text-[10px] sm:text-xs text-white/70">Eemerson SAC</p>
               </div>
             </div>
 
-            {/* Separador y mensaje de bienvenida */}
-            <div className="flex items-center gap-4">
+            {/* Separador y mensaje de bienvenida - oculto en móvil */}
+            <div className="hidden md:flex items-center gap-4">
               <div className="h-8 w-px bg-white/30"></div>
               <div>
                 <p className="text-sm text-white font-medium">
@@ -211,11 +216,11 @@ export default function DashboardPage() {
           </div>
 
           {/* Botón de cerrar sesión */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <UpdatesNotification />
-            <Button variant="secondary" onClick={handleLogout} className="shadow-md hover:shadow-lg transition-shadow">
-              <LogOut className="h-4 w-4 mr-2" />
-              Cerrar Sesión
+            <Button variant="secondary" onClick={handleLogout} className="shadow-md hover:shadow-lg transition-shadow h-8 sm:h-9 px-2 sm:px-4">
+              <LogOut className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Cerrar Sesión</span>
             </Button>
           </div>
         </div>
@@ -223,6 +228,14 @@ export default function DashboardPage() {
 
       {/* Main Layout con Sidebar */}
       <div className="flex flex-1">
+        {/* Backdrop móvil - oscurece el contenido al abrir sidebar */}
+        {!sidebarCollapsed && (
+          <div
+            className="fixed inset-0 top-14 bg-black/50 z-30 md:hidden"
+            onClick={() => setSidebarCollapsed(true)}
+          />
+        )}
+
         {/* Sidebar */}
         <Sidebar
           activeSection={activeSection}
@@ -233,92 +246,94 @@ export default function DashboardPage() {
         />
 
         {/* Main Content */}
-        <main className="flex-1 p-4 md:p-8 overflow-auto">
-          <div className="w-full max-w-[1600px] mx-auto">
+        <main className="flex-1 p-2 sm:p-4 md:p-8 overflow-auto min-w-0">
+          <div className="w-full max-w-[1600px] mx-auto min-w-0">
             {activeSection === 'dashboard' && <Dashboard />}
 
             {activeSection === 'pagos' && (
               <div className="space-y-6">
-                <div className="flex flex-col gap-4 bg-card/40 p-4 rounded-xl border border-border/50 shadow-sm">
-                  {/* Fila Superior: Título, Filtros, Botones de Acción */}
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary/10 rounded-lg">
-                        <FileText className="h-6 w-6 text-primary" />
+                <div className="flex flex-col gap-3 bg-card/40 p-3 sm:p-4 rounded-xl border border-border/50 shadow-sm">
+                  {/* Fila 1: Título + Botones de Acción */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg">
+                        <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-primary tracking-tight">Pagos</h2>
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Historial y gestión de registros</p>
+                        <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Pagos</h2>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">Historial y gestión de registros</p>
                       </div>
                     </div>
 
-                    <div className="flex-1 flex flex-wrap items-center justify-center gap-3 px-2">
-                      <div className="flex items-center gap-2 bg-background p-1 rounded-lg border border-border shadow-sm">
-                        <div className="flex items-center gap-1.5 px-2">
-                          <CalendarIcon className="h-3.5 w-3.5 text-primary/70" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Desde</span>
-                          <Input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="h-8 w-[125px] text-xs bg-transparent border-none shadow-none focus-visible:ring-0"
-                          />
-                        </div>
-                        <div className="h-4 w-[1px] bg-border/60" />
-                        <div className="flex items-center gap-1.5 px-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Hasta</span>
-                          <Input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="h-8 w-[125px] text-xs bg-transparent border-none shadow-none focus-visible:ring-0"
-                          />
-                        </div>
-                      </div>
-
-
-                      <div className="flex items-center gap-1.5">
-                        <Button
-                          onClick={handleApplyFilters}
-                          size="sm"
-                          className="h-9 px-4 bg-primary hover:bg-primary/90 text-white font-bold text-xs rounded-lg transition-all shadow-md active:scale-95"
-                        >
-                          <Search className="h-3.5 w-3.5 mr-1.5" />
-                          Filtrar
-                        </Button>
-                        <Button
-                          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                          variant={showAdvancedFilters ? "default" : "outline"}
-                          size="sm"
-                          className={`h-9 px-3 text-xs font-semibold ${showAdvancedFilters ? "bg-muted text-foreground hover:bg-muted-foreground/10" : "bg-background hover:bg-muted/50"}`}
-                        >
-                          Avanzados
-                          {showAdvancedFilters ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
-                        </Button>
-                        {(startDate || endDate || selectedCategories.length > 0 || minAmount || maxAmount || currency !== 'all' || paymentType !== 'all' || docSearch) && (
-                          <Button
-                            onClick={handleClearFilters}
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
-                            title="Limpiar filtros"
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <ExportExcelModal buttonVariant="outline" buttonSize="sm" buttonClass="h-9 px-4 bg-emerald-50 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 border-emerald-200 shadow-sm font-semibold text-xs rounded-lg" />
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <ExportExcelModal buttonVariant="outline" buttonSize="sm" buttonClass="h-8 sm:h-9 px-2 sm:px-4 bg-emerald-50 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 border-emerald-200 shadow-sm font-semibold text-xs rounded-lg" />
                       {canCreate && !showNewPaymentForm && (
                         <Button
                           onClick={() => setShowNewPaymentForm(true)}
                           size="sm"
-                          className="h-9 px-5 shadow-md hover:shadow-lg transition-all font-bold text-xs rounded-lg bg-[#1a2332] hover:bg-[#2c3a4f]"
+                          className="h-8 sm:h-9 px-3 sm:px-5 shadow-md hover:shadow-lg transition-all font-bold text-xs rounded-lg bg-[#1a2332] hover:bg-[#2c3a4f]"
                         >
-                          <PlusCircle className="h-4 w-4 mr-2" />
-                          Nuevo pago
+                          <PlusCircle className="h-4 w-4 sm:mr-2" />
+                          <span className="hidden sm:inline">Nuevo pago</span>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Fila 2: Filtros de fecha + botones */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Fechas: en móvil separadas, en desktop juntas */}
+                    <div className="flex flex-1 min-w-0 flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-0 bg-background rounded-lg border border-border shadow-sm">
+                      <div className="flex items-center gap-1 px-2 py-1 flex-1 min-w-0">
+                        <CalendarIcon className="h-3 w-3 text-primary/70 shrink-0" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">Desde</span>
+                        <Input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="h-7 flex-1 min-w-0 text-xs bg-transparent border-none shadow-none focus-visible:ring-0 p-0"
+                        />
+                      </div>
+                      <div className="hidden sm:block h-4 w-[1px] bg-border/60 shrink-0" />
+                      <div className="flex items-center gap-1 px-2 py-1 flex-1 min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">Hasta</span>
+                        <Input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="h-7 flex-1 min-w-0 text-xs bg-transparent border-none shadow-none focus-visible:ring-0 p-0"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        onClick={handleApplyFilters}
+                        size="sm"
+                        className="h-8 sm:h-9 px-3 sm:px-4 bg-primary hover:bg-primary/90 text-white font-bold text-xs rounded-lg transition-all shadow-md active:scale-95"
+                      >
+                        <Search className="h-3.5 w-3.5 sm:mr-1.5" />
+                        <span className="hidden sm:inline">Filtrar</span>
+                      </Button>
+                      <Button
+                        onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                        variant={showAdvancedFilters ? "default" : "outline"}
+                        size="sm"
+                        className={`h-8 sm:h-9 px-2 sm:px-3 text-xs font-semibold ${showAdvancedFilters ? "bg-muted text-foreground hover:bg-muted-foreground/10" : "bg-background hover:bg-muted/50"}`}
+                      >
+                        <span className="hidden sm:inline">Avanzados</span>
+                        <Filter className="sm:hidden h-3.5 w-3.5" />
+                        {showAdvancedFilters ? <ChevronUp className="h-4 w-4 ml-0 sm:ml-1" /> : <ChevronDown className="h-4 w-4 ml-0 sm:ml-1" />}
+                      </Button>
+                      {(startDate || endDate || selectedCategories.length > 0 || minAmount || maxAmount || currency !== 'all' || paymentType !== 'all' || docSearch) && (
+                        <Button
+                          onClick={handleClearFilters}
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 sm:h-9 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
+                          title="Limpiar filtros"
+                        >
+                          <XCircle className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
@@ -424,7 +439,7 @@ export default function DashboardPage() {
 
                 {/* Formulario de nuevo pago embebido */}
                 {showNewPaymentForm && canCreate && (
-                  <div className="bg-card border rounded-lg p-6 shadow-md">
+                  <div className="bg-card border rounded-lg p-3 sm:p-6 shadow-md">
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h3 className="text-xl font-semibold text-primary">Nuevo Registro de Pago</h3>

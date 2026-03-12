@@ -97,8 +97,14 @@ export function Sidebar({
 
   return (
     <aside className={cn(
-      "bg-primary text-primary-foreground min-h-[calc(100vh-73px)] border-r border-primary/20 shadow-xl transition-all duration-300",
-      collapsed ? "w-20" : "w-56"
+      "bg-primary text-primary-foreground border-r border-primary/20 shadow-2xl transition-all duration-300 overflow-y-auto",
+      // Móvil: overlay fijo debajo del header
+      "fixed left-0 top-14 h-[calc(100vh-3.5rem)] z-40 w-72",
+      // Desktop: estático en el flujo normal
+      "md:static md:h-auto md:min-h-[calc(100vh-73px)] md:z-auto md:overflow-visible",
+      collapsed
+        ? "-translate-x-full md:translate-x-0 md:w-20"
+        : "translate-x-0 md:w-56"
     )}>
       <div className={cn("p-3 space-y-1.5", collapsed && "px-2.5 py-3")}>
         {visibleItems.map((item) => {

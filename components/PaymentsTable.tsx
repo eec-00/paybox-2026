@@ -305,12 +305,12 @@ export function PaymentsTable({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Subido por</TableHead>
-                <TableHead>Fecha y Hora</TableHead>
+                <TableHead className="hidden sm:table-cell">Subido por</TableHead>
+                <TableHead className="whitespace-nowrap">Fecha</TableHead>
                 <TableHead>Beneficiario</TableHead>
-                <TableHead>Tipo de Documento</TableHead>
-                <TableHead>Monto</TableHead>
-                <TableHead>Categoría</TableHead>
+                <TableHead className="hidden md:table-cell">Tipo Doc.</TableHead>
+                <TableHead className="whitespace-nowrap">Monto</TableHead>
+                <TableHead className="hidden lg:table-cell">Categoría</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -324,14 +324,15 @@ export function PaymentsTable({
               ) : (
                 registros.map((registro) => (
                   <TableRow key={registro.id}>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <span className="font-medium text-sm">{registro.nombre_usuario || 'Usuario desconocido'}</span>
                     </TableCell>
-                    <TableCell className="font-medium">
-                      {formatDateTime(registro.fecha_y_hora_pago)}
+                    <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">
+                      <span className="hidden sm:inline">{formatDateTime(registro.fecha_y_hora_pago)}</span>
+                      <span className="sm:hidden">{formatDateOnly(registro.fecha_y_hora_pago)}</span>
                     </TableCell>
-                    <TableCell>{registro.beneficiario}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-sm max-w-[120px] sm:max-w-none truncate">{registro.beneficiario}</TableCell>
+                    <TableCell className="hidden md:table-cell">
                       {registro.tipo_documento ? (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary/10 text-secondary">
                           {registro.tipo_documento === 'factura' ? 'Factura' : 'Comprobante'}
@@ -340,12 +341,12 @@ export function PaymentsTable({
                         <span className="text-muted-foreground text-xs">-</span>
                       )}
                     </TableCell>
-                    <TableCell className="font-semibold">
+                    <TableCell className="font-semibold text-sm whitespace-nowrap">
                       {formatCurrency(registro.monto, registro.moneda)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <div className="flex flex-col">
-                        <span className="font-medium text-secondary">
+                        <span className="font-medium text-secondary text-sm">
                           {registro.categoria?.categoria_id_texto}
                         </span>
                         <span className="text-xs text-muted-foreground">
@@ -354,16 +355,17 @@ export function PaymentsTable({
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1 sm:gap-2">
                         <Dialog>
                           <DialogTrigger asChild>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => setSelectedRegistro(registro)}
+                              className="px-2 sm:px-3"
                             >
-                              <Eye className="h-4 w-4 mr-1" />
-                              Ver más
+                              <Eye className="h-4 w-4 sm:mr-1" />
+                              <span className="hidden sm:inline">Ver más</span>
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="max-w-[95vw] lg:max-w-[1400px] max-h-[95vh] overflow-y-auto">
@@ -500,7 +502,7 @@ export function PaymentsTable({
                                         {selectedRegistro.comprobantes.map((url, index) => (
                                           <div key={index} className="relative group">
                                             <div className="relative overflow-hidden rounded-lg border-2 border-secondary/20 shadow-md hover:shadow-xl transition-all hover:border-secondary/40">
-                                              <div className="aspect-[3/4] relative">
+                                              <div className="aspect-3/4 relative">
                                                 <img
                                                   src={url}
                                                   alt={`Comprobante ${index + 1}`}
@@ -512,7 +514,7 @@ export function PaymentsTable({
                                                 />
                                               </div>
                                               {index === 0 && (
-                                                <div className="absolute top-3 left-3 bg-gradient-to-r from-secondary to-secondary/80 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
+                                                <div className="absolute top-3 left-3 bg-linear-to-r from-secondary to-secondary/80 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
                                                   📄 Principal
                                                 </div>
                                               )}
@@ -607,25 +609,32 @@ export function PaymentsTable({
 
         {/* Paginación */}
         {totalRecords > 0 && (
-          <div className="flex items-center justify-between mt-6 border-t pt-4">
-            <div className="text-sm text-muted-foreground">
-              Mostrando <span className="font-medium text-foreground">{(currentPage - 1) * PAGE_SIZE + 1}</span> a{' '}
+          <div className="flex flex-col sm:flex-row items-center justify-between mt-6 border-t pt-4 gap-3">
+            <div className="text-xs sm:text-sm text-muted-foreground">
+              <span className="hidden sm:inline">Mostrando </span>
+              <span className="font-medium text-foreground">{(currentPage - 1) * PAGE_SIZE + 1}</span>–
               <span className="font-medium text-foreground">
                 {Math.min(currentPage * PAGE_SIZE, totalRecords)}
-              </span> de{' '}
-              <span className="font-medium text-foreground">{totalRecords}</span> registros
+              </span>
+              <span className="hidden sm:inline"> de </span>
+              <span className="sm:hidden"> / </span>
+              <span className="font-medium text-foreground">{totalRecords}</span>
+              <span className="hidden sm:inline"> registros</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1 || loading}
               >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Anterior
+                <ChevronLeft className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Anterior</span>
               </Button>
-              <div className="flex items-center gap-1">
+              <span className="sm:hidden text-xs font-medium text-muted-foreground px-1">
+                {currentPage} / {Math.ceil(totalRecords / PAGE_SIZE)}
+              </span>
+              <div className="hidden sm:flex items-center gap-1">
                 {(() => {
                   const totalPages = Math.ceil(totalRecords / PAGE_SIZE);
                   let pages: (number | string)[] = [];
@@ -669,8 +678,8 @@ export function PaymentsTable({
                 onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalRecords / PAGE_SIZE), prev + 1))}
                 disabled={currentPage >= Math.ceil(totalRecords / PAGE_SIZE) || loading}
               >
-                Siguiente
-                <ChevronRight className="h-4 w-4 ml-1" />
+                <span className="hidden sm:inline">Siguiente</span>
+                <ChevronRight className="h-4 w-4 sm:ml-1" />
               </Button>
             </div>
           </div>

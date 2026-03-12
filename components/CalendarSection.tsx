@@ -236,7 +236,7 @@ export function CalendarSection() {
 
         // Add empty cells for days before the 1st
         for (let i = 0; i < firstDay; i++) {
-            days.push(<div key={`empty-${i}`} className="h-32 border border-muted/50 bg-muted/10 rounded-sm w-full"></div>)
+            days.push(<div key={`empty-${i}`} className="h-16 sm:h-32 border border-muted/50 bg-muted/10 rounded-sm w-full"></div>)
         }
 
         // Add actual days
@@ -246,13 +246,16 @@ export function CalendarSection() {
             const isToday = new Date().toISOString().split('T')[0] === dateStr
 
             days.push(
-                <div key={day} className={`h-32 border border-muted/50 rounded-sm p-1 overflow-hidden flex flex-col ${isToday ? 'bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
-                    <div className="flex justify-between items-center mb-1 shrink-0">
-                        <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+                <div key={day} className={`h-16 sm:h-32 border border-muted/50 rounded-sm p-0.5 sm:p-1 overflow-hidden flex flex-col ${isToday ? 'bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
+                    <div className="flex justify-between items-center mb-0.5 sm:mb-1 shrink-0">
+                        <span className={`text-[10px] sm:text-xs font-semibold w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
                             {day}
                         </span>
+                        {dayPagos.length > 0 && (
+                            <span className="sm:hidden text-[9px] font-bold text-blue-500">{dayPagos.length}</span>
+                        )}
                     </div>
-                    <div className="space-y-1 flex-1">
+                    <div className="space-y-0.5 sm:space-y-1 flex-1 hidden sm:block">
                         {dayPagos.slice(0, 3).map(pago => (
                             <div key={pago.id} className={`text-[10px] p-1 rounded-sm flex flex-col gap-0.5 ${pago.estado === 'pagado' ? 'bg-green-100/50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-blue-100/50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'}`}>
                                 <div className="font-semibold truncate" title={pago.nombre_pago}>{pago.nombre_pago}</div>
@@ -312,16 +315,25 @@ export function CalendarSection() {
 
         return (
             <div className="w-full">
-                <div className="flex justify-between items-center mb-4">
-                    <Button variant="outline" onClick={() => setCurrentDate(new Date(year, month - 1, 1))}>Anterior</Button>
-                    <h3 className="text-lg font-bold">
+                <div className="flex justify-between items-center mb-3 sm:mb-4">
+                    <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date(year, month - 1, 1))}>
+                        <span className="hidden sm:inline">Anterior</span>
+                        <span className="sm:hidden">‹</span>
+                    </Button>
+                    <h3 className="text-sm sm:text-lg font-bold">
                         {currentDate.toLocaleString('es-PE', { month: 'long', year: 'numeric' }).toUpperCase()}
                     </h3>
-                    <Button variant="outline" onClick={() => setCurrentDate(new Date(year, month + 1, 1))}>Siguiente</Button>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date(year, month + 1, 1))}>
+                        <span className="hidden sm:inline">Siguiente</span>
+                        <span className="sm:hidden">›</span>
+                    </Button>
                 </div>
                 <div className="grid grid-cols-7 gap-1">
-                    {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
-                        <div key={d} className="text-center text-sm font-semibold text-muted-foreground py-2">{d}</div>
+                    {[['Dom','D'], ['Lun','L'], ['Mar','M'], ['Mié','M'], ['Jue','J'], ['Vie','V'], ['Sáb','S']].map(([full, short]) => (
+                        <div key={full} className="text-center text-xs sm:text-sm font-semibold text-muted-foreground py-1 sm:py-2">
+                            <span className="hidden sm:inline">{full}</span>
+                            <span className="sm:hidden">{short}</span>
+                        </div>
                     ))}
                     {days}
                 </div>
@@ -331,14 +343,14 @@ export function CalendarSection() {
 
     const renderList = () => {
         return (
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Fecha</TableHead>
+                            <TableHead className="whitespace-nowrap">Fecha</TableHead>
                             <TableHead>Nombre</TableHead>
-                            <TableHead>Monto</TableHead>
-                            <TableHead>Factura</TableHead>
+                            <TableHead className="whitespace-nowrap">Monto</TableHead>
+                            <TableHead className="hidden md:table-cell">Factura</TableHead>
                             <TableHead>Estado</TableHead>
                             {canCreate && <TableHead className="text-right">Acciones</TableHead>}
                         </TableRow>
@@ -353,18 +365,18 @@ export function CalendarSection() {
                         ) : (
                             pagos.map(pago => (
                                 <TableRow key={pago.id}>
-                                    <TableCell className="font-medium">{new Date(pago.fecha + 'T12:00:00').toLocaleDateString('es-PE')}</TableCell>
+                                    <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">{new Date(pago.fecha + 'T12:00:00').toLocaleDateString('es-PE')}</TableCell>
                                     <TableCell>
-                                        <div className="flex items-center gap-1">
-                                            {pago.nombre_pago}
+                                        <div className="flex items-center gap-1 text-sm">
+                                            <span className="font-medium">{pago.nombre_pago}</span>
                                             {pago.frecuencia !== 'unica' && <span title={pago.frecuencia}><RefreshCw className="w-3 h-3 text-muted-foreground" /></span>}
                                         </div>
-                                        {pago.descripcion && <div className="text-xs text-muted-foreground">{pago.descripcion}</div>}
+                                        {pago.descripcion && <div className="text-xs text-muted-foreground line-clamp-1">{pago.descripcion}</div>}
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="text-sm whitespace-nowrap">
                                         {pago.monto_variable ? <span className="text-muted-foreground italic text-xs">A definir</span> : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`}
                                     </TableCell>
-                                    <TableCell>{pago.numero_factura || '-'}</TableCell>
+                                    <TableCell className="hidden md:table-cell text-sm">{pago.numero_factura || '-'}</TableCell>
                                     <TableCell>
                                         {pago.estado === 'pagado' ? (
                                             <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
@@ -399,32 +411,32 @@ export function CalendarSection() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <CalendarIcon className="h-6 w-6 text-primary" />
-                    <div>
-                        <h2 className="text-2xl font-bold text-primary">Calendario de Pagos</h2>
-                        <p className="text-muted-foreground">Gestiona los pagos recurrentes y programados</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                    <CalendarIcon className="h-6 w-6 text-primary shrink-0" />
+                    <div className="min-w-0">
+                        <h2 className="text-xl sm:text-2xl font-bold text-primary">Calendario de Pagos</h2>
+                        <p className="text-muted-foreground text-sm hidden sm:block">Gestiona los pagos recurrentes y programados</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                     <div className="bg-muted p-1 rounded-md flex">
                         <Button
                             variant={viewMode === 'calendar' ? 'default' : 'ghost'}
                             size="sm"
                             onClick={() => setViewMode('calendar')}
-                            className="h-8"
+                            className="h-8 px-2 sm:px-3"
                         >
-                            <CalendarIcon className="w-4 h-4 mr-1" /> Calendario
+                            <CalendarIcon className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Calendario</span>
                         </Button>
                         <Button
                             variant={viewMode === 'list' ? 'default' : 'ghost'}
                             size="sm"
                             onClick={() => setViewMode('list')}
-                            className="h-8"
+                            className="h-8 px-2 sm:px-3"
                         >
-                            <List className="w-4 h-4 mr-1" /> Lista
+                            <List className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Lista</span>
                         </Button>
                     </div>
 
@@ -432,7 +444,7 @@ export function CalendarSection() {
                         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                             <DialogTrigger asChild>
                                 <Button size="sm" className="h-8 ml-2">
-                                    <Plus className="w-4 h-4 mr-1" /> Programar Pago
+                                    <Plus className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Programar Pago</span>
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto w-[95vw]">

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ImageUploader, OCRData } from '@/components/ImageUploader'
 import { getUserPermissions } from '@/lib/utils/auth'
-import { Shield } from 'lucide-react'
+import { Shield, CheckCircle2 } from 'lucide-react'
 import type { Categoria, CalendarioPago } from '@/lib/types/database.types'
 
 interface PaymentFormProps {
@@ -28,6 +28,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [canCreate, setCanCreate] = useState(false)
   const [checkingPermissions, setCheckingPermissions] = useState(true)
+  const [ocrToast, setOcrToast] = useState(false)
 
   // Datos fijos (para OCR)
   const [fechaYHoraPago, setFechaYHoraPago] = useState('')
@@ -258,9 +259,8 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
       if (data.descripcion) message += `📝 Concepto: ${data.descripcion}\n`
     }
 
-    message += '\nPor favor verifica la información antes de guardar.'
-
-    alert(message)
+    setOcrToast(true)
+    setTimeout(() => setOcrToast(false), 2500)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -376,8 +376,15 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <>
+      {ocrToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-9999 bg-green-500 text-white px-5 py-2.5 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 animate-fade-in pointer-events-none">
+          <CheckCircle2 className="w-4 h-4" />
+          Datos obtenidos
+        </div>
+      )}
+      <Card>
+        <CardHeader>
         <CardTitle className="text-primary">Nuevo Registro de Pago</CardTitle>
         <CardDescription>Complete los datos del comprobante</CardDescription>
       </CardHeader>
@@ -692,5 +699,6 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
         </form>
       </CardContent>
     </Card>
+    </>
   )
 }

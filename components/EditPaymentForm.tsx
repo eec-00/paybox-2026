@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Categoria, Registro } from '@/lib/types/database.types'
 import { ImageUploader, OCRData } from './ImageUploader'
+import { CheckCircle2 } from 'lucide-react'
 
 interface EditPaymentFormProps {
   registro: Registro
@@ -21,6 +22,7 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [selectedCategoria, setSelectedCategoria] = useState<Categoria | null>(null)
   const [loading, setLoading] = useState(false)
+  const [ocrToast, setOcrToast] = useState(false)
 
   // Campos básicos
   const [fechaYHoraPago, setFechaYHoraPago] = useState('')
@@ -148,7 +150,8 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
       setRuc(data.ruc)
     }
 
-    alert('Datos extraídos exitosamente del OCR. Por favor verifica la información antes de guardar.')
+    setOcrToast(true)
+    setTimeout(() => setOcrToast(false), 2500)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -196,7 +199,14 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <>
+      {ocrToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-9999 bg-green-500 text-white px-5 py-2.5 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 animate-fade-in pointer-events-none">
+          <CheckCircle2 className="w-4 h-4" />
+          Datos obtenidos
+        </div>
+      )}
+      <form onSubmit={handleSubmit}>
       <DialogHeader className="pb-4 border-b">
         <DialogTitle className="text-2xl text-primary">Editar Registro de Pago</DialogTitle>
         <DialogDescription className="text-base">
@@ -407,6 +417,7 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
           {loading ? 'Guardando...' : 'Guardar Cambios'}
         </Button>
       </DialogFooter>
-    </form>
+      </form>
+    </>
   )
 }
