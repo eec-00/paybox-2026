@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +19,11 @@ interface PaymentFormProps {
 export function PaymentForm({ onSuccess }: PaymentFormProps) {
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [selectedCategoria, setSelectedCategoria] = useState<Categoria | null>(null)
+  const [selectedNaturaleza, setSelectedNaturaleza] = useState('')
+  const [selectedSubgrupo, setSelectedSubgrupo] = useState('')
+  const [categoriaSearch, setCategoriaSearch] = useState('')
+  const [categoriasDropdownOpen, setCategoriasDropdownOpen] = useState(false)
+  const categoriaRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [canCreate, setCanCreate] = useState(false)
@@ -91,6 +96,16 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
     }
   }
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (categoriaRef.current && !categoriaRef.current.contains(e.target as Node)) {
+        setCategoriasDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   const loadCategorias = async () => {
     try {
       const { data, error } = await supabase
@@ -105,11 +120,41 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
     }
   }
 
-  const handleCategoriaChange = (categoriaId: string) => {
-    const categoria = categorias.find(c => c.id === parseInt(categoriaId))
-    setSelectedCategoria(categoria || null)
+  const handleNaturalezaChange = (val: string) => {
+    const nuevo = val === 'all' ? '' : val
+    setSelectedNaturaleza(nuevo)
+    setSelectedSubgrupo('')
+    setSelectedCategoria(null)
+    setCategoriaSearch('')
     setDatosDinamicos({})
   }
+
+  const handleSubgrupoChange = (val: string) => {
+    setSelectedSubgrupo(val === 'all' ? '' : val)
+    setSelectedCategoria(null)
+    setCategoriaSearch('')
+    setDatosDinamicos({})
+  }
+
+  const handleCategoriaSelect = (cat: Categoria) => {
+    setSelectedCategoria(cat)
+    setCategoriaSearch(cat.categoria_nombre)
+    setCategoriasDropdownOpen(false)
+    setDatosDinamicos({})
+  }
+
+  const naturalezas = [...new Set(categorias.map(c => c.naturaleza))].sort()
+  const subgrupos = [...new Set(
+    categorias
+      .filter(c => !selectedNaturaleza || c.naturaleza === selectedNaturaleza)
+      .map(c => c.subgrupo)
+  )].sort()
+  const filteredCategorias = categorias.filter(c => {
+    if (selectedNaturaleza && c.naturaleza !== selectedNaturaleza) return false
+    if (selectedSubgrupo && c.subgrupo !== selectedSubgrupo) return false
+    if (categoriaSearch && !c.categoria_nombre.toLowerCase().includes(categoriaSearch.toLowerCase())) return false
+    return true
+  })
 
   const handlePagoProgramadoChange = (val: string) => {
     setSelectedPagoProgramado(val)
@@ -518,25 +563,98 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
               />
             </div>
           </div>
-          {/* Selector de Categoría */}
-          <div className="space-y-2 border-t pt-4">
-            <Label htmlFor="categoria">Categoría *</Label>
-            <Select
-              value={selectedCategoria?.id.toString() || ''}
-              onValueChange={handleCategoriaChange}
-              disabled={loading}
-            >
-              <SelectTrigger id="categoria">
-                <SelectValue placeholder="Seleccione una categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                {categorias.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id.toString()}>
-                    {cat.categoria_nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Selector de Categoría con filtros en cascada */}
+          <div className="space-y-4 border-t pt-4">
+            <p className="text-sm font-semibold text-secondary">Categoría *</p>
+
+            {/* Paso 1 y 2: Filtros opcionales */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Naturaleza (filtro opcional)</Label>
+                <Select
+                  value={selectedNaturaleza || 'all'}
+                  onValueChange={handleNaturalezaChange}
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas las naturalezas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las naturalezas</SelectItem>
+                    {naturalezas.map(n => (
+                      <SelectItem key={n} value={n}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Subgrupo (filtro opcional)</Label>
+                <Select
+                  value={selectedSubgrupo || 'all'}
+                  onValueChange={handleSubgrupoChange}
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos los subgrupos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los subgrupos</SelectItem>
+                    {subgrupos.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Paso 3: Buscador de categoría */}
+            <div className="space-y-1" ref={categoriaRef}>
+              <Label className="text-xs text-muted-foreground">
+                Buscar categoría
+                {filteredCategorias.length > 0 && (
+                  <span className="ml-1 text-muted-foreground/60">({filteredCategorias.length} disponibles)</span>
+                )}
+              </Label>
+              <div className="relative">
+                <Input
+                  placeholder="Escribe para buscar..."
+                  value={categoriaSearch}
+                  onChange={(e) => {
+                    setCategoriaSearch(e.target.value)
+                    setCategoriasDropdownOpen(true)
+                    if (!e.target.value) setSelectedCategoria(null)
+                  }}
+                  onFocus={() => setCategoriasDropdownOpen(true)}
+                  disabled={loading}
+                />
+                {categoriasDropdownOpen && (filteredCategorias.length > 0 || categoriaSearch) && (
+                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-56 overflow-y-auto">
+                    {filteredCategorias.length > 0 ? (
+                      filteredCategorias.map(cat => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors ${selectedCategoria?.id === cat.id ? 'bg-primary/10 font-medium' : ''}`}
+                          onClick={() => handleCategoriaSelect(cat)}
+                        >
+                          <span>{cat.categoria_nombre}</span>
+                          <span className="text-xs text-muted-foreground ml-2">{cat.categoria_id_texto}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="px-3 py-2 text-sm text-muted-foreground">Sin resultados para &ldquo;{categoriaSearch}&rdquo;</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              {selectedCategoria && (
+                <p className="text-xs text-muted-foreground pt-1">
+                  <span className="font-medium text-secondary">{selectedCategoria.naturaleza}</span>
+                  {' · '}
+                  {selectedCategoria.subgrupo}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Campos Dinámicos según Categoría */}
