@@ -245,11 +245,11 @@ export function Dashboard() {
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {/* Total de Registros */}
         <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-primary">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 sm:px-4 pt-2 sm:pt-3">
             <CardTitle className="text-xs sm:text-sm font-medium">Total Registros</CardTitle>
             <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
           </CardHeader>
-          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+          <CardContent className="px-3 sm:px-4 pb-2 sm:pb-3">
             <div className="text-xl sm:text-2xl font-bold">{stats.totalPayments}</div>
             <p className="text-xs text-muted-foreground mt-1">En el sistema</p>
           </CardContent>
@@ -257,11 +257,11 @@ export function Dashboard() {
 
         {/* Monto Total en Soles */}
         <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-green-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 sm:px-4 pt-2 sm:pt-3">
             <CardTitle className="text-xs sm:text-sm font-medium">Monto Total</CardTitle>
             <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 shrink-0" />
           </CardHeader>
-          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+          <CardContent className="px-3 sm:px-4 pb-2 sm:pb-3">
             <div className="text-base sm:text-2xl font-bold leading-tight">
               S/ {stats.totalAmountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
             </div>
@@ -276,11 +276,11 @@ export function Dashboard() {
 
         {/* Mes Actual */}
         <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 sm:px-4 pt-2 sm:pt-3">
             <CardTitle className="text-xs sm:text-sm font-medium">Mes Actual</CardTitle>
             <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 shrink-0" />
           </CardHeader>
-          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+          <CardContent className="px-3 sm:px-4 pb-2 sm:pb-3">
             <div className="text-base sm:text-2xl font-bold leading-tight">
               S/ {stats.monthlyTotalSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
             </div>
@@ -297,11 +297,11 @@ export function Dashboard() {
 
         {/* Mis Registros */}
         <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-secondary">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 sm:px-4 pt-2 sm:pt-3">
             <CardTitle className="text-xs sm:text-sm font-medium">Mis Registros</CardTitle>
             <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-secondary shrink-0" />
           </CardHeader>
-          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+          <CardContent className="px-3 sm:px-4 pb-2 sm:pb-3">
             <div className="text-xl sm:text-2xl font-bold">{stats.userPayments}</div>
             <p className="text-xs text-muted-foreground mt-1 truncate">
               S/ {stats.userAmountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
