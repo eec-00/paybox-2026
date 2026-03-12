@@ -167,30 +167,30 @@ export default function DashboardPage() {
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header reorganizado */}
       <header className="border-b bg-gradient-to-r from-primary via-primary to-primary/95 shadow-lg sticky top-0 z-50">
-        <div className="px-3 sm:px-6 py-3 sm:py-3.5 flex items-center justify-between gap-2">
+        <div className="px-3 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between gap-2">
           {/* Logo y nombre de la empresa */}
           <div className="flex items-center gap-2 sm:gap-6 min-w-0">
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
               {/* Botón de colapsar sidebar */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="h-8 w-8 bg-white/10 hover:bg-white/20 text-white rounded-md transition-all hover:scale-110"
+                className="h-9 w-9 bg-white/10 hover:bg-white/20 text-white rounded-md transition-all hover:scale-110"
                 title={sidebarCollapsed ? "Expandir menú" : "Contraer menú"}
               >
                 {sidebarCollapsed ? (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
                 ) : (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 )}
               </Button>
 
-              <div className="relative w-8 h-8 sm:w-10 sm:h-10 shrink-0">
+              <div className="relative w-10 h-10 sm:w-12 sm:h-12 shrink-0">
                 <Image
                   src="/logo.png"
                   alt="Logo"
@@ -199,8 +199,8 @@ export default function DashboardPage() {
                 />
               </div>
               <div>
-                <h1 className="font-bold text-base sm:text-xl text-white font-[family-name:var(--font-montserrat)]">PayBox</h1>
-                <p className="text-[10px] sm:text-xs text-white/70">Eemerson SAC</p>
+                <h1 className="font-bold text-lg sm:text-2xl text-white font-[family-name:var(--font-montserrat)]">PayBox</h1>
+                <p className="text-[11px] sm:text-sm text-white/70 leading-tight">Eemerson SAC</p>
               </div>
             </div>
 
@@ -218,7 +218,7 @@ export default function DashboardPage() {
           {/* Botón de cerrar sesión */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <UpdatesNotification />
-            <Button variant="secondary" onClick={handleLogout} className="shadow-md hover:shadow-lg transition-shadow h-8 sm:h-9 px-2 sm:px-4">
+            <Button variant="secondary" onClick={handleLogout} className="shadow-md hover:shadow-lg transition-shadow h-9 sm:h-10 px-3 sm:px-4 text-sm">
               <LogOut className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Cerrar Sesión</span>
             </Button>
@@ -231,7 +231,7 @@ export default function DashboardPage() {
         {/* Backdrop móvil - oscurece el contenido al abrir sidebar */}
         {!sidebarCollapsed && (
           <div
-            className="fixed inset-0 top-14 bg-black/50 z-30 md:hidden"
+            className="fixed inset-0 top-16 bg-black/50 z-30 md:hidden"
             onClick={() => setSidebarCollapsed(true)}
           />
         )}

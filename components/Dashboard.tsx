@@ -235,39 +235,39 @@ export function Dashboard() {
   const hasDolares = stats.totalAmountDolares > 0
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-primary mb-2">Dashboard</h2>
-        <p className="text-muted-foreground">Resumen general del sistema de gestión de pagos</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-primary mb-1">Dashboard</h2>
+        <p className="text-sm text-muted-foreground">Resumen general del sistema de gestión de pagos</p>
       </div>
 
-      {/* Tarjetas principales */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Tarjetas principales — 2 columnas en móvil, 4 en desktop */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {/* Total de Registros */}
         <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-primary">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Registros</CardTitle>
-            <FileText className="h-4 w-4 text-primary" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Registros</CardTitle>
+            <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalPayments}</div>
+          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="text-xl sm:text-2xl font-bold">{stats.totalPayments}</div>
             <p className="text-xs text-muted-foreground mt-1">En el sistema</p>
           </CardContent>
         </Card>
 
         {/* Monto Total en Soles */}
         <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-green-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monto Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-600" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Monto Total</CardTitle>
+            <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              S/ {stats.totalAmountSoles.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="text-base sm:text-2xl font-bold leading-tight">
+              S/ {stats.totalAmountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
             </div>
             {hasDolares && (
-              <div className="text-sm font-semibold text-amber-600 mt-1">
-                $ {stats.totalAmountDolares.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <div className="text-xs sm:text-sm font-semibold text-amber-600 mt-0.5">
+                $ {stats.totalAmountDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">Todos los pagos</p>
@@ -276,20 +276,20 @@ export function Dashboard() {
 
         {/* Mes Actual */}
         <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Mes Actual</CardTitle>
-            <Calendar className="h-4 w-4 text-blue-600" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Mes Actual</CardTitle>
+            <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              S/ {stats.monthlyTotalSoles.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="text-base sm:text-2xl font-bold leading-tight">
+              S/ {stats.monthlyTotalSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
             </div>
             {hasDolares && stats.monthlyTotalDolares > 0 && (
-              <div className="text-sm font-semibold text-amber-600 mt-1">
-                $ {stats.monthlyTotalDolares.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <div className="text-xs sm:text-sm font-semibold text-amber-600 mt-0.5">
+                $ {stats.monthlyTotalDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-1 capitalize">
               {new Date().toLocaleDateString('es-PE', { month: 'long' })}
             </p>
           </CardContent>
@@ -297,13 +297,13 @@ export function Dashboard() {
 
         {/* Mis Registros */}
         <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-secondary">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Mis Registros</CardTitle>
-            <User className="h-4 w-4 text-secondary" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+            <CardTitle className="text-xs sm:text-sm font-medium">Mis Registros</CardTitle>
+            <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-secondary shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.userPayments}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+            <div className="text-xl sm:text-2xl font-bold">{stats.userPayments}</div>
+            <p className="text-xs text-muted-foreground mt-1 truncate">
               S/ {stats.userAmountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
               {hasDolares && stats.userAmountDolares > 0 && (
                 <span className="text-amber-600 ml-1">
@@ -316,7 +316,7 @@ export function Dashboard() {
       </div>
 
       {/* Grid de información detallada */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-3 sm:gap-6 md:grid-cols-2">
         {/* Distribución por Método de Pago */}
         <Card>
           <CardHeader>
@@ -501,7 +501,7 @@ export function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-7 gap-2">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {weeklyTrend.map((day, index) => {
               const date = new Date(day.date)
               const dayName = date.toLocaleDateString('es-PE', { weekday: 'short' })
@@ -511,8 +511,8 @@ export function Dashboard() {
               const heightPercentage = (totalDay / maxAmount) * 100
 
               return (
-                <div key={index} className="flex flex-col items-center gap-2">
-                  <div className="h-32 w-full flex items-end justify-center">
+                <div key={index} className="flex flex-col items-center gap-1 sm:gap-2">
+                  <div className="h-20 sm:h-32 w-full flex items-end justify-center">
                     <div
                       className="w-full bg-linear-to-r from-primary to-secondary rounded-t-md transition-all hover:opacity-80 relative group"
                       style={{ height: `${Math.max(heightPercentage, 8)}%` }}
@@ -526,8 +526,11 @@ export function Dashboard() {
                     </div>
                   </div>
                   <div className="text-center">
-                    <p className="text-xs font-medium capitalize">{dayName}</p>
-                    <p className="text-xs text-muted-foreground">{dayNum}</p>
+                    <p className="text-[10px] sm:text-xs font-medium capitalize">
+                      <span className="sm:hidden">{dayName.charAt(0).toUpperCase()}</span>
+                      <span className="hidden sm:inline">{dayName}</span>
+                    </p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">{dayNum}</p>
                   </div>
                 </div>
               )
