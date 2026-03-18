@@ -11,6 +11,12 @@ export function createClient() {
         persistSession: true,
         autoRefreshToken: true,
       },
+      // PWA fix: sin maxAge las cookies son "session cookies" y se borran
+      // al cerrar la PWA en iOS Safari y Android Chrome.
+      cookieOptions: {
+        maxAge: 60 * 60 * 24 * 400, // 400 días (máximo permitido por los browsers)
+        sameSite: 'lax',
+      },
     }
   )
 }

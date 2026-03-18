@@ -19,6 +19,7 @@ import { CalendarSection } from '@/components/CalendarSection'
 import { UpdatesNotification } from '@/components/UpdatesNotification'
 import { UpdatesManagement } from '@/components/UpdatesManagement'
 import { UpdatesList } from '@/components/UpdatesList'
+import { SyncOdooModal } from '@/components/SyncOdooModal'
 import { isAdmin, getUserPermissions, getCurrentUserProfile } from '@/lib/utils/auth'
 import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText, Megaphone, Calendar as CalendarIcon, Filter, Search, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -267,6 +268,7 @@ export default function DashboardPage() {
 
                     <div className="flex items-center gap-1.5 sm:gap-2">
                       <ExportExcelModal buttonVariant="outline" buttonSize="sm" buttonClass="h-8 sm:h-9 px-2 sm:px-4 bg-emerald-50 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 border-emerald-200 shadow-sm font-semibold text-xs rounded-lg" />
+                      {isAdminUser && <SyncOdooModal />}
                       {canCreate && !showNewPaymentForm && (
                         <Button
                           onClick={() => setShowNewPaymentForm(true)}
