@@ -6,6 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "PayBox",
     description: "Sistema de Gestión de Gastos - Eemerson SAC",
     start_url: "/dashboard",
+    scope: "/",
     display: "standalone",
     orientation: "portrait",
     background_color: "#1a2332",
@@ -31,5 +32,6 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
     categories: ["business", "finance", "productivity"],
+    prefer_related_applications: false,
   };
 }

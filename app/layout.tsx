@@ -21,10 +21,15 @@ const montserrat = Montserrat({
 export const metadata: Metadata = {
   title: "PayBox - Sistema de Gestión de Gastos",
   description: "Sistema integral de gestión de gastos con categorías dinámicas y matriz de imputación",
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "PayBox",
+    startupImage: "/logo.png",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
   },
 };
 
@@ -37,9 +42,22 @@ export default function RootLayout({
     <html lang="es">
       <head>
         {/* PDF.js Library */}
-        <script 
+        <script
           src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
           async
+        />
+        {/* Service Worker Registration */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js')
+                    .catch(function(err) { console.log('SW registration failed:', err); });
+                });
+              }
+            `,
+          }}
         />
       </head>
       <body
