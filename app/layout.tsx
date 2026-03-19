@@ -21,6 +21,21 @@ const montserrat = Montserrat({
 export const metadata: Metadata = {
   title: "PayBox - Sistema de Gestión de Gastos",
   description: "Sistema integral de gestión de gastos con categorías dinámicas y matriz de imputación",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/logo.png", type: "image/png" },
+    ],
+    shortcut: "/logo.png",
+    apple: [
+      { url: "/logo.png", type: "image/png" },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "PayBox",
+  },
 };
 
 export default function RootLayout({
