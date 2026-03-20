@@ -6,11 +6,63 @@ const ODOO_URL = (process.env.ODOO_URL || process.env.URL || '').trim().replace(
 const ODOO_DB = (process.env.ODOO_DB || process.env.DB || '').trim()
 const ODOO_EMAIL = (process.env.ODOO_EMAIL || process.env.EMAIL || '').trim()
 const ODOO_API_KEY = (process.env.ODOO_API_KEY || process.env.API_KEY || '').trim()
+const ODOO_EXPENSE_AREA_FIELD = (process.env.ODOO_EXPENSE_AREA_FIELD || '').trim()
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+type AxisMapping = {
+  odooField: string
+  model: string
+  searchFields: string[]
+}
+
+// Mapeo de ejes dinámicos del formulario -> campos custom en hr.expense (Odoo)
+const AXIS_MAPPINGS: Record<string, AxisMapping> = {
+  servicio: {
+    odooField: 'x_studio_operacin',
+    model: 'sale.order',
+    searchFields: ['name', 'client_order_ref', 'origin'],
+  },
+  placa: {
+    odooField: 'x_studio_placa',
+    model: 'fleet.vehicle',
+    searchFields: ['license_plate', 'name'],
+  },
+  conductor: {
+    odooField: 'x_studio_conductor',
+    model: 'hr.employee',
+    searchFields: ['name'],
+  },
+}
+
+function normalizeAxisName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+function getAxisValue(
+  datosDinamicos: Record<string, unknown>,
+  eje: string
+): string {
+  const direct = datosDinamicos[eje]
+  if (typeof direct === 'string' && direct.trim()) return direct.trim()
+
+  const normalizedEje = normalizeAxisName(eje)
+  const matchedKey = Object.keys(datosDinamicos).find(
+    (key) => normalizeAxisName(key) === normalizedEje
+  )
+
+  if (!matchedKey) return ''
+
+  const value = datosDinamicos[matchedKey]
+  return typeof value === 'string' ? value.trim() : ''
+}
 
 // ── Odoo autenticación via /jsonrpc (soporta API keys) ───────────────────────
 // Este endpoint es el estándar de Odoo para integraciones externas
@@ -103,6 +155,58 @@ async function resolveId(
   return results[0].id
 }
 
+async function resolveIdByCandidateFields(
+  uid: number,
+  model: string,
+  value: string,
+  fields: string[]
+): Promise<number | null> {
+  const cleanValue = value.trim()
+  if (!cleanValue) return null
+
+  for (const field of fields) {
+    const exactKey = `${model}::${field}::exact::${cleanValue}`
+    if (resolveCache.has(exactKey)) {
+      return resolveCache.get(exactKey) as number | null
+    }
+
+    const exact = await odooCall<{ id: number }[]>(
+      uid,
+      model,
+      'search_read',
+      [[[field, '=', cleanValue]]],
+      { fields: ['id', 'name'], limit: 1 }
+    )
+
+    if (exact.length) {
+      resolveCache.set(exactKey, exact[0].id)
+      return exact[0].id
+    }
+    resolveCache.set(exactKey, null)
+
+    const ilikeKey = `${model}::${field}::ilike::${cleanValue}`
+    if (resolveCache.has(ilikeKey)) {
+      return resolveCache.get(ilikeKey) as number | null
+    }
+
+    const fuzzy = await odooCall<{ id: number }[]>(
+      uid,
+      model,
+      'search_read',
+      [[[field, 'ilike', cleanValue]]],
+      { fields: ['id', 'name'], limit: 1 }
+    )
+
+    if (fuzzy.length) {
+      resolveCache.set(ilikeKey, fuzzy[0].id)
+      return fuzzy[0].id
+    }
+    resolveCache.set(ilikeKey, null)
+  }
+
+  return null
+}
+
 async function resolveAnalytic(uid: number, name: string): Promise<string | null> {
   const key = `analytic::${name}`
   if (resolveCache.has(key)) return resolveCache.get(key) as string | null
@@ -146,10 +250,13 @@ export async function POST(request: NextRequest) {
         monto,
         moneda,
         descripcion,
+        datos_dinamicos,
         creado_por,
         categoria:categoria_id (
           id,
-          categoria_nombre
+          categoria_nombre,
+          area,
+          ejes_obligatorios
         )
       `)
       .gte('fecha_y_hora_pago', `${fechaDesde}T00:00:00`)
@@ -194,7 +301,11 @@ export async function POST(request: NextRequest) {
       try {
         const empleadoNombre = profileMap.get(registro.creado_por) ?? ''
         const categoriaNombre = (registro.categoria as any)?.categoria_nombre ?? ''
+        const categoriaArea = ((registro.categoria as any)?.area ?? '').trim()
+        const ejesObligatorios = ((registro.categoria as any)?.ejes_obligatorios ?? []) as string[]
+        const datosDinamicos = (registro.datos_dinamicos ?? {}) as Record<string, unknown>
         const fechaGasto = registro.fecha_y_hora_pago.split('T')[0]
+        const analyticSource = categoriaArea || categoriaNombre
 
         if (!empleadoNombre) throw new Error('Empleado sin nombre en user_profiles')
         if (!categoriaNombre) throw new Error('Registro sin categoría')
@@ -202,7 +313,7 @@ export async function POST(request: NextRequest) {
         const [productId, empleadoId, analiticaId] = await Promise.all([
           resolveId(uid, 'product.product', categoriaNombre),
           resolveId(uid, 'hr.employee', empleadoNombre),
-          resolveAnalytic(uid, categoriaNombre),
+          resolveAnalytic(uid, analyticSource),
         ])
 
         const expenseData: Record<string, unknown> = {
@@ -216,6 +327,37 @@ export async function POST(request: NextRequest) {
         // Cuenta analítica opcional — solo se agrega si existe en Odoo
         if (analiticaId) {
           expenseData.analytic_distribution = { [analiticaId]: 100.0 }
+
+          // Si se configuró un campo custom de Área en hr.expense, también lo poblamos.
+          // Ejemplo: ODOO_EXPENSE_AREA_FIELD=x_studio_area
+          if (ODOO_EXPENSE_AREA_FIELD) {
+            expenseData[ODOO_EXPENSE_AREA_FIELD] = Number(analiticaId)
+          }
+        }
+
+        // Ejes dinámicos por categoría -> campos custom many2one en Odoo
+        for (const eje of ejesObligatorios) {
+          const ejeKey = normalizeAxisName(eje)
+          const mapping = AXIS_MAPPINGS[ejeKey]
+          if (!mapping) continue
+
+          const ejeValue = getAxisValue(datosDinamicos, eje)
+          if (!ejeValue) continue
+
+          const relatedId = await resolveIdByCandidateFields(
+            uid,
+            mapping.model,
+            ejeValue,
+            mapping.searchFields
+          )
+
+          if (!relatedId) {
+            throw new Error(
+              `No se encontró '${ejeValue}' para eje '${eje}' en modelo Odoo '${mapping.model}'`
+            )
+          }
+
+          expenseData[mapping.odooField] = relatedId
         }
 
         const odooId = await odooCall<number>(uid, 'hr.expense', 'create', [expenseData])

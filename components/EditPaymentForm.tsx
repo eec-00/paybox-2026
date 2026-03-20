@@ -9,12 +9,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Categoria, Registro } from '@/lib/types/database.types'
 import { ImageUploader, OCRData } from './ImageUploader'
+import { OdooAxisAutocomplete } from './OdooAxisAutocomplete'
 import { CheckCircle2 } from 'lucide-react'
 
 interface EditPaymentFormProps {
   registro: Registro
   onSuccess: () => void
   onCancel: () => void
+}
+
+type OdooAxisKey = 'servicio' | 'placa' | 'conductor'
+
+function normalizeAxisName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+function toOdooAxisKey(axisName: string): OdooAxisKey | null {
+  const normalized = normalizeAxisName(axisName)
+  if (normalized === 'servicio') return 'servicio'
+  if (normalized === 'placa') return 'placa'
+  if (normalized === 'conductor') return 'conductor'
+  return null
 }
 
 export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditPaymentFormProps) {
@@ -394,14 +413,26 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
                   <Label htmlFor={eje}>
                     {eje} *
                   </Label>
-                  <Input
-                    id={eje}
-                    value={datosDinamicos[eje] || ''}
-                    onChange={(e) => handleDinamicoChange(eje, e.target.value)}
-                    placeholder={eje}
-                    required
-                    disabled={loading}
-                  />
+                  {toOdooAxisKey(eje) ? (
+                    <OdooAxisAutocomplete
+                      id={eje}
+                      axis={toOdooAxisKey(eje)!}
+                      value={datosDinamicos[eje] || ''}
+                      onChange={(value) => handleDinamicoChange(eje, value)}
+                      placeholder={`Buscar ${eje} en Odoo o escribir`}
+                      required
+                      disabled={loading}
+                    />
+                  ) : (
+                    <Input
+                      id={eje}
+                      value={datosDinamicos[eje] || ''}
+                      onChange={(e) => handleDinamicoChange(eje, e.target.value)}
+                      placeholder={eje}
+                      required
+                      disabled={loading}
+                    />
+                  )}
                 </div>
               ))}
             </div>

@@ -2,6 +2,7 @@ export interface Categoria {
   id: number
   categoria_id_texto: string
   categoria_nombre: string
+  area?: string
   naturaleza: string
   subgrupo: string
   centro_costo_destino: string

@@ -7,14 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { Eye, Pencil, Trash2, Download, Filter, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { Eye, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getUserPermissions, isAdmin } from '@/lib/utils/auth'
 import type { Registro } from '@/lib/types/database.types'
 import { format } from 'date-fns'
 import EditPaymentForm from './EditPaymentForm'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ExportExcelModal } from './ExportExcelModal'
+
 interface PaymentsTableProps {
   refresh?: number
   externalCatSearch?: string
@@ -48,8 +46,6 @@ export function PaymentsTable({
   const [isAdminUser, setIsAdminUser] = useState(false)
   const [permissions, setPermissions] = useState({ can_create: false, can_edit: false, can_delete: false })
   const [deleting, setDeleting] = useState<number | null>(null)
-  const [exporting, setExporting] = useState(false)
-  const [estadisticas, setEstadisticas] = useState({ pendientes: 0, exportados: 0, total: 0 })
 
   const [currentPage, setCurrentPage] = useState(1)
   const [totalRecords, setTotalRecords] = useState(0)
@@ -59,7 +55,6 @@ export function PaymentsTable({
   useEffect(() => {
     loadUser()
     loadRegistros()
-    loadEstadisticas()
   }, [refresh, externalCatSearch, externalDocSearch, currentPage, externalStartDate, externalEndDate])
 
   const loadUser = async () => {
@@ -91,6 +86,7 @@ export function PaymentsTable({
             id,
             categoria_id_texto,
             categoria_nombre,
+            area,
             ejes_obligatorios
           )
         `, { count: 'exact' })
@@ -171,53 +167,6 @@ export function PaymentsTable({
     }
   }
 
-  const loadEstadisticas = async () => {
-    try {
-      const response = await fetch('/api/export/excel')
-      const data = await response.json()
-      setEstadisticas(data)
-    } catch (error: any) {
-      console.error('Error al cargar estadísticas:', error)
-    }
-  }
-
-  const handleExport = async () => {
-    setExporting(true)
-    try {
-      const response = await fetch('/api/export/excel', {
-        method: 'POST',
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error('❌ Error del servidor:', errorData)
-        throw new Error(errorData.details || errorData.error || 'Error al exportar')
-      }
-
-      // Descargar el archivo
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `Gastos_Odoo_${format(new Date(), 'dd-MM-yyyy')}.xlsx`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
-
-      console.log('✅ Archivo exportado exitosamente')
-
-      // Recargar datos
-      await loadRegistros()
-      await loadEstadisticas()
-    } catch (error: any) {
-      console.error('❌ Error completo:', error)
-      alert(`Error al exportar registros: ${error.message}`)
-    } finally {
-      setExporting(false)
-    }
-  }
-
   const formatCurrency = (amount: number, currency: 'soles' | 'dolares') => {
     const symbol = currency === 'soles' ? 'S/' : '$'
     return `${symbol} ${amount.toFixed(2)}`
@@ -289,12 +238,6 @@ export function PaymentsTable({
             <CardTitle className="text-primary/80 font-bold">Resumen de Registros</CardTitle>
             <CardDescription className="flex items-center gap-2 mt-1">
               <span>{totalRecords} registros encontrados</span>
-              {estadisticas && estadisticas.pendientes > 0 && (
-                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold border border-amber-100 uppercase tracking-tighter">
-                  <div className="w-1 h-1 bg-amber-500 rounded-full animate-pulse" />
-                  {estadisticas.pendientes} pendientes de Odoo
-                </span>
-              )}
             </CardDescription>
           </div>
 
@@ -441,6 +384,12 @@ export function PaymentsTable({
                                         </p>
                                         <p className="text-sm text-muted-foreground">{selectedRegistro.categoria?.categoria_nombre}</p>
                                       </div>
+                                      {selectedRegistro.categoria?.area && (
+                                        <div className="space-y-1">
+                                          <span className="text-xs text-muted-foreground uppercase tracking-wide">Área</span>
+                                          <p className="font-semibold text-base">{selectedRegistro.categoria.area}</p>
+                                        </div>
+                                      )}
                                       {selectedRegistro.descripcion && (
                                         <div className="md:col-span-2 space-y-1">
                                           <span className="text-xs text-muted-foreground uppercase tracking-wide">Descripción / Concepto</span>

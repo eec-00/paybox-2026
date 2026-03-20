@@ -8,12 +8,31 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ImageUploader, OCRData } from '@/components/ImageUploader'
+import { OdooAxisAutocomplete } from '@/components/OdooAxisAutocomplete'
 import { getUserPermissions } from '@/lib/utils/auth'
 import { Shield, CheckCircle2 } from 'lucide-react'
 import type { Categoria, CalendarioPago } from '@/lib/types/database.types'
 
 interface PaymentFormProps {
   onSuccess?: () => void
+}
+
+type OdooAxisKey = 'servicio' | 'placa' | 'conductor'
+
+function normalizeAxisName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+function toOdooAxisKey(axisName: string): OdooAxisKey | null {
+  const normalized = normalizeAxisName(axisName)
+  if (normalized === 'servicio') return 'servicio'
+  if (normalized === 'placa') return 'placa'
+  if (normalized === 'conductor') return 'conductor'
+  return null
 }
 
 export function PaymentForm({ onSuccess }: PaymentFormProps) {
@@ -672,15 +691,27 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
                 {selectedCategoria.ejes_obligatorios.map((eje) => (
                   <div key={eje} className="space-y-2">
                     <Label htmlFor={`dinamico_${eje}`}>{eje} *</Label>
-                    <Input
-                      id={`dinamico_${eje}`}
-                      type="text"
-                      placeholder={`Ingrese ${eje}`}
-                      value={datosDinamicos[eje] || ''}
-                      onChange={(e) => handleDinamicoChange(eje, e.target.value)}
-                      required
-                      disabled={loading}
-                    />
+                    {toOdooAxisKey(eje) ? (
+                      <OdooAxisAutocomplete
+                        id={`dinamico_${eje}`}
+                        axis={toOdooAxisKey(eje)!}
+                        value={datosDinamicos[eje] || ''}
+                        onChange={(value) => handleDinamicoChange(eje, value)}
+                        placeholder={`Buscar ${eje} en Odoo o escribir`}
+                        required
+                        disabled={loading}
+                      />
+                    ) : (
+                      <Input
+                        id={`dinamico_${eje}`}
+                        type="text"
+                        placeholder={`Ingrese ${eje}`}
+                        value={datosDinamicos[eje] || ''}
+                        onChange={(e) => handleDinamicoChange(eje, e.target.value)}
+                        required
+                        disabled={loading}
+                      />
+                    )}
                   </div>
                 ))}
               </div>
