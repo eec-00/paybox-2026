@@ -131,7 +131,7 @@ async function odooCall<T = unknown>(
 }
 
 // ── Name → ID cache ──────────────────────────────────────────────────────────
-const resolveCache = new Map<string, number | string>()
+const resolveCache = new Map<string, number | string | null>()
 
 async function resolveId(
   uid: number,
@@ -220,7 +220,7 @@ async function resolveAnalytic(uid: number, name: string): Promise<string | null
   )
 
   if (!results.length) {
-    resolveCache.set(key, null as any)
+    resolveCache.set(key, null)
     return null // No bloquear si no existe la cuenta analítica
   }
   const id = String(results[0].id)
