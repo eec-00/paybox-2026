@@ -35,6 +35,10 @@ function toOdooAxisKey(axisName: string): OdooAxisKey | null {
   return null
 }
 
+function isHiddenAxis(axisName: string): boolean {
+  return normalizeAxisName(axisName) === 'servicio'
+}
+
 export function PaymentForm({ onSuccess }: PaymentFormProps) {
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [selectedCategoria, setSelectedCategoria] = useState<Categoria | null>(null)
@@ -299,7 +303,11 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
       }
 
       // Validar que todos los ejes obligatorios estén completos
-      const camposFaltantes = selectedCategoria.ejes_obligatorios.filter(
+      const ejesVisibles = selectedCategoria.ejes_obligatorios.filter(
+        eje => !isHiddenAxis(eje)
+      )
+
+      const camposFaltantes = ejesVisibles.filter(
         eje => !datosDinamicos[eje] || datosDinamicos[eje].trim() === ''
       )
 
@@ -684,11 +692,13 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
           </div>
 
           {/* Campos Dinámicos según Categoría */}
-          {selectedCategoria && selectedCategoria.ejes_obligatorios.length > 0 && (
+          {selectedCategoria && selectedCategoria.ejes_obligatorios.filter((eje) => !isHiddenAxis(eje)).length > 0 && (
             <div className="space-y-4 border-t pt-4">
               <h3 className="font-semibold text-secondary">Datos Específicos de la Categoría</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedCategoria.ejes_obligatorios.map((eje) => (
+                {selectedCategoria.ejes_obligatorios
+                  .filter((eje) => !isHiddenAxis(eje))
+                  .map((eje) => (
                   <div key={eje} className="space-y-2">
                     <Label htmlFor={`dinamico_${eje}`}>{eje} *</Label>
                     {toOdooAxisKey(eje) ? (

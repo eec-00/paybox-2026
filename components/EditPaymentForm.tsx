@@ -36,6 +36,10 @@ function toOdooAxisKey(axisName: string): OdooAxisKey | null {
   return null
 }
 
+function isHiddenAxis(axisName: string): boolean {
+  return normalizeAxisName(axisName) === 'servicio'
+}
+
 export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditPaymentFormProps) {
   const supabase = createClient()
   const [categorias, setCategorias] = useState<Categoria[]>([])
@@ -404,11 +408,13 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
         </div>
 
         {/* Campos Dinámicos */}
-        {selectedCategoria && selectedCategoria.ejes_obligatorios && selectedCategoria.ejes_obligatorios.length > 0 && (
+        {selectedCategoria && selectedCategoria.ejes_obligatorios && selectedCategoria.ejes_obligatorios.filter((eje) => !isHiddenAxis(eje)).length > 0 && (
           <div className="space-y-4 border-t pt-4">
             <h3 className="font-semibold text-base text-secondary">Datos Específicos de la Categoría</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {selectedCategoria.ejes_obligatorios.map((eje: string) => (
+              {selectedCategoria.ejes_obligatorios
+                .filter((eje) => !isHiddenAxis(eje))
+                .map((eje: string) => (
                 <div key={eje} className="space-y-2">
                   <Label htmlFor={eje}>
                     {eje} *
