@@ -11,6 +11,8 @@ import { ExportExcelModal } from '@/components/ExportExcelModal'
 import { UserManagement } from '@/components/UserManagement'
 import { UsersList } from '@/components/UsersList'
 import { VehiclesList } from '@/components/VehiclesList'
+import { ZonesList } from '@/components/ZonesList'
+import { ZoneEvents } from '@/components/ZoneEvents'
 import { TutorialsList } from '@/components/TutorialsList'
 import { TrailersTable } from '@/components/TrailersTable'
 import { TrailerForm } from '@/components/TrailerForm'
@@ -21,7 +23,7 @@ import { UpdatesManagement } from '@/components/UpdatesManagement'
 import { UpdatesList } from '@/components/UpdatesList'
 import { SyncOdooModal } from '@/components/SyncOdooModal'
 import { isAdmin, getUserPermissions, getCurrentUserProfile } from '@/lib/utils/auth'
-import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText, Megaphone, Calendar as CalendarIcon, Filter, Search, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText, Megaphone, Calendar as CalendarIcon, Filter, Search, XCircle, ChevronDown, ChevronUp, MapPin } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import Image from 'next/image'
@@ -34,6 +36,7 @@ export default function DashboardPage() {
   const [showNewPaymentForm, setShowNewPaymentForm] = useState(false)
   const [showNewTrailerForm, setShowNewTrailerForm] = useState(false)
   const [trailerToEdit, setTrailerToEdit] = useState<any>(null)
+  const [showNavitelSection, setShowNavitelSection] = useState(false)
   const [isDeveloper, setIsDeveloper] = useState(false)
   const [isAdminUser, setIsAdminUser] = useState(false)
   const [canCreate, setCanCreate] = useState(false)
@@ -479,12 +482,23 @@ export default function DashboardPage() {
 
             {activeSection === 'trailers' && (
               <div className="space-y-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <Car className="h-6 w-6 text-primary" />
-                  <div>
-                    <h2 className="text-2xl font-bold text-primary">Gestión de Trailers</h2>
-                    <p className="text-muted-foreground">Visualiza y gestiona los servicios de trailers y contenedores</p>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <Car className="h-6 w-6 text-primary" />
+                    <div>
+                      <h2 className="text-2xl font-bold text-primary">Gestión de Trailers</h2>
+                      <p className="text-muted-foreground">Servicios de trailers · Rastreo GPS Navitel</p>
+                    </div>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowNavitelSection(prev => !prev)}
+                    className="h-8 text-xs shrink-0"
+                  >
+                    <Car className="h-3.5 w-3.5 mr-1.5" />
+                    {showNavitelSection ? 'Ocultar Rastreadores' : 'Ver Rastreadores GPS'}
+                  </Button>
                 </div>
 
                 {(showNewTrailerForm || trailerToEdit) && canCreate && (
@@ -537,6 +551,18 @@ export default function DashboardPage() {
                     }
                   />
                 )}
+
+                {/* Panel Navitel GPS — colapsable */}
+                {showNavitelSection && (
+                  <div className="border-t pt-6 space-y-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Car className="h-5 w-5 text-primary" />
+                      <h3 className="text-lg font-semibold text-primary">Rastreadores GPS (Navitel)</h3>
+                      <span className="text-xs text-muted-foreground">Flota en tiempo real · Gestión de geoenlaces</span>
+                    </div>
+                    <VehiclesList />
+                  </div>
+                )}
               </div>
             )}
 
@@ -550,6 +576,20 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <VehiclesList />
+              </div>
+            )}
+
+            {activeSection === 'geocercas' && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-6 w-6 text-primary" />
+                  <div>
+                    <h2 className="text-2xl font-bold text-primary">Geocercas</h2>
+                    <p className="text-muted-foreground">Zonas GPS configuradas en Navitel</p>
+                  </div>
+                </div>
+                <ZonesList />
+                <ZoneEvents />
               </div>
             )}
 
