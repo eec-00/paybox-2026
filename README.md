@@ -1,17 +1,5 @@
 # PayBox - Sistema de Gestión de Gastos.
 
-## 🆕 NUEVA FUNCIONALIDAD: Sistema OCR con Soporte para PDFs
-
-✨ **Ahora puedes cargar y analizar automáticamente facturas y comprobantes en PDF e imágenes**
-
-El sistema cuenta con análisis inteligente usando OpenAI GPT-4o que:
-- 📄 Detecta automáticamente si es una **Factura Electrónica** o **Comprobante de Pago**
-- 🔍 Extrae datos específicos según el tipo de documento
-- ✅ Pre-llena formularios automáticamente
-- 🔄 Convierte PDFs a imágenes de alta calidad
-
-**📚 Documentación completa**: [OCR_DOCS_INDEX.md](OCR_DOCS_INDEX.md)
-
 **🚀 Inicio rápido**:
 - **Desarrolladores**: [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)
 - **Usuarios**: [PDF_OCR_USAGE_GUIDE.md](PDF_OCR_USAGE_GUIDE.md)
