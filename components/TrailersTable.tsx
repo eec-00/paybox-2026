@@ -199,9 +199,8 @@ export function TrailersTable({ refresh, onEdit, onCopy, headerAction }: { refre
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     tracker_id: row.navitel_tracker_id,
-                    // Usar created_at (timestamp exacto de creación) para no detectar
-                    // llegadas que ocurrieron ANTES de que se creara el servicio
-                    from_date: row.created_at || row.fecha,
+                    // inicio_servicio (editable) tiene prioridad sobre created_at
+                    from_date: row.inicio_servicio || row.created_at || row.fecha,
                     geocercas: geocercaResults.map((r) => ({
                         id: r.geocerca.id,
                         zone_id: r.geocerca.zone_id,

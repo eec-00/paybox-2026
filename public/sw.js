@@ -1,7 +1,5 @@
-const CACHE_NAME = 'paybox-v1';
+const CACHE_NAME = 'paybox-v2';
 const STATIC_ASSETS = [
-  '/',
-  '/dashboard',
   '/logo.png',
   '/login.png',
 ];
@@ -30,6 +28,12 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Helper: detect HTML navigation requests (pages with auth checks)
+function isNavigationRequest(request) {
+  return request.mode === 'navigate' ||
+    request.headers.get('accept')?.includes('text/html');
+}
+
 self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
@@ -40,13 +44,20 @@ self.addEventListener('fetch', (event) => {
   // Skip API routes — always fetch fresh
   if (event.request.url.includes('/api/')) return;
 
+  // Never cache HTML navigation requests — they contain auth redirects
+  // that must always hit the server to be valid
+  if (isNavigationRequest(event.request)) return;
+
+  // Skip Next.js RSC (React Server Component) requests
+  if (event.request.url.includes('_rsc') || event.request.headers.get('rsc')) return;
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
       return fetch(event.request).then((response) => {
-        // Only cache valid responses
+        // Only cache valid static asset responses
         if (!response || response.status !== 200 || response.type !== 'basic') {
           return response;
         }
@@ -56,8 +67,7 @@ self.addEventListener('fetch', (event) => {
         });
         return response;
       }).catch(() => {
-        // Offline fallback
-        return caches.match('/') || new Response('Offline', { status: 503 });
+        return new Response('Offline', { status: 503 });
       });
     })
   );

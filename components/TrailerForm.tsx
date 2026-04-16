@@ -52,6 +52,7 @@ const trailerSchema = z.object({
     navitel_tracker_label: z.string().optional().nullable(),
     navitel_zone_id: z.string().optional().nullable(),
     navitel_zone_name: z.string().optional().nullable(),
+    inicio_servicio: z.string().optional().nullable(),
 })
 
 type TrailerFormValues = z.infer<typeof trailerSchema>
@@ -141,6 +142,7 @@ export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: (
             navitel_tracker_label: '',
             navitel_zone_id: '',
             navitel_zone_name: '',
+            inicio_servicio: '',
         },
     })
 
@@ -159,6 +161,10 @@ export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: (
                 navitel_tracker_label: initialData.navitel_tracker_label || '',
                 navitel_zone_id: initialData.navitel_zone_id?.toString() || '',
                 navitel_zone_name: initialData.navitel_zone_name || '',
+                inicio_servicio: initialData.inicio_servicio
+                    ? new Date(new Date(initialData.inicio_servicio).getTime() - 5 * 60 * 60 * 1000)
+                        .toISOString().slice(0, 16)
+                    : '',
             })
             // Pre-fill geolink preview if exists and not expired
             if (initialData.geolink_url && initialData.geolink_expires_at) {
@@ -383,6 +389,10 @@ export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: (
             navitel_tracker_label: data.navitel_tracker_label || null,
             navitel_zone_id: parseIntFk(data.navitel_zone_id),
             navitel_zone_name: data.navitel_zone_name || null,
+            // datetime-local viene sin zona → tratamos como hora Lima (UTC-5) → guardar en UTC
+            inicio_servicio: data.inicio_servicio
+                ? new Date(data.inicio_servicio + ':00-05:00').toISOString()
+                : null,
         }
 
         // Crear geoenlace automáticamente si hay tracker seleccionado
@@ -715,6 +725,22 @@ export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: (
                         </div>
                         <p className="text-xs text-muted-foreground">
                             Al guardar, se generará automáticamente un geoenlace de seguimiento válido por 6 horas.
+                        </p>
+                    </div>
+
+                    {/* Inicio del servicio (para GPS) */}
+                    <div className="space-y-2">
+                        <Label htmlFor="inicio_servicio" className="flex items-center gap-1.5">
+                            Inicio del Servicio
+                            <span className="text-xs font-normal text-muted-foreground">(hora Lima)</span>
+                        </Label>
+                        <Input
+                            id="inicio_servicio"
+                            type="datetime-local"
+                            {...form.register('inicio_servicio')}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Desde esta hora se verifican las llegadas a geocercas. Edítalo si creaste el servicio tarde. Si lo dejas vacío, se usa la hora en que guardaste el registro.
                         </p>
                     </div>
 
