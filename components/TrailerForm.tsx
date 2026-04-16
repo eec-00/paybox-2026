@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { Plus, Satellite, Link2, RefreshCw, CheckCircle, AlertCircle, Copy, ExternalLink } from "lucide-react"
+import { Plus, X, Satellite, Link2, RefreshCw, CheckCircle, AlertCircle, Copy, ExternalLink } from "lucide-react"
 
 const trailerSchema = z.object({
     fecha: z.string().min(1, 'La fecha es obligatoria'),
@@ -59,6 +59,12 @@ type TrailerFormValues = z.infer<typeof trailerSchema>
 interface NavitelVehicle { id: number; label: string }
 interface NavitelZone { id: number; name: string }
 
+type GeoEntry = {
+    zone_id: string
+    zone_name: string
+    event_type: 'zone_in' | 'zone_out'
+}
+
 export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: () => void, initialData?: any, onCancel?: () => void }) {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -78,6 +84,11 @@ export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: (
     const [creatingGeolink, setCreatingGeolink] = useState(false)
     const [geolinkPreview, setGeolinkPreview] = useState<{ url: string; expires: string } | null>(null)
     const [copiedGeolink, setCopiedGeolink] = useState(false)
+
+    // Geocercas múltiples
+    const [geocercas, setGeocercas] = useState<GeoEntry[]>([
+        { zone_id: '', zone_name: '', event_type: 'zone_in' },
+    ])
 
     // Quick create state
     const [createModal, setCreateModal] = useState<{
@@ -162,6 +173,39 @@ export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: (
         }
     }, [initialData, form])
 
+    // Cargar geocercas cuando se edita un servicio existente
+    useEffect(() => {
+        if (!initialData?.id) {
+            setGeocercas([{ zone_id: '', zone_name: '', event_type: 'zone_in' }])
+            return
+        }
+        supabase
+            .from('trailer_geocercas')
+            .select('*')
+            .eq('servicio_id', initialData.id)
+            .order('orden')
+            .then(({ data }) => {
+                if (data && data.length > 0) {
+                    setGeocercas(
+                        data.map((g) => ({
+                            zone_id: g.zone_id.toString(),
+                            zone_name: g.zone_name,
+                            event_type: g.event_type as 'zone_in' | 'zone_out',
+                        })),
+                    )
+                } else if (initialData.navitel_zone_id) {
+                    // Migración desde campo único
+                    setGeocercas([{
+                        zone_id: initialData.navitel_zone_id.toString(),
+                        zone_name: initialData.navitel_zone_name || '',
+                        event_type: 'zone_in',
+                    }])
+                } else {
+                    setGeocercas([{ zone_id: '', zone_name: '', event_type: 'zone_in' }])
+                }
+            })
+    }, [initialData?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
     useEffect(() => {
         async function fetchData() {
             try {
@@ -219,6 +263,25 @@ export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: (
         form.setValue('navitel_zone_id', zoneId)
         const zone = navitelZones.find(z => z.id.toString() === zoneId)
         form.setValue('navitel_zone_name', zone?.name || '')
+    }
+
+    const addGeocerca = () => {
+        setGeocercas(prev => [...prev, { zone_id: '', zone_name: '', event_type: 'zone_in' }])
+    }
+
+    const removeGeocerca = (index: number) => {
+        setGeocercas(prev => prev.filter((_, i) => i !== index))
+    }
+
+    const updateGeocerca = (index: number, field: keyof GeoEntry, value: string) => {
+        setGeocercas(prev => prev.map((g, i) => {
+            if (i !== index) return g
+            if (field === 'zone_id') {
+                const zone = navitelZones.find(z => z.id.toString() === value)
+                return { ...g, zone_id: value, zone_name: zone?.name || '' }
+            }
+            return { ...g, [field]: value }
+        }))
     }
 
     const handleCreateGeolink = async () => {
@@ -361,12 +424,35 @@ export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: (
         }
 
         let saveError
+        let serviceId: string | null = initialData?.id || null
+
         if (initialData?.id) {
             const { error } = await supabase.from('servicios_trailers').update(payload).eq('id', initialData.id)
             saveError = error
         } else {
-            const { error } = await supabase.from('servicios_trailers').insert([payload])
+            // Generamos el ID en el cliente para evitar el .select() que requiere
+            // que todas las columnas del payload estén en el schema cache de PostgREST
+            const newId = crypto.randomUUID()
+            const { error } = await supabase.from('servicios_trailers').insert([{ ...payload, id: newId }])
             saveError = error
+            if (!error) serviceId = newId
+        }
+
+        // Guardar geocercas múltiples
+        if (!saveError && serviceId) {
+            await supabase.from('trailer_geocercas').delete().eq('servicio_id', serviceId)
+            const validGeos = geocercas.filter(g => g.zone_id)
+            if (validGeos.length > 0) {
+                await supabase.from('trailer_geocercas').insert(
+                    validGeos.map((g, i) => ({
+                        servicio_id: serviceId,
+                        orden: i + 1,
+                        zone_id: parseInt(g.zone_id),
+                        zone_name: g.zone_name,
+                        event_type: g.event_type,
+                    })),
+                )
+            }
         }
 
         if (saveError) {
@@ -597,65 +683,105 @@ export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: (
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Rastreador GPS */}
-                        <div className="space-y-2">
-                            <Label htmlFor="navitel_tracker_id" className="flex items-center gap-1.5">
-                                <Satellite className="h-4 w-4 text-primary" />
-                                Rastreador GPS (Navitel)
-                            </Label>
-                            <div className="flex gap-2">
-                                <select
-                                    id="navitel_tracker_id"
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                    disabled={navitelLoading}
-                                    value={form.watch('navitel_tracker_id') || ''}
-                                    onChange={(e) => handleTrackerChange(e.target.value)}
-                                >
-                                    <option value="">{navitelLoading ? 'Cargando...' : 'Sin rastreador'}</option>
-                                    {navitelVehicles.map(v => (
-                                        <option key={v.id} value={v.id.toString()}>{v.label}</option>
-                                    ))}
-                                </select>
+                    {/* Rastreador GPS */}
+                    <div className="space-y-2">
+                        <Label htmlFor="navitel_tracker_id" className="flex items-center gap-1.5">
+                            <Satellite className="h-4 w-4 text-primary" />
+                            Rastreador GPS (Navitel)
+                        </Label>
+                        <div className="flex gap-2">
+                            <select
+                                id="navitel_tracker_id"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                disabled={navitelLoading}
+                                value={form.watch('navitel_tracker_id') || ''}
+                                onChange={(e) => handleTrackerChange(e.target.value)}
+                            >
+                                <option value="">{navitelLoading ? 'Cargando...' : 'Sin rastreador'}</option>
+                                {navitelVehicles.map(v => (
+                                    <option key={v.id} value={v.id.toString()}>{v.label}</option>
+                                ))}
+                            </select>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={fetchNavitelData}
+                                disabled={navitelLoading}
+                                title="Actualizar lista de rastreadores"
+                            >
+                                <RefreshCw className={`h-4 w-4 ${navitelLoading ? 'animate-spin' : ''}`} />
+                            </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Al guardar, se generará automáticamente un geoenlace de seguimiento válido por 6 horas.
+                        </p>
+                    </div>
+
+                    {/* Geocercas múltiples */}
+                    {selectedTrackerId && (
+                        <div className="space-y-3 pt-1">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-sm font-semibold">Geocercas de Llegada / Salida</Label>
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    size="icon"
-                                    onClick={fetchNavitelData}
-                                    disabled={navitelLoading}
-                                    title="Actualizar lista de rastreadores"
+                                    size="sm"
+                                    className="h-8"
+                                    onClick={addGeocerca}
                                 >
-                                    <RefreshCw className={`h-4 w-4 ${navitelLoading ? 'animate-spin' : ''}`} />
+                                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                    Agregar geocerca
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                                Al guardar, se generará automáticamente un geoenlace de seguimiento válido por 6 horas.
-                            </p>
-                        </div>
 
-                        {/* Geocerca de llegada */}
-                        <div className="space-y-2">
-                            <Label htmlFor="navitel_zone_id" className="flex items-center gap-1.5">
-                                Geocerca de Llegada
-                                <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
-                            </Label>
-                            <select
-                                id="navitel_zone_id"
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                disabled={navitelLoading}
-                                value={form.watch('navitel_zone_id') || ''}
-                                onChange={(e) => handleZoneChange(e.target.value)}
-                            >
-                                <option value="">{navitelLoading ? 'Cargando...' : 'Sin geocerca asignada'}</option>
-                                {navitelZones.map(z => (
-                                    <option key={z.id} value={z.id.toString()}>{z.name}</option>
+                            <div className="space-y-2">
+                                {geocercas.map((geo, i) => (
+                                    <div key={i} className="flex gap-2 items-center p-2 bg-muted/30 rounded-md border border-border/50">
+                                        <span className="text-xs text-muted-foreground w-5 text-center shrink-0 font-medium">
+                                            {i + 1}
+                                        </span>
+                                        <select
+                                            className="flex h-9 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm min-w-0"
+                                            disabled={navitelLoading}
+                                            value={geo.zone_id}
+                                            onChange={(e) => updateGeocerca(i, 'zone_id', e.target.value)}
+                                        >
+                                            <option value="">{navitelLoading ? 'Cargando...' : 'Seleccionar geocerca...'}</option>
+                                            {navitelZones.map(z => (
+                                                <option key={z.id} value={z.id.toString()}>{z.name}</option>
+                                            ))}
+                                        </select>
+                                        <select
+                                            className="flex h-9 w-28 shrink-0 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                            value={geo.event_type}
+                                            onChange={(e) => updateGeocerca(i, 'event_type', e.target.value)}
+                                        >
+                                            <option value="zone_in">Entrada</option>
+                                            <option value="zone_out">Salida</option>
+                                        </select>
+                                        {i > 0 ? (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+                                                onClick={() => removeGeocerca(i)}
+                                                title="Eliminar geocerca"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        ) : (
+                                            <div className="w-9 shrink-0" />
+                                        )}
+                                    </div>
                                 ))}
-                            </select>
+                            </div>
                             <p className="text-xs text-muted-foreground">
-                                Define la zona donde se detectará la llegada del vehículo. Se usará para registrar la hora automáticamente.
+                                Define las zonas donde se detectará la llegada o salida del vehículo. Se registrará la hora exacta automáticamente.
                             </p>
                         </div>
-                    </div>
+                    )}
 
                     {/* Geoenlace */}
                     {selectedTrackerId && (

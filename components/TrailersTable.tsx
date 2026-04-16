@@ -5,29 +5,35 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Pencil, Trash2, Copy, Search, Satellite, Link2, ExternalLink, CheckCircle, Clock, AlertCircle } from 'lucide-react'
+import { Pencil, Trash2, Copy, Search, Satellite, Link2, ExternalLink, CheckCircle, Clock, AlertCircle, MapPin } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 
-// Campos de tiempo disponibles para registrar llegada
-const TIME_FIELDS: { value: string; label: string }[] = [
-    { value: 'llegada_almacen_retiro', label: 'Llegada Almacén Retiro' },
-    { value: 'salida_almacen_retiro', label: 'Salida Almacén Retiro' },
-    { value: 'llegada_cliente', label: 'Llegada Cliente' },
-    { value: 'ingreso_planta', label: 'Ingreso a Planta' },
-    { value: 'inicio_carga', label: 'Inicio Carga/Descarga' },
-    { value: 'termino_descarga', label: 'Término de Descarga' },
-    { value: 'hora_devolucion', label: 'Hora Devolución' },
-]
+function formatArrivalTime(ts: string | null): string | null {
+    if (!ts) return null
+    const d = new Date(ts)
+    if (isNaN(d.getTime())) return ts // ya es HH:MM
+    return d.toLocaleTimeString('es-PE', {
+        timeZone: 'America/Lima',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    })
+}
+
+interface GeocercaResult {
+    geocerca: any
+    arrived: boolean | null
+    time: string | null
+    saving: boolean
+    saved: boolean
+}
 
 interface ArrivalDialog {
     open: boolean
     row: any | null
     checking: boolean
-    arrived: boolean | null
-    detectedTime: string | null
+    geocercaResults: GeocercaResult[]
     error: string | null
-    selectedField: string
-    saving: boolean
 }
 
 export function TrailersTable({ refresh, onEdit, onCopy, headerAction }: { refresh: number, onEdit?: (record: any) => void, onCopy?: (record: any) => void, headerAction?: React.ReactNode }) {
@@ -40,16 +46,14 @@ export function TrailersTable({ refresh, onEdit, onCopy, headerAction }: { refre
     const [searchTerm, setSearchTerm] = useState('')
     const [isDeleteMode, setIsDeleteMode] = useState(false)
     const [copiedId, setCopiedId] = useState<number | null>(null)
+    const [geocercasMap, setGeocercasMap] = useState<Record<string, any[]>>({})
 
     const [arrivalDialog, setArrivalDialog] = useState<ArrivalDialog>({
         open: false,
         row: null,
         checking: false,
-        arrived: null,
-        detectedTime: null,
+        geocercaResults: [],
         error: null,
-        selectedField: 'llegada_cliente',
-        saving: false,
     })
 
     useEffect(() => {
@@ -79,9 +83,31 @@ export function TrailersTable({ refresh, onEdit, onCopy, headerAction }: { refre
                 } else {
                     setError(`Error al cargar datos: ${error.message}`)
                 }
-            } else {
-                setData(trailers || [])
+                setLoading(false)
+                return
             }
+
+            setData(trailers || [])
+
+            // Cargar geocercas de todos los servicios cargados
+            if (trailers && trailers.length > 0) {
+                const serviceIds = trailers.map((t) => t.id)
+                const { data: geocercas } = await supabase
+                    .from('trailer_geocercas')
+                    .select('*')
+                    .in('servicio_id', serviceIds)
+                    .order('orden')
+
+                if (geocercas) {
+                    const map: Record<string, any[]> = {}
+                    for (const g of geocercas) {
+                        if (!map[g.servicio_id]) map[g.servicio_id] = []
+                        map[g.servicio_id].push(g)
+                    }
+                    setGeocercasMap(map)
+                }
+            }
+
             setLoading(false)
         }
 
@@ -150,43 +176,50 @@ export function TrailersTable({ refresh, onEdit, onCopy, headerAction }: { refre
 
     // --- Verificar llegada ---
     const openArrivalDialog = (row: any) => {
-        setArrivalDialog({
-            open: true,
-            row,
-            checking: false,
-            arrived: null,
-            detectedTime: null,
-            error: null,
-            selectedField: 'llegada_cliente',
+        const serviceGeocercas = geocercasMap[row.id] || []
+        const results: GeocercaResult[] = serviceGeocercas.map((g) => ({
+            geocerca: g,
+            arrived: g.arrived_at ? true : null,
+            time: formatArrivalTime(g.arrived_at),
             saving: false,
-        })
+            saved: !!g.arrived_at,
+        }))
+        setArrivalDialog({ open: true, row, checking: false, geocercaResults: results, error: null })
     }
 
-    const checkArrival = async () => {
-        const { row } = arrivalDialog
-        if (!row) return
+    const checkAllArrivals = async () => {
+        const { row, geocercaResults } = arrivalDialog
+        if (!row || geocercaResults.length === 0) return
 
-        setArrivalDialog(prev => ({ ...prev, checking: true, error: null, arrived: null, detectedTime: null }))
+        setArrivalDialog(prev => ({ ...prev, checking: true, error: null }))
 
         try {
-            const res = await fetch('/api/navitel/check-arrival', {
+            const res = await fetch('/api/navitel/check-arrivals', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     tracker_id: row.navitel_tracker_id,
-                    zone_id: row.navitel_zone_id || undefined,
-                    from_date: row.fecha,
+                    // Usar created_at (timestamp exacto de creación) para no detectar
+                    // llegadas que ocurrieron ANTES de que se creara el servicio
+                    from_date: row.created_at || row.fecha,
+                    geocercas: geocercaResults.map((r) => ({
+                        id: r.geocerca.id,
+                        zone_id: r.geocerca.zone_id,
+                        event_type: r.geocerca.event_type,
+                    })),
                 }),
             })
             const data = await res.json()
-
             if (!data.success) throw new Error(data.error || 'Error al verificar')
 
             setArrivalDialog(prev => ({
                 ...prev,
                 checking: false,
-                arrived: data.arrived,
-                detectedTime: data.time,
+                geocercaResults: prev.geocercaResults.map((r) => {
+                    const result = data.results?.find((x: any) => x.id === r.geocerca.id)
+                    if (!result || r.saved) return r
+                    return { ...r, arrived: result.arrived, time: result.time }
+                }),
             }))
         } catch (err) {
             setArrivalDialog(prev => ({
@@ -197,25 +230,47 @@ export function TrailersTable({ refresh, onEdit, onCopy, headerAction }: { refre
         }
     }
 
-    const saveArrivalTime = async () => {
-        const { row, detectedTime, selectedField } = arrivalDialog
-        if (!row || !detectedTime || !selectedField) return
-
-        setArrivalDialog(prev => ({ ...prev, saving: true }))
+    const saveGeocercaTime = async (geocercaId: string, time: string) => {
+        setArrivalDialog(prev => ({
+            ...prev,
+            geocercaResults: prev.geocercaResults.map((r) =>
+                r.geocerca.id === geocercaId ? { ...r, saving: true } : r,
+            ),
+        }))
 
         const { error } = await supabase
-            .from('servicios_trailers')
-            .update({ [selectedField]: detectedTime })
-            .eq('id', row.id)
+            .from('trailer_geocercas')
+            .update({ arrived_at: time })
+            .eq('id', geocercaId)
 
         if (error) {
-            setArrivalDialog(prev => ({ ...prev, saving: false, error: `Error al guardar: ${error.message}` }))
+            setArrivalDialog(prev => ({
+                ...prev,
+                geocercaResults: prev.geocercaResults.map((r) =>
+                    r.geocerca.id === geocercaId ? { ...r, saving: false } : r,
+                ),
+                error: `Error al guardar: ${error.message}`,
+            }))
         } else {
-            // Actualizar dato localmente
-            setData(prev => prev.map(item =>
-                item.id === row.id ? { ...item, [selectedField]: detectedTime } : item
-            ))
-            setArrivalDialog(prev => ({ ...prev, open: false, saving: false }))
+            setArrivalDialog(prev => ({
+                ...prev,
+                geocercaResults: prev.geocercaResults.map((r) =>
+                    r.geocerca.id === geocercaId
+                        ? { ...r, saving: false, saved: true }
+                        : r,
+                ),
+            }))
+            // Actualizar geocercasMap localmente
+            setGeocercasMap(prev => {
+                const { row } = arrivalDialog
+                if (!row) return prev
+                return {
+                    ...prev,
+                    [row.id]: (prev[row.id] || []).map((g) =>
+                        g.id === geocercaId ? { ...g, arrived_at: time } : g,
+                    ),
+                }
+            })
         }
     }
 
@@ -392,7 +447,7 @@ export function TrailersTable({ refresh, onEdit, onCopy, headerAction }: { refre
                                         {/* Columna GPS */}
                                         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                                             {hasTracker ? (
-                                                <div className="flex flex-col gap-1.5 min-w-[140px]">
+                                                <div className="flex flex-col gap-1.5 min-w-[150px]">
                                                     {/* Tracker badge */}
                                                     <div className="flex items-center gap-1 text-xs">
                                                         <Satellite className="h-3 w-3 text-primary shrink-0" />
@@ -407,51 +462,56 @@ export function TrailersTable({ refresh, onEdit, onCopy, headerAction }: { refre
                                                             <span className="text-[10px] text-green-700 bg-green-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
                                                                 <Link2 className="h-2.5 w-2.5" /> Activo
                                                             </span>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-6 w-6"
-                                                                title="Copiar geoenlace"
-                                                                onClick={() => copyGeolink(row.geolink_url, row.id)}
-                                                            >
-                                                                {copiedId === row.id
-                                                                    ? <CheckCircle className="h-3 w-3 text-green-600" />
-                                                                    : <Copy className="h-3 w-3" />}
+                                                            <Button variant="ghost" size="icon" className="h-6 w-6" title="Copiar geoenlace" onClick={() => copyGeolink(row.geolink_url, row.id)}>
+                                                                {copiedId === row.id ? <CheckCircle className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
                                                             </Button>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-6 w-6"
-                                                                title="Abrir geoenlace"
-                                                                onClick={() => window.open(row.geolink_url, '_blank')}
-                                                            >
+                                                            <Button variant="ghost" size="icon" className="h-6 w-6" title="Abrir geoenlace" onClick={() => window.open(row.geolink_url, '_blank')}>
                                                                 <ExternalLink className="h-3 w-3" />
                                                             </Button>
                                                         </div>
                                                     ) : row.geolink_url ? (
-                                                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                                            Geolink expirado
-                                                        </span>
+                                                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Geolink expirado</span>
                                                     ) : null}
 
+                                                    {/* Geocercas con estado de llegada */}
+                                                    {(() => {
+                                                        const serviceGeocercas = geocercasMap[row.id] || []
+                                                        if (serviceGeocercas.length > 0) {
+                                                            return (
+                                                                <div className="space-y-0.5 mt-0.5">
+                                                                    {serviceGeocercas.map((g) => (
+                                                                        <div key={g.id} className="flex items-center gap-1 text-[10px]">
+                                                                            <MapPin className={`h-2.5 w-2.5 shrink-0 ${g.arrived_at ? 'text-green-600' : 'text-muted-foreground'}`} />
+                                                                            <span className="truncate max-w-[95px]" title={g.zone_name}>{g.zone_name}</span>
+                                                                            <span className="text-muted-foreground shrink-0">{g.event_type === 'zone_out' ? '↗' : '↘'}</span>
+                                                                            {g.arrived_at && (
+                                                                                <span className="font-semibold text-green-700 shrink-0">{formatArrivalTime(g.arrived_at)}</span>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )
+                                                        } else if (row.navitel_zone_name) {
+                                                            return (
+                                                                <span className="text-[10px] text-muted-foreground truncate max-w-[130px]" title={row.navitel_zone_name}>
+                                                                    ⬡ {row.navitel_zone_name}
+                                                                </span>
+                                                            )
+                                                        }
+                                                        return null
+                                                    })()}
+
                                                     {/* Verificar llegada */}
-                                                    {canCheckArrival && row.status_servicio !== 'FINALIZADO' && (
+                                                    {canCheckArrival && row.status_servicio !== 'FINALIZADO' && (geocercasMap[row.id]?.length ?? 0) > 0 && (
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            className="h-6 text-[10px] px-2 py-0 border-primary/30 text-primary hover:bg-primary/5"
+                                                            className="h-6 text-[10px] px-2 py-0 border-primary/30 text-primary hover:bg-primary/5 mt-0.5"
                                                             onClick={() => openArrivalDialog(row)}
                                                         >
                                                             <Clock className="h-3 w-3 mr-1" />
                                                             Verificar llegada
                                                         </Button>
-                                                    )}
-
-                                                    {/* Geocerca asignada */}
-                                                    {row.navitel_zone_name && (
-                                                        <span className="text-[10px] text-muted-foreground truncate max-w-[130px]" title={row.navitel_zone_name}>
-                                                            ⬡ {row.navitel_zone_name}
-                                                        </span>
                                                     )}
                                                 </div>
                                             ) : (
@@ -475,9 +535,9 @@ export function TrailersTable({ refresh, onEdit, onCopy, headerAction }: { refre
                 </div>
             </div>
 
-            {/* Dialog: Verificar llegada */}
+            {/* Dialog: Verificar llegada (múltiples geocercas) */}
             <Dialog open={arrivalDialog.open} onOpenChange={(open) => !open && setArrivalDialog(prev => ({ ...prev, open: false }))}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Satellite className="h-5 w-5 text-primary" />
@@ -485,32 +545,12 @@ export function TrailersTable({ refresh, onEdit, onCopy, headerAction }: { refre
                         </DialogTitle>
                         <DialogDescription>
                             {arrivalDialog.row && (
-                                <>
-                                    Rastreador: <strong>{arrivalDialog.row.navitel_tracker_label || `ID ${arrivalDialog.row.navitel_tracker_id}`}</strong>
-                                    {arrivalDialog.row.navitel_zone_name && (
-                                        <> · Zona: <strong>{arrivalDialog.row.navitel_zone_name}</strong></>
-                                    )}
-                                </>
+                                <>Rastreador: <strong>{arrivalDialog.row.navitel_tracker_label || `ID ${arrivalDialog.row.navitel_tracker_id}`}</strong></>
                             )}
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-4 py-2">
-                        {/* Botón verificar */}
-                        {arrivalDialog.arrived === null && !arrivalDialog.error && (
-                            <Button
-                                onClick={checkArrival}
-                                disabled={arrivalDialog.checking}
-                                className="w-full"
-                            >
-                                {arrivalDialog.checking ? (
-                                    <><Clock className="h-4 w-4 mr-2 animate-pulse" />Consultando Navitel...</>
-                                ) : (
-                                    <><Satellite className="h-4 w-4 mr-2" />Consultar llegada</>
-                                )}
-                            </Button>
-                        )}
-
+                    <div className="space-y-3 py-2">
                         {/* Error */}
                         {arrivalDialog.error && (
                             <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
@@ -518,68 +558,74 @@ export function TrailersTable({ refresh, onEdit, onCopy, headerAction }: { refre
                                 <div>
                                     <p className="font-medium">Error al consultar</p>
                                     <p className="text-xs mt-0.5">{arrivalDialog.error}</p>
-                                    <Button variant="ghost" size="sm" className="mt-2 h-7 text-xs" onClick={checkArrival}>
-                                        Reintentar
-                                    </Button>
                                 </div>
                             </div>
                         )}
 
-                        {/* Resultado: no llegó */}
-                        {arrivalDialog.arrived === false && (
-                            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg text-sm text-muted-foreground">
-                                <Clock className="h-4 w-4 shrink-0" />
-                                <div>
-                                    <p className="font-medium text-foreground">Sin registro de llegada</p>
-                                    <p className="text-xs mt-0.5">
-                                        No se encontraron eventos de entrada a zona para este rastreador en la fecha del servicio.
-                                        {!arrivalDialog.row?.navitel_zone_id && ' (Sin geocerca asignada: se buscaron todos los eventos de zona)'}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
+                        {/* Lista de geocercas */}
+                        {arrivalDialog.geocercaResults.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">
+                                Este servicio no tiene geocercas asignadas.
+                            </p>
+                        ) : (
+                            <div className="space-y-2">
+                                {arrivalDialog.geocercaResults.map((r, i) => (
+                                    <div key={r.geocerca.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                                        {/* Número */}
+                                        <span className="text-xs font-medium text-muted-foreground w-4 shrink-0">#{i + 1}</span>
 
-                        {/* Resultado: llegó */}
-                        {arrivalDialog.arrived === true && arrivalDialog.detectedTime && (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 p-3 bg-green-50 text-green-800 rounded-lg">
-                                    <CheckCircle className="h-5 w-5 shrink-0" />
-                                    <div>
-                                        <p className="font-semibold">¡Llegada detectada!</p>
-                                        <p className="text-2xl font-bold mt-0.5">{arrivalDialog.detectedTime}</p>
+                                        {/* Zona + tipo */}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium truncate">{r.geocerca.zone_name}</p>
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${r.geocerca.event_type === 'zone_out' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                {r.geocerca.event_type === 'zone_out' ? '↗ Salida' : '↘ Entrada'}
+                                            </span>
+                                        </div>
+
+                                        {/* Estado */}
+                                        <div className="shrink-0 text-right">
+                                            {r.saved ? (
+                                                <div className="flex items-center gap-1 text-green-700">
+                                                    <CheckCircle className="h-4 w-4" />
+                                                    <span className="text-sm font-bold">{r.time}</span>
+                                                </div>
+                                            ) : r.arrived === null && !arrivalDialog.checking ? (
+                                                <span className="text-xs text-muted-foreground">Sin verificar</span>
+                                            ) : arrivalDialog.checking ? (
+                                                <span className="text-xs text-muted-foreground animate-pulse">Consultando...</span>
+                                            ) : r.arrived === false ? (
+                                                <span className="text-xs text-muted-foreground">Sin registro</span>
+                                            ) : r.time ? (
+                                                <Button
+                                                    size="sm"
+                                                    className="h-7 text-xs"
+                                                    disabled={r.saving}
+                                                    onClick={() => saveGeocercaTime(r.geocerca.id, r.time!)}
+                                                >
+                                                    {r.saving ? 'Guardando...' : `Guardar ${r.time}`}
+                                                </Button>
+                                            ) : null}
+                                        </div>
                                     </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Guardar en el campo:</label>
-                                    <select
-                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                        value={arrivalDialog.selectedField}
-                                        onChange={(e) => setArrivalDialog(prev => ({ ...prev, selectedField: e.target.value }))}
-                                    >
-                                        {TIME_FIELDS.map(f => (
-                                            <option key={f.value} value={f.value}>{f.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                ))}
                             </div>
                         )}
                     </div>
 
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setArrivalDialog(prev => ({ ...prev, open: false }))}
-                            disabled={arrivalDialog.saving}
-                        >
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setArrivalDialog(prev => ({ ...prev, open: false }))}>
                             Cerrar
                         </Button>
-                        {arrivalDialog.arrived && arrivalDialog.detectedTime && (
+                        {arrivalDialog.geocercaResults.length > 0 && (
                             <Button
-                                onClick={saveArrivalTime}
-                                disabled={arrivalDialog.saving}
+                                onClick={checkAllArrivals}
+                                disabled={arrivalDialog.checking}
                             >
-                                {arrivalDialog.saving ? 'Guardando...' : `Guardar ${arrivalDialog.detectedTime}`}
+                                {arrivalDialog.checking ? (
+                                    <><Clock className="h-4 w-4 mr-2 animate-pulse" />Consultando Navitel...</>
+                                ) : (
+                                    <><Satellite className="h-4 w-4 mr-2" />Verificar todas</>
+                                )}
                             </Button>
                         )}
                     </DialogFooter>
