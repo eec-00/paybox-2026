@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,7 @@ import {
   Bell,
   ChevronDown,
   ChevronRight,
+  Download,
   Loader2,
   Mail,
   Plus,
@@ -33,6 +34,7 @@ import {
   normalizeAlertas,
   diasANombre,
 } from '@/lib/automatizacion/campos'
+import { VencimientosFlyer, type FlyerRow } from '@/components/VencimientosFlyer'
 
 interface Props {
   tipo: 'trailers' | 'conductores'
@@ -72,6 +74,8 @@ export function AutomatizacionSection({ tipo }: Props) {
   const [savingConfig, setSavingConfig] = useState(false)
   const [configSaved, setConfigSaved] = useState(false)
   const [expandedCampos, setExpandedCampos] = useState<Set<string>>(new Set())
+  const [downloading, setDownloading] = useState(false)
+  const flyerRef = useRef<HTMLDivElement>(null)
 
   // Filters
   const [busqueda, setBusqueda] = useState('')
@@ -252,10 +256,47 @@ export function AutomatizacionSection({ tipo }: Props) {
     })
   }
 
-  // Derived data
-  const allGlobalDias = (config.alertas._global || []).filter((a) => a.activo).map((a) => a.dias)
+  // Derived data — normalize defensively in case DB still has old array format
+  const safeConfigAlertas: Record<string, any> = Array.isArray(config.alertas)
+    ? { _global: config.alertas }
+    : (config.alertas as any ?? {})
+  const safeEditAlertas: Record<string, any> = Array.isArray(editConfig.alertas)
+    ? { _global: editConfig.alertas }
+    : (editConfig.alertas as any ?? {})
+
+  const allGlobalDias = (safeConfigAlertas._global || []).filter((a: any) => a.activo).map((a: any) => a.dias as number)
   const maxAlertaDias = Math.max(...allGlobalDias, 0)
-  const camposConOverride = Object.keys(editConfig.alertas).filter((k) => k !== '_global')
+  const camposConOverride = Object.keys(safeEditAlertas).filter((k) => k !== '_global')
+
+  // Filas para el flyer: empleados con vencimientos dentro del mayor umbral activo (mín 90d)
+  const flyerDias = Math.max(maxAlertaDias, 90)
+  const flyerRows: FlyerRow[] = []
+  for (const emp of empleados) {
+    for (const campo of CAMPOS_VENCIMIENTO) {
+      const fecha = emp[campo.key]
+      const dias = getDaysUntil(fecha)
+      if (dias === null || dias > flyerDias) continue
+      flyerRows.push({ unidad: emp.name, documento: campo.label, fecha: fecha as string, dias })
+    }
+  }
+  flyerRows.sort((a, b) => a.dias - b.dias)
+
+  const handleDescargarFlyer = async () => {
+    if (!flyerRef.current) return
+    setDownloading(true)
+    try {
+      const { toPng } = await import('html-to-image')
+      const dataUrl = await toPng(flyerRef.current, { pixelRatio: 2 })
+      const link = document.createElement('a')
+      link.download = `vencimientos-proximos-${new Date().toISOString().slice(0, 10)}.png`
+      link.href = dataUrl
+      link.click()
+    } catch (err) {
+      console.error('Error generando imagen:', err)
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const empleadosFiltrados = empleados.filter((emp) => {
     const matchBusqueda =
@@ -272,7 +313,7 @@ export function AutomatizacionSection({ tipo }: Props) {
         // Incluir si el campo está dentro del mayor umbral global
         if (maxAlertaDias > 0 && dias <= maxAlertaDias) return true
         // O si tiene override específico
-        const campoMax = Math.max(...(config.alertas[campo.key] || []).filter((a) => a.activo).map((a) => a.dias), 0)
+        const campoMax = Math.max(...((safeConfigAlertas[campo.key] as any[] | undefined) || []).filter((a: any) => a.activo).map((a: any) => a.dias as number), 0)
         return campoMax > 0 && dias <= campoMax
       })
     }
@@ -340,6 +381,16 @@ export function AutomatizacionSection({ tipo }: Props) {
           >
             {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
             Vista previa
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDescargarFlyer}
+            disabled={downloading || loading}
+            className="gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50"
+          >
+            {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Descargar vencimientos
           </Button>
           <Button
             size="sm"
@@ -412,10 +463,10 @@ export function AutomatizacionSection({ tipo }: Props) {
                 <Plus className="h-3 w-3" /> Agregar
               </Button>
             </div>
-            {(editConfig.alertas._global || []).length === 0 && (
+            {(safeEditAlertas._global || []).length === 0 && (
               <p className="text-xs text-muted-foreground italic py-1">Sin alertas globales</p>
             )}
-            {(editConfig.alertas._global || []).map((alerta, i) => (
+            {(safeEditAlertas._global || []).map((alerta: any, i: number) => (
               <div key={i} className="flex items-center gap-2 p-2 bg-blue-50/50 border border-blue-100 rounded-lg">
                 <Checkbox
                   checked={alerta.activo}
@@ -451,7 +502,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                 onChange={(e) => { if (e.target.value) addCampoOverride(e.target.value) }}
               >
                 <option value="">+ Agregar campo…</option>
-                {CAMPOS_VENCIMIENTO.filter((c) => !editConfig.alertas[c.key]).map((c) => (
+                {CAMPOS_VENCIMIENTO.filter((c) => !safeEditAlertas[c.key]).map((c) => (
                   <option key={c.key} value={c.key}>{c.label}</option>
                 ))}
               </select>
@@ -465,7 +516,7 @@ export function AutomatizacionSection({ tipo }: Props) {
 
             {camposConOverride.map((campoKey) => {
               const campo = CAMPOS_VENCIMIENTO.find((c) => c.key === campoKey)
-              const alertas = editConfig.alertas[campoKey] || []
+              const alertas = (safeEditAlertas[campoKey] as any[] | undefined) || []
               const expanded = expandedCampos.has(campoKey)
               return (
                 <div key={campoKey} className="border border-amber-200 bg-amber-50/40 rounded-lg overflow-hidden">
@@ -723,6 +774,11 @@ export function AutomatizacionSection({ tipo }: Props) {
             {l.label}
           </span>
         ))}
+      </div>
+
+      {/* Flyer oculto para captura de imagen */}
+      <div style={{ position: 'absolute', left: -9999, top: 0, pointerEvents: 'none' }}>
+        <VencimientosFlyer ref={flyerRef} rows={flyerRows} />
       </div>
     </div>
   )

@@ -68,13 +68,18 @@ async function odooCall<T>(
 
 function buildEmailHtml(nombre: string, items: { label: string; fecha: string; dias: number }[]): string {
   const filas = items
-    .map((c) => {
-      const estado = c.dias < 0 ? `VENCIDO (hace ${Math.abs(c.dias)} días)` : c.dias === 0 ? 'VENCE HOY' : `Vence en ${c.dias} días`
-      const color = c.dias < 0 ? '#dc2626' : c.dias <= 30 ? '#d97706' : '#ca8a04'
-      return `<tr>
-        <td style="border:1px solid #e5e7eb;padding:10px 14px">${c.label}</td>
-        <td style="border:1px solid #e5e7eb;padding:10px 14px">${c.fecha}</td>
-        <td style="border:1px solid #e5e7eb;padding:10px 14px;color:${color};font-weight:600">${estado}</td>
+    .map((c, idx) => {
+      const bg = idx % 2 === 0 ? '#fffde7' : '#ffffff'
+      const estadoColor = c.dias < 0 ? '#dc2626' : c.dias <= 7 ? '#ea580c' : c.dias <= 30 ? '#d97706' : '#854d0e'
+      const estadoTxt = c.dias < 0
+        ? `VENCIDO (hace ${Math.abs(c.dias)} d)`
+        : c.dias === 0 ? 'VENCE HOY'
+        : `${c.dias} días`
+      return `<tr style="background:${bg}">
+        <td style="border:1px solid #f59e0b;padding:9px 14px;font-size:13px;color:#1c1917;text-align:center">${nombre.toUpperCase()}</td>
+        <td style="border:1px solid #f59e0b;padding:9px 14px;font-size:13px;color:#1c1917;text-align:center">${c.label}</td>
+        <td style="border:1px solid #f59e0b;padding:9px 14px;font-size:13px;color:#1c1917;text-align:center">${c.fecha}</td>
+        <td style="border:1px solid #f59e0b;padding:9px 14px;font-size:13px;font-weight:700;color:${estadoColor};text-align:center">${estadoTxt}</td>
       </tr>`
     })
     .join('')
@@ -82,33 +87,51 @@ function buildEmailHtml(nombre: string, items: { label: string; fecha: string; d
   return `<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;background:#f9fafb">
-  <div style="max-width:640px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1)">
-    <div style="background:#1a2332;padding:24px 28px">
-      <h1 style="margin:0;color:#fff;font-size:20px">⚠️ Aviso de Vencimientos</h1>
-      <p style="margin:6px 0 0;color:rgba(255,255,255,.7);font-size:13px">Eemerson SAC — Sistema PayBox</p>
-    </div>
-    <div style="padding:28px">
-      <p style="margin:0 0 16px;font-size:15px;color:#374151">Estimado(a) <strong>${nombre}</strong>,</p>
-      <p style="margin:0 0 20px;font-size:14px;color:#6b7280">
-        Le informamos que los siguientes documentos están próximos a vencer o ya han vencido.
-        Por favor tome las acciones necesarias para su renovación.
-      </p>
-      <table style="border-collapse:collapse;width:100%;font-size:14px">
-        <thead>
-          <tr style="background:#f3f4f6">
-            <th style="border:1px solid #e5e7eb;padding:10px 14px;text-align:left;color:#374151">Documento</th>
-            <th style="border:1px solid #e5e7eb;padding:10px 14px;text-align:left;color:#374151">Fecha de Vencimiento</th>
-            <th style="border:1px solid #e5e7eb;padding:10px 14px;text-align:left;color:#374151">Estado</th>
-          </tr>
-        </thead>
-        <tbody>${filas}</tbody>
-      </table>
-      <p style="margin:24px 0 0;font-size:13px;color:#9ca3af;border-top:1px solid #f3f4f6;padding-top:16px">
-        Atentamente,<br><strong style="color:#374151">Eemerson SAC</strong> · Sistema PayBox
-      </p>
+<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;background:#f0f4f8">
+<div style="max-width:660px;margin:32px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.12)">
+
+  <!-- Header -->
+  <div style="background:#ffffff;padding:28px 32px 16px;text-align:center;border-bottom:3px solid #f59e0b">
+    <div style="display:inline-flex;align-items:center;gap:12px">
+      <span style="font-size:32px">📢</span>
+      <div>
+        <h1 style="margin:0;font-size:22px;font-weight:900;letter-spacing:2px;color:#1c1917;text-transform:uppercase">Vencimientos Próximos</h1>
+        <p style="margin:4px 0 0;font-size:12px;color:#78716c;letter-spacing:1px">EEMERSON SAC — Sistema PayBox</p>
+      </div>
     </div>
   </div>
+
+  <!-- Body -->
+  <div style="padding:24px 28px">
+    <p style="margin:0 0 18px;font-size:14px;color:#44403c">
+      Estimado(a) <strong>${nombre}</strong>, los siguientes documentos están próximos a vencer o ya han vencido.
+      Por favor tome las acciones necesarias para su renovación.
+    </p>
+
+    <table style="border-collapse:collapse;width:100%;font-size:13px">
+      <thead>
+        <tr style="background:#f59e0b">
+          <th style="border:1px solid #d97706;padding:10px 14px;color:#ffffff;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.5px">Conductor / Unidad</th>
+          <th style="border:1px solid #d97706;padding:10px 14px;color:#ffffff;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.5px">Documento</th>
+          <th style="border:1px solid #d97706;padding:10px 14px;color:#ffffff;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.5px">F. Vencimiento</th>
+          <th style="border:1px solid #d97706;padding:10px 14px;color:#ffffff;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.5px">Estado</th>
+        </tr>
+      </thead>
+      <tbody>${filas}</tbody>
+    </table>
+
+    <div style="margin-top:20px;padding:12px 16px;background:#fef9c3;border-left:4px solid #f59e0b;border-radius:4px;font-size:13px;color:#713f12">
+      Si ya lo actualizaste, <strong>comunícalo</strong> al área administrativa para que pueda proceder con su presentación.
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="background:#1c1917;padding:18px 28px;text-align:center">
+    <p style="margin:0;font-size:15px;font-weight:800;color:#f59e0b;letter-spacing:1px;text-transform:uppercase">¡Agradecemos su atención!</p>
+    <p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,.6);letter-spacing:.5px">Administración EEMERSON SAC</p>
+  </div>
+
+</div>
 </body>
 </html>`
 }
