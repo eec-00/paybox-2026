@@ -1,4 +1,4 @@
-const CACHE_NAME = 'paybox-v2';
+const CACHE_NAME = 'paybox-v3';
 const STATIC_ASSETS = [
   '/logo.png',
   '/login.png',
@@ -50,6 +50,9 @@ self.addEventListener('fetch', (event) => {
 
   // Skip Next.js RSC (React Server Component) requests
   if (event.request.url.includes('_rsc') || event.request.headers.get('rsc')) return;
+
+  // Skip Next.js static assets — they are managed by content hashes and HTTP cache headers
+  if (event.request.url.includes('/_next/')) return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
