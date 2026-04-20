@@ -17,6 +17,7 @@ import { TutorialsList } from '@/components/TutorialsList'
 import { TrailersTable } from '@/components/TrailersTable'
 import { TrailerForm } from '@/components/TrailerForm'
 import { Sidebar, type Section } from '@/components/Sidebar'
+import { AutomatizacionSection } from '@/components/AutomatizacionSection'
 import { CalendarSection } from '@/components/CalendarSection'
 import { UpdatesNotification } from '@/components/UpdatesNotification'
 import { UpdatesManagement } from '@/components/UpdatesManagement'
@@ -634,6 +635,14 @@ export default function DashboardPage() {
                 {/* Lista de actualizaciones para todos */}
                 <UpdatesList />
               </div>
+            )}
+
+            {activeSection === 'automatizacion-trailers' && (
+              <AutomatizacionSection tipo="trailers" />
+            )}
+
+            {activeSection === 'automatizacion-conductores' && (
+              <AutomatizacionSection tipo="conductores" />
             )}
 
             {activeSection === 'administracion' && (
