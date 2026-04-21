@@ -637,12 +637,16 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {activeSection === 'automatizacion-trailers' && (
-              <AutomatizacionSection tipo="trailers" />
-            )}
-
             {activeSection === 'automatizacion-conductores' && (
               <AutomatizacionSection tipo="conductores" />
+            )}
+
+            {activeSection === 'automatizacion-tractos' && (
+              <AutomatizacionSection tipo="tractos" />
+            )}
+
+            {activeSection === 'automatizacion-carretas' && (
+              <AutomatizacionSection tipo="carretas" />
             )}
 
             {activeSection === 'administracion' && (

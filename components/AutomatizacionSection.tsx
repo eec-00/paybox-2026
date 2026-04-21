@@ -24,7 +24,8 @@ import {
   Zap,
 } from 'lucide-react'
 import {
-  CAMPOS_VENCIMIENTO,
+  getCamposForTipo,
+  isVehicleTipo,
   type AlertaThreshold,
   type AlertasConfig,
   type AutomatizacionConfig,
@@ -37,7 +38,7 @@ import {
 import { VencimientosFlyer, type FlyerRow } from '@/components/VencimientosFlyer'
 
 interface Props {
-  tipo: 'trailers' | 'conductores'
+  tipo: 'conductores' | 'tractos' | 'carretas'
 }
 
 interface PreviewItem {
@@ -55,19 +56,23 @@ const DEFAULT_ALERTAS: AlertasConfig = {
 }
 
 export function AutomatizacionSection({ tipo }: Props) {
-  const titulo = tipo === 'trailers' ? 'Trailers' : 'Conductores'
+  const esVehiculo = isVehicleTipo(tipo)
+  const camposDeTipo = getCamposForTipo(tipo)
+  const titulo = tipo === 'conductores' ? 'Conductores' : tipo === 'tractos' ? 'Tractos' : 'Carretas'
+  const registroLabel = esVehiculo ? 'vehículos' : 'empleados'
 
   // Data
-  const [empleados, setEmpleados] = useState<any[]>([])
+  const [registros, setRegistros] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Config
   const [config, setConfig] = useState<AutomatizacionConfig>({
     tipo,
-    job_title: 'Conductor',
+    job_title: tipo === 'conductores' ? 'Conductor' : tipo === 'tractos' ? 'Camión' : 'Semirremolque Plataforma',
     alertas: DEFAULT_ALERTAS,
     activo: true,
+    destination_email: '',
   })
   const [editConfig, setEditConfig] = useState<AutomatizacionConfig>(config)
   const [showConfig, setShowConfig] = useState(false)
@@ -102,28 +107,37 @@ export function AutomatizacionSection({ tipo }: Props) {
     }
   }, [tipo])
 
-  const loadEmpleados = useCallback(async () => {
+  const loadRegistros = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/automatizacion/empleados?job_title=${encodeURIComponent(config.job_title)}`)
-      if (!res.ok) throw new Error((await res.json()).error || 'Error al cargar empleados')
-      const data = await res.json()
-      setEmpleados(data.empleados || [])
+      let res: Response
+      if (esVehiculo) {
+        const filtro = config.job_title || tipo
+        res = await fetch(`/api/automatizacion/vehiculos?tipo=${tipo}&filtro=${encodeURIComponent(filtro)}`)
+        if (!res.ok) throw new Error((await res.json()).error || 'Error al cargar vehículos')
+        const data = await res.json()
+        setRegistros(data.vehiculos || [])
+      } else {
+        res = await fetch(`/api/automatizacion/empleados?job_title=${encodeURIComponent(config.job_title)}`)
+        if (!res.ok) throw new Error((await res.json()).error || 'Error al cargar empleados')
+        const data = await res.json()
+        setRegistros(data.empleados || [])
+      }
     } catch (err: any) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [config.job_title])
+  }, [config.job_title, tipo, esVehiculo])
 
   useEffect(() => {
     loadConfig()
   }, [loadConfig])
 
   useEffect(() => {
-    loadEmpleados()
-  }, [loadEmpleados])
+    loadRegistros()
+  }, [loadRegistros])
 
   const saveConfig = async () => {
     setSavingConfig(true)
@@ -186,7 +200,7 @@ export function AutomatizacionSection({ tipo }: Props) {
   const addGlobal = () => {
     setEditConfig((prev) => ({
       ...prev,
-      alertas: { ...prev.alertas, _global: [...(prev.alertas._global || []), { dias: 60, activo: true, nombre: '2 meses' }] },
+      alertas: { ...prev.alertas, _global: [...(prev.alertas._global || []), { dias: 60, activo: true }] },
     }))
   }
   const removeGlobal = (i: number) => {
@@ -211,7 +225,7 @@ export function AutomatizacionSection({ tipo }: Props) {
       ...prev,
       alertas: {
         ...prev.alertas,
-        [campoKey]: [...(prev.alertas[campoKey] || []), { dias: 30, activo: true, nombre: '1 mes' }],
+        [campoKey]: [...(prev.alertas[campoKey] || []), { dias: 30, activo: true }],
       },
     }))
   }
@@ -237,7 +251,7 @@ export function AutomatizacionSection({ tipo }: Props) {
     if (editConfig.alertas[campoKey]) return
     setEditConfig((prev) => ({
       ...prev,
-      alertas: { ...prev.alertas, [campoKey]: [{ dias: 30, activo: true, nombre: '1 mes' }] },
+      alertas: { ...prev.alertas, [campoKey]: [{ dias: 30, activo: true }] },
     }))
     setExpandedCampos((prev) => new Set([...prev, campoKey]))
   }
@@ -268,15 +282,15 @@ export function AutomatizacionSection({ tipo }: Props) {
   const maxAlertaDias = Math.max(...allGlobalDias, 0)
   const camposConOverride = Object.keys(safeEditAlertas).filter((k) => k !== '_global')
 
-  // Filas para el flyer: empleados con vencimientos dentro del mayor umbral activo (mín 90d)
-  const flyerDias = Math.max(maxAlertaDias, 90)
+  // Filas para el flyer — solo dentro del umbral activo más alto
+  const flyerDias = maxAlertaDias
   const flyerRows: FlyerRow[] = []
-  for (const emp of empleados) {
-    for (const campo of CAMPOS_VENCIMIENTO) {
-      const fecha = emp[campo.key]
+  for (const reg of registros) {
+    for (const campo of camposDeTipo) {
+      const fecha = reg[campo.key]
       const dias = getDaysUntil(fecha)
       if (dias === null || dias > flyerDias) continue
-      flyerRows.push({ unidad: emp.name, documento: campo.label, fecha: fecha as string, dias })
+      flyerRows.push({ unidad: reg.name, documento: campo.label, fecha: fecha as string, dias })
     }
   }
   flyerRows.sort((a, b) => a.dias - b.dias)
@@ -288,7 +302,7 @@ export function AutomatizacionSection({ tipo }: Props) {
       const { toPng } = await import('html-to-image')
       const dataUrl = await toPng(flyerRef.current, { pixelRatio: 2 })
       const link = document.createElement('a')
-      link.download = `vencimientos-proximos-${new Date().toISOString().slice(0, 10)}.png`
+      link.download = `vencimientos-${tipo}-${new Date().toISOString().slice(0, 10)}.png`
       link.href = dataUrl
       link.click()
     } catch (err) {
@@ -298,21 +312,20 @@ export function AutomatizacionSection({ tipo }: Props) {
     }
   }
 
-  const empleadosFiltrados = empleados.filter((emp) => {
+  const registrosFiltrados = registros.filter((reg) => {
+    const secondField = esVehiculo ? reg.license_plate : reg.work_email
     const matchBusqueda =
       !busqueda ||
-      emp.name?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      emp.work_email?.toLowerCase().includes(busqueda.toLowerCase())
+      reg.name?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      secondField?.toLowerCase().includes(busqueda.toLowerCase())
 
     if (!matchBusqueda) return false
 
     if (soloProximos) {
-      return CAMPOS_VENCIMIENTO.some((campo) => {
-        const dias = getDaysUntil(emp[campo.key])
+      return camposDeTipo.some((campo) => {
+        const dias = getDaysUntil(reg[campo.key])
         if (dias === null) return false
-        // Incluir si el campo está dentro del mayor umbral global
         if (maxAlertaDias > 0 && dias <= maxAlertaDias) return true
-        // O si tiene override específico
         const campoMax = Math.max(...((safeConfigAlertas[campo.key] as any[] | undefined) || []).filter((a: any) => a.activo).map((a: any) => a.dias as number), 0)
         return campoMax > 0 && dias <= campoMax
       })
@@ -323,14 +336,14 @@ export function AutomatizacionSection({ tipo }: Props) {
 
   // Stats
   const stats = {
-    total: empleados.length,
+    total: registros.length,
     vencidos: 0,
     proximos30: 0,
     proximos90: 0,
   }
-  for (const emp of empleados) {
-    for (const campo of CAMPOS_VENCIMIENTO) {
-      const dias = getDaysUntil(emp[campo.key])
+  for (const reg of registros) {
+    for (const campo of camposDeTipo) {
+      const dias = getDaysUntil(reg[campo.key])
       if (dias === null) continue
       if (dias < 0) stats.vencidos++
       else if (dias <= 30) stats.proximos30++
@@ -365,7 +378,7 @@ export function AutomatizacionSection({ tipo }: Props) {
           <Button
             variant="outline"
             size="sm"
-            onClick={loadEmpleados}
+            onClick={loadRegistros}
             disabled={loading}
             className="gap-1.5"
           >
@@ -407,7 +420,7 @@ export function AutomatizacionSection({ tipo }: Props) {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Empleados', value: stats.total, color: 'bg-primary/10 text-primary' },
+          { label: titulo, value: stats.total, color: 'bg-primary/10 text-primary' },
           { label: 'Vencidos', value: stats.vencidos, color: 'bg-red-100 text-red-700' },
           { label: 'Próx. 30 días', value: stats.proximos30, color: 'bg-orange-100 text-orange-700' },
           { label: 'Próx. 90 días', value: stats.proximos90, color: 'bg-yellow-100 text-yellow-700' },
@@ -431,7 +444,7 @@ export function AutomatizacionSection({ tipo }: Props) {
             </Button>
           </div>
 
-          {/* Activo + job_title */}
+          {/* Activo + filtro + destination_email */}
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <Checkbox
@@ -442,14 +455,28 @@ export function AutomatizacionSection({ tipo }: Props) {
               <Label htmlFor="activo-switch" className="text-sm">Automatización activa</Label>
             </div>
             <div className="flex items-center gap-2 ml-auto">
-              <Label className="text-xs text-muted-foreground whitespace-nowrap">Puesto Odoo:</Label>
+              <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                {esVehiculo ? 'Filtro nombre:' : 'Puesto Odoo:'}
+              </Label>
               <Input
                 value={editConfig.job_title}
                 onChange={(e) => setEditConfig((p) => ({ ...p, job_title: e.target.value }))}
-                placeholder="Ej: Conductor"
+                placeholder={esVehiculo ? 'Ej: Tracto' : 'Ej: Conductor'}
                 className="h-7 text-xs w-36"
               />
             </div>
+            {esVehiculo && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground whitespace-nowrap">Correo destino:</Label>
+                <Input
+                  value={editConfig.destination_email || ''}
+                  onChange={(e) => setEditConfig((p) => ({ ...p, destination_email: e.target.value }))}
+                  placeholder="alertas@empresa.com"
+                  type="email"
+                  className="h-7 text-xs w-52"
+                />
+              </div>
+            )}
           </div>
 
           {/* Alertas globales */}
@@ -502,7 +529,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                 onChange={(e) => { if (e.target.value) addCampoOverride(e.target.value) }}
               >
                 <option value="">+ Agregar campo…</option>
-                {CAMPOS_VENCIMIENTO.filter((c) => !safeEditAlertas[c.key]).map((c) => (
+                {camposDeTipo.filter((c) => !safeEditAlertas[c.key]).map((c) => (
                   <option key={c.key} value={c.key}>{c.label}</option>
                 ))}
               </select>
@@ -515,7 +542,7 @@ export function AutomatizacionSection({ tipo }: Props) {
             )}
 
             {camposConOverride.map((campoKey) => {
-              const campo = CAMPOS_VENCIMIENTO.find((c) => c.key === campoKey)
+              const campo = camposDeTipo.find((c) => c.key === campoKey)
               const alertas = (safeEditAlertas[campoKey] as any[] | undefined) || []
               const expanded = expandedCampos.has(campoKey)
               return (
@@ -622,7 +649,7 @@ export function AutomatizacionSection({ tipo }: Props) {
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <Bell className="h-4 w-4 text-blue-600" />
-              Vista previa — {preview.length} empleado(s) recibirán alertas
+              Vista previa — {preview.length} {esVehiculo ? 'consolidado' : `${registroLabel} recibirán alertas`}
             </h3>
             <button onClick={() => setShowPreview(false)}><X className="h-4 w-4" /></button>
           </div>
@@ -640,7 +667,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                         variant="outline"
                         className={`text-[10px] ${c.dias < 0 ? 'border-red-400 text-red-700' : c.dias <= 30 ? 'border-orange-400 text-orange-700' : 'border-yellow-400 text-yellow-700'}`}
                       >
-                        {c.label}: {c.dias < 0 ? `vencido` : `${c.dias}d`}
+                        {c.label}: {c.dias < 0 ? 'vencido' : `${c.dias}d`}
                       </Badge>
                     ))}
                   </div>
@@ -651,7 +678,7 @@ export function AutomatizacionSection({ tipo }: Props) {
           {preview.length > 0 && (
             <Button size="sm" onClick={handleSendAlerts} disabled={sending} className="gap-1.5">
               {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
-              Confirmar y enviar {preview.length} correo(s)
+              Confirmar y enviar
             </Button>
           )}
         </div>
@@ -662,7 +689,7 @@ export function AutomatizacionSection({ tipo }: Props) {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre o correo…"
+            placeholder={esVehiculo ? 'Buscar por nombre o placa…' : 'Buscar por nombre o correo…'}
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="pl-8 h-8 text-sm"
@@ -684,7 +711,7 @@ export function AutomatizacionSection({ tipo }: Props) {
           </Label>
         </div>
         <span className="text-xs text-muted-foreground">
-          {empleadosFiltrados.length} de {empleados.length} empleados
+          {registrosFiltrados.length} de {registros.length} {registroLabel}
         </span>
       </div>
 
@@ -692,12 +719,12 @@ export function AutomatizacionSection({ tipo }: Props) {
       {loading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
           <Loader2 className="h-5 w-5 animate-spin" />
-          Cargando empleados desde Odoo…
+          Cargando {registroLabel} desde Odoo…
         </div>
-      ) : empleadosFiltrados.length === 0 ? (
+      ) : registrosFiltrados.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground text-sm">
-          No se encontraron empleados con job_title "{config.job_title}".
-          <br />Verifica el filtro de puesto en Configurar.
+          No se encontraron {registroLabel} con filtro "{config.job_title}".
+          <br />Verifica el filtro en Configurar.
         </div>
       ) : (
         <div className="border rounded-xl overflow-hidden shadow-sm">
@@ -705,13 +732,13 @@ export function AutomatizacionSection({ tipo }: Props) {
             <table className="w-full text-xs border-collapse min-w-max">
               <thead>
                 <tr className="bg-primary text-primary-foreground">
-                  <th className="sticky left-0 z-10 bg-primary px-3 py-2.5 text-left font-semibold min-w-40">
-                    Empleado
+                  <th className="sticky left-0 z-20 bg-primary px-3 py-2.5 text-left font-semibold min-w-40">
+                    {esVehiculo ? 'Unidad' : 'Empleado'}
                   </th>
-                  <th className="sticky left-40 z-10 bg-primary px-3 py-2.5 text-left font-semibold min-w-[180px]">
-                    Correo
+                  <th className="sticky left-40 z-20 bg-primary px-3 py-2.5 text-left font-semibold min-w-[140px]">
+                    {esVehiculo ? 'Placa' : 'Correo'}
                   </th>
-                  {CAMPOS_VENCIMIENTO.map((c) => (
+                  {camposDeTipo.map((c) => (
                     <th
                       key={c.key}
                       className="px-2 py-2.5 text-center font-semibold whitespace-nowrap min-w-[90px]"
@@ -722,39 +749,40 @@ export function AutomatizacionSection({ tipo }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {empleadosFiltrados.map((emp, i) => {
+                {registrosFiltrados.map((reg, i) => {
                   const stickyBg = i % 2 === 0 ? 'bg-background' : 'bg-muted/60'
                   return (
-                  <tr key={emp.id} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
-                    <td className={`sticky left-0 z-10 px-3 py-2 font-medium border-r border-border/50 whitespace-nowrap max-w-40 truncate ${stickyBg}`}>
-                      {emp.name}
-                    </td>
-                    <td className={`sticky left-40 z-10 px-3 py-2 text-muted-foreground border-r border-border/50 whitespace-nowrap max-w-[180px] truncate ${stickyBg}`}>
-                      {emp.work_email || '—'}
-                    </td>
-                    {CAMPOS_VENCIMIENTO.map((campo) => {
-                      const fecha = emp[campo.key]
-                      const dias = getDaysUntil(fecha)
-                      const colorClass = getStatusColor(dias)
-                      return (
-                        <td
-                          key={campo.key}
-                          className={`px-2 py-2 text-center whitespace-nowrap ${colorClass} border-r border-border/20`}
-                          title={fecha ? `${fecha} (${getStatusLabel(dias)})` : 'Sin fecha'}
-                        >
-                          {fecha ? (
-                            <div className="flex flex-col items-center">
-                              <span>{fecha as string}</span>
-                              <span className="text-[10px] opacity-75">{getStatusLabel(dias)}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground/40">—</span>
-                          )}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )})}
+                    <tr key={reg.id} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
+                      <td className={`sticky left-0 z-20 px-3 py-2 font-medium border-r border-border/50 whitespace-nowrap max-w-40 truncate ${stickyBg}`}>
+                        {reg.name}
+                      </td>
+                      <td className={`sticky left-40 z-20 px-3 py-2 text-muted-foreground border-r border-border/50 whitespace-nowrap max-w-[140px] truncate ${stickyBg}`}>
+                        {esVehiculo ? (reg.license_plate || '—') : (reg.work_email || '—')}
+                      </td>
+                      {camposDeTipo.map((campo) => {
+                        const fecha = reg[campo.key]
+                        const dias = getDaysUntil(fecha)
+                        const colorClass = getStatusColor(dias)
+                        return (
+                          <td
+                            key={campo.key}
+                            className={`px-2 py-2 text-center whitespace-nowrap ${colorClass} border-r border-border/20`}
+                            title={fecha ? `${fecha} (${getStatusLabel(dias)})` : 'Sin fecha'}
+                          >
+                            {fecha ? (
+                              <div className="flex flex-col items-center">
+                                <span>{fecha as string}</span>
+                                <span className="text-[10px] opacity-75">{getStatusLabel(dias)}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground/40">—</span>
+                            )}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

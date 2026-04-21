@@ -67,11 +67,46 @@ export type AlertasConfig = {
   [campoKey: string]: AlertaThreshold[] | undefined
 }
 
+export type TipoAutomatizacion = 'conductores' | 'tractos' | 'carretas'
+
+export const CAMPOS_VENCIMIENTO_TRACTOS: CampoVencimiento[] = [
+  { key: 'x_studio_dpw', label: 'DPW' },
+  { key: 'x_studio_chvg', label: 'CHVG' },
+  { key: 'x_studio_chve', label: 'CHVE' },
+  { key: 'x_studio_rt_g', label: 'RT G' },
+  { key: 'x_studio_rt_mp', label: 'RT MP' },
+  { key: 'x_studio_pol_imo', label: 'POL. IMO' },
+]
+
+export const CAMPOS_VENCIMIENTO_CARRETAS: CampoVencimiento[] = [
+  { key: 'x_studio_dpw', label: 'DPW' },
+  { key: 'x_studio_chvg', label: 'CHVG' },
+  { key: 'x_studio_chve', label: 'CHVE' },
+  { key: 'x_studio_soat', label: 'SOAT' },
+  { key: 'x_studio_rt_g', label: 'RT G' },
+  { key: 'x_studio_rt_mp', label: 'RT MP' },
+  { key: 'x_studio_poliza', label: 'Póliza' },
+  { key: 'x_studio_pol_imo', label: 'POL. IMO' },
+]
+
+export function getCamposForTipo(tipo: string): CampoVencimiento[] {
+  if (tipo === 'tractos') return CAMPOS_VENCIMIENTO_TRACTOS
+  if (tipo === 'carretas') return CAMPOS_VENCIMIENTO_CARRETAS
+  return CAMPOS_VENCIMIENTO
+}
+
+export function isVehicleTipo(tipo: string): boolean {
+  return tipo === 'tractos' || tipo === 'carretas'
+}
+
 export interface AutomatizacionConfig {
   tipo: string
+  /** Para conductores: job_title en Odoo. Para vehículos: filtro de nombre (ilike). */
   job_title: string
   alertas: AlertasConfig
   activo: boolean
+  /** Correo destino para alertas de vehículos (tractos/carretas) */
+  destination_email?: string
 }
 
 /** Normaliza el formato antiguo (array) al nuevo (objeto con _global) */

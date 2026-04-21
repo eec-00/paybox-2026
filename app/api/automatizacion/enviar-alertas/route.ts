@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { createClient } from '@supabase/supabase-js'
-import { CAMPOS_VENCIMIENTO, getDaysUntil, normalizeAlertas, getAlertasEfectivas } from '@/lib/automatizacion/campos'
+import { CAMPOS_VENCIMIENTO, getCamposForTipo, isVehicleTipo, getDaysUntil, normalizeAlertas, getAlertasEfectivas } from '@/lib/automatizacion/campos'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -136,9 +136,55 @@ function buildEmailHtml(nombre: string, items: { label: string; fecha: string; d
 </html>`
 }
 
+async function fetchRegistros(uid: number, tipo: string, filtro: string): Promise<any[]> {
+  const campos = getCamposForTipo(tipo)
+  const studioFields = campos.map((c) => c.key)
+
+  if (isVehicleTipo(tipo)) {
+    // fleet.vehicle — filtrar por categoría
+    const domain: any[] = filtro ? [['category_id.name', '=', filtro]] : []
+    const baseFields = ['id', 'name', 'license_plate']
+    let base = await odooCall<any[]>(uid, 'fleet.vehicle', 'search_read', [domain], {
+      fields: baseFields, limit: 500, order: 'name asc',
+    }) || []
+    if (base.length === 0) return []
+    const ids = base.map((v) => v.id)
+    let studio: any[] = []
+    try {
+      studio = await odooCall<any[]>(uid, 'fleet.vehicle', 'search_read', [[['id', 'in', ids]]], {
+        fields: ['id', ...studioFields], limit: 500,
+      }) || []
+    } catch { studio = [] }
+    const map = new Map(studio.map((r) => [r.id, r]))
+    return base.map((v) => ({ ...v, ...(map.get(v.id) || {}) }))
+  } else {
+    // hr.employee — filtrar por job_title
+    let base = await odooCall<any[]>(uid, 'hr.employee', 'search_read',
+      [[['job_title', '=', filtro]]],
+      { fields: ['id', 'name', 'work_email'], limit: 500 }
+    ) || []
+    if (base.length === 0) {
+      base = await odooCall<any[]>(uid, 'hr.employee', 'search_read',
+        [[['job_title', 'ilike', filtro]]],
+        { fields: ['id', 'name', 'work_email'], limit: 500 }
+      ) || []
+    }
+    if (base.length === 0) return []
+    const ids = base.map((e) => e.id)
+    let studio: any[] = []
+    try {
+      studio = await odooCall<any[]>(uid, 'hr.employee', 'search_read', [[['id', 'in', ids]]], {
+        fields: ['id', ...studioFields], limit: 500,
+      }) || []
+    } catch { studio = [] }
+    const map = new Map(studio.map((r) => [r.id, r]))
+    return base.map((e) => ({ ...e, ...(map.get(e.id) || {}) }))
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { tipo = 'trailers', soloPreview = false } = await req.json()
+    const { tipo = 'conductores', soloPreview = false } = await req.json()
 
     // Load config from Supabase
     const { data: config } = await supabase
@@ -148,77 +194,44 @@ export async function POST(req: NextRequest) {
       .single()
 
     const alertasConfig = normalizeAlertas(config?.alertas)
+    const filtro = config?.job_title || (tipo === 'conductores' ? 'Conductor' : tipo)
+    const camposDeTipo = getCamposForTipo(tipo)
+    const esVehiculo = isVehicleTipo(tipo)
 
-    const jobTitle = config?.job_title || 'Conductor'
+    // Para vehículos: el email destino es destination_email configurado
+    const destinationEmail = config?.destination_email || ''
 
-    // Fetch employees from Odoo
     const uid = await odooAuth()
-    // Paso 1: obtener empleados por job_title (sin campos x_studio_ para evitar errores)
-    let empleadosBase = await odooCall<any[]>(
-      uid,
-      'hr.employee',
-      'search_read',
-      [[['job_title', '=', jobTitle]]],
-      { fields: ['id', 'name', 'work_email'], limit: 500 }
-    )
-    if (!empleadosBase || empleadosBase.length === 0) {
-      empleadosBase = await odooCall<any[]>(
-        uid,
-        'hr.employee',
-        'search_read',
-        [[['job_title', 'ilike', jobTitle]]],
-        { fields: ['id', 'name', 'work_email'], limit: 500 }
-      ) || []
-    }
+    const registros = await fetchRegistros(uid, tipo, filtro)
 
-    // Paso 2: obtener campos de vencimiento
-    const ids = empleadosBase.map((e) => e.id)
-    const studioFields = CAMPOS_VENCIMIENTO.map((c) => c.key)
-    let studioData: any[] = []
-    try {
-      studioData = await odooCall<any[]>(
-        uid,
-        'hr.employee',
-        'search_read',
-        [[['id', 'in', ids]]],
-        { fields: ['id', ...studioFields], limit: 500 }
-      ) || []
-    } catch {
-      studioData = []
-    }
-    const studioMap = new Map(studioData.map((r) => [r.id, r]))
-    const empleados = empleadosBase.map((emp) => ({ ...emp, ...(studioMap.get(emp.id) || {}) }))
+    const alertasPorRegistro: { registro: any; campos: any[] }[] = []
 
-    const emailsParaEnviar: { empleado: any; campos: any[] }[] = []
-
-    for (const empleado of empleados || []) {
-      if (!empleado.work_email) continue
+    for (const registro of registros) {
+      // Conductores necesitan work_email; vehículos usan destination_email
+      if (!esVehiculo && !registro.work_email) continue
 
       const camposAlerta: any[] = []
 
-      for (const campo of CAMPOS_VENCIMIENTO) {
-        const fecha = empleado[campo.key]
+      for (const campo of camposDeTipo) {
+        const fecha = registro[campo.key]
         if (!fecha || fecha === false) continue
 
         const dias = getDaysUntil(fecha)
         if (dias === null) continue
 
-        // Umbrales efectivos: específicos del campo + globales
         const umbrales = getAlertasEfectivas(alertasConfig, campo.key)
         if (umbrales.length === 0) continue
 
-        // Threshold más cercano que aún cubre los días restantes
         const alertaMatch = umbrales
           .sort((a, b) => a.dias - b.dias)
           .find((a) => dias <= a.dias)
 
         if (!alertaMatch) continue
 
-        // Check if already sent for this field+threshold+date combination
         const { data: yaEnviado } = await supabase
           .from('automatizacion_alertas_log')
           .select('id')
-          .eq('empleado_odoo_id', empleado.id)
+          .eq('empleado_odoo_id', registro.id)
           .eq('campo', campo.key)
           .eq('dias_anticipacion', alertaMatch.dias)
           .eq('fecha_vencimiento', fecha)
@@ -226,28 +239,36 @@ export async function POST(req: NextRequest) {
 
         if (yaEnviado) continue
 
-        camposAlerta.push({
-          key: campo.key,
-          label: campo.label,
-          fecha: fecha as string,
-          dias,
-          diasAlerta: alertaMatch.dias,
-        })
+        camposAlerta.push({ key: campo.key, label: campo.label, fecha: fecha as string, dias, diasAlerta: alertaMatch.dias })
       }
 
-      if (camposAlerta.length > 0) {
-        emailsParaEnviar.push({ empleado, campos: camposAlerta })
-      }
+      if (camposAlerta.length > 0) alertasPorRegistro.push({ registro, campos: camposAlerta })
     }
 
     if (soloPreview) {
+      if (esVehiculo) {
+        // Para vehículos: preview consolidado
+        const todosLosCampos = alertasPorRegistro.flatMap((r) =>
+          r.campos.map((c) => ({ label: `${r.registro.name} — ${c.label}`, fecha: c.fecha, dias: c.dias }))
+        )
+        return NextResponse.json({
+          preview: true,
+          total: alertasPorRegistro.length > 0 ? 1 : 0,
+          destinationEmail,
+          detalle: alertasPorRegistro.length > 0 ? [{
+            nombre: `${tipo.charAt(0).toUpperCase() + tipo.slice(1)} (${alertasPorRegistro.length} unidades)`,
+            email: destinationEmail,
+            campos: todosLosCampos,
+          }] : [],
+        })
+      }
       return NextResponse.json({
         preview: true,
-        total: emailsParaEnviar.length,
-        detalle: emailsParaEnviar.map((e) => ({
-          nombre: e.empleado.name,
-          email: e.empleado.work_email,
-          campos: e.campos.map((c) => ({ label: c.label, fecha: c.fecha, dias: c.dias })),
+        total: alertasPorRegistro.length,
+        detalle: alertasPorRegistro.map((r) => ({
+          nombre: r.registro.name,
+          email: r.registro.work_email,
+          campos: r.campos.map((c) => ({ label: c.label, fecha: c.fecha, dias: c.dias })),
         })),
       })
     }
@@ -264,15 +285,57 @@ export async function POST(req: NextRequest) {
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     })
 
     const resultados = { enviados: 0, errores: 0, omitidos: 0, detalles: [] as any[] }
 
-    for (const { empleado, campos } of emailsParaEnviar) {
+    if (esVehiculo) {
+      // Vehículos: un solo correo consolidado al destination_email
+      if (!destinationEmail) {
+        return NextResponse.json({ error: 'Configura el correo destino en Configurar → Correo destino' }, { status: 400 })
+      }
+      if (alertasPorRegistro.length === 0) {
+        return NextResponse.json({ enviados: 0, errores: 0, omitidos: 0, detalles: [] })
+      }
+      const tipoLabel = tipo.charAt(0).toUpperCase() + tipo.slice(1)
+      const allItems = alertasPorRegistro.flatMap((r) =>
+        r.campos.map((c) => ({ label: `${r.registro.name} — ${c.label}`, fecha: c.fecha, dias: c.dias }))
+      )
+      try {
+        await transporter.sendMail({
+          from: `"Eemerson SAC" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+          to: destinationEmail,
+          subject: `⚠️ Documentos próximos a vencer — ${tipoLabel} (${alertasPorRegistro.length} unidades)`,
+          html: buildEmailHtml(`${tipoLabel} — Flota Eemerson SAC`, allItems),
+        })
+        // Log sent alerts
+        for (const { registro, campos } of alertasPorRegistro) {
+          for (const campo of campos) {
+            await supabase.from('automatizacion_alertas_log').upsert({
+              empleado_odoo_id: registro.id,
+              empleado_nombre: registro.name,
+              campo: campo.key,
+              dias_anticipacion: campo.diasAlerta,
+              fecha_vencimiento: campo.fecha,
+              enviado_a: destinationEmail,
+              enviado_at: new Date().toISOString(),
+            }, { onConflict: 'empleado_odoo_id,campo,dias_anticipacion,fecha_vencimiento', ignoreDuplicates: true })
+          }
+        }
+        resultados.enviados = 1
+        resultados.detalles.push({ nombre: tipoLabel, email: destinationEmail, status: 'enviado', campos: allItems.length })
+      } catch (err: any) {
+        resultados.errores = 1
+        resultados.detalles.push({ nombre: tipoLabel, email: destinationEmail, status: 'error', error: err.message })
+      }
+      return NextResponse.json(resultados)
+    }
+
+    // Conductores: un email por persona
+    const emailsParaEnviar = alertasPorRegistro
+
+    for (const { registro: empleado, campos } of emailsParaEnviar) {
       try {
         await transporter.sendMail({
           from: `"Eemerson SAC" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
@@ -284,7 +347,6 @@ export async function POST(req: NextRequest) {
           ),
         })
 
-        // Log each sent alert to avoid duplicates
         for (const campo of campos) {
           await supabase.from('automatizacion_alertas_log').upsert(
             {

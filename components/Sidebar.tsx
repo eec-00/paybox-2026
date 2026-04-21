@@ -27,7 +27,8 @@ export type Section =
   | 'tutoriales'
   | 'administracion'
   | 'updates'
-  | 'automatizacion-trailers'
+  | 'automatizacion-tractos'
+  | 'automatizacion-carretas'
   | 'automatizacion-conductores'
 
 interface FlatItem {
@@ -167,19 +168,28 @@ export function Sidebar({
       children: [
         {
           type: 'item',
-          id: 'automatizacion-trailers',
-          label: 'Trailers',
-          icon: Truck,
-          description: 'Vencimientos conductores',
+          id: 'automatizacion-conductores',
+          label: 'Conductores',
+          icon: UserCog,
+          description: 'Documentos conductores',
           adminOnly: false,
           requiresCreate: false,
         },
         {
           type: 'item',
-          id: 'automatizacion-conductores',
-          label: 'Conductores',
-          icon: UserCog,
-          description: 'Vencimientos conductores',
+          id: 'automatizacion-tractos',
+          label: 'Tractos',
+          icon: Truck,
+          description: 'Documentos tractos',
+          adminOnly: false,
+          requiresCreate: false,
+        },
+        {
+          type: 'item',
+          id: 'automatizacion-carretas',
+          label: 'Carretas',
+          icon: Truck,
+          description: 'Documentos carretas',
           adminOnly: false,
           requiresCreate: false,
         },
