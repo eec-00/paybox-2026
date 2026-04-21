@@ -230,8 +230,8 @@ export function Sidebar({
   const visibleItems = menuItems.filter((item) => {
     if (item.adminOnly && !isAdmin) return false
     if (item.requiresCreate && !canCreate) return false
-    // dashboard siempre visible
-    if (item.id === 'dashboard') return true
+    // siempre visibles para todos
+    if (item.id === 'dashboard' || item.id === 'updates') return true
     if (item.type === 'group') {
       // el grupo es visible si está permitido directamente o algún hijo está permitido
       return canSeeModule(item.id) || item.children.some((c) => canSeeModule(c.id))
