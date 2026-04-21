@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Obtener datos del request
-    const { email, password, fullName, role, permissions } = await request.json()
+    const { email, password, fullName, role, permissions, modulePermissions } = await request.json()
 
     // Validaciones
     if (!email || !password || !fullName) {
@@ -76,14 +76,16 @@ export async function POST(request: NextRequest) {
 
     // El trigger handle_new_user() ya creó el perfil automáticamente
     // Solo necesitamos actualizarlo con el rol y permisos correctos
+    const isPrivileged = role === 'admin' || role === 'developer'
     const { error: profileUpdateError } = await adminClient
       .from('user_profiles')
       .update({
         full_name: fullName,
         role: role || 'user',
-        can_create: role === 'admin' || role === 'developer' ? true : (permissions?.can_create || false),
-        can_edit: role === 'admin' || role === 'developer' ? true : (permissions?.can_edit || false),
-        can_delete: role === 'admin' || role === 'developer' ? true : (permissions?.can_delete || false)
+        can_create: isPrivileged ? true : (permissions?.can_create || false),
+        can_edit: isPrivileged ? true : (permissions?.can_edit || false),
+        can_delete: isPrivileged ? true : (permissions?.can_delete || false),
+        module_permissions: isPrivileged ? null : (modulePermissions ?? null),
       })
       .eq('id', newUser.user.id)
 

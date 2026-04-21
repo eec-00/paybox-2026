@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import { UserProfile, UserPermissions, UserRole } from '@/lib/types/user-profile.types'
+import { UserProfile, UserPermissions, UserRole, ModulePermissions } from '@/lib/types/user-profile.types'
 
 /**
  * Obtiene el perfil completo del usuario actual desde la base de datos
@@ -162,27 +162,27 @@ export async function createUser({
   password,
   fullName,
   role = 'user',
-  permissions = { can_create: false, can_edit: false, can_delete: false }
+  permissions = { can_create: false, can_edit: false, can_delete: false },
+  modulePermissions = null,
 }: {
   email: string
   password: string
   fullName: string
   role?: UserRole
   permissions?: UserPermissions
+  modulePermissions?: ModulePermissions | null
 }): Promise<{ success: boolean; userId?: string; error?: string }> {
   try {
-    // Llamar al API route que tiene privilegios de admin
     const response = await fetch('/api/users/create', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email,
         password,
         fullName,
         role,
-        permissions
+        permissions,
+        modulePermissions,
       })
     })
 

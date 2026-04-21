@@ -41,6 +41,7 @@ export default function DashboardPage() {
   const [isDeveloper, setIsDeveloper] = useState(false)
   const [isAdminUser, setIsAdminUser] = useState(false)
   const [canCreate, setCanCreate] = useState(false)
+  const [allowedModules, setAllowedModules] = useState<string[] | null>(null)
 
   // Estados de filtros para Pagos
   const [startDate, setStartDate] = useState('')
@@ -132,6 +133,16 @@ export default function DashboardPage() {
         // Obtener permisos
         const permissions = await getUserPermissions()
         setCanCreate(permissions.can_create)
+
+        // Derivar allowedModules desde module_permissions para el Sidebar
+        if (!adminStatus && profile?.module_permissions) {
+          const mp = profile.module_permissions
+          const sections: string[] = []
+          if (mp.pagos?.enabled)          sections.push('finanzas')
+          if (mp.servicios?.enabled)      sections.push('servicios')
+          if (mp.automatizacion?.enabled) sections.push('automatizacion')
+          setAllowedModules(sections)
+        }
       }
     }
 
@@ -248,6 +259,7 @@ export default function DashboardPage() {
           isAdmin={isAdminUser}
           canCreate={canCreate}
           collapsed={sidebarCollapsed}
+          allowedModules={allowedModules}
         />
 
         {/* Main Content */}

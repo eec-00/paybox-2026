@@ -10,24 +10,81 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Users, Edit, Shield, Check, Calendar, Trash2, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
-import { UserProfile, UserRole } from '@/lib/types/user-profile.types'
+import { UserProfile, UserRole, ModulePermissions, DEFAULT_MODULE_PERMISSIONS } from '@/lib/types/user-profile.types'
 import { getAllUserProfiles, updateUserProfile, deleteUserProfile } from '@/lib/utils/auth'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { ModulePermissionsEditor } from '@/components/ModulePermissionsEditor'
+
+const MODULE_LABELS: Record<string, string> = {
+  pagos:          'Finanzas',
+  servicios:      'Servicios',
+  automatizacion: 'Automatización',
+}
+
+const CRUD_LABELS = [
+  { key: 'can_create', label: 'C' },
+  { key: 'can_edit',   label: 'E' },
+  { key: 'can_delete', label: 'D' },
+] as const
+
+function ModulePermsBadges({ user }: { user: UserProfile }) {
+  if (user.role === 'admin' || user.role === 'developer') {
+    return <span className="text-xs text-muted-foreground">Todos los permisos</span>
+  }
+
+  const mp = user.module_permissions
+  if (!mp) {
+    return <span className="text-xs text-muted-foreground">Todos los módulos</span>
+  }
+
+  const enabled = (Object.keys(mp) as (keyof typeof mp)[]).filter((k) => mp[k].enabled)
+  if (enabled.length === 0) {
+    return <span className="text-xs text-muted-foreground">Sin acceso</span>
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {enabled.map((key) => {
+        const access = mp[key]
+        const fullAccess = access.can_create && access.can_edit && access.can_delete
+        return (
+          <div key={key} className="flex items-center gap-1">
+            <span className="inline-flex px-1.5 py-0.5 text-xs font-medium bg-primary/10 text-primary rounded">
+              {MODULE_LABELS[key] ?? key}
+            </span>
+            {!fullAccess && (
+              <span className="flex gap-0.5">
+                {CRUD_LABELS.map(({ key: ck, label }) => (
+                  <span
+                    key={ck}
+                    className={`w-4 h-4 text-[10px] font-bold flex items-center justify-center rounded ${
+                      access[ck]
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                        : 'bg-gray-100 text-gray-400 dark:bg-gray-800 line-through'
+                    }`}
+                  >
+                    {label}
+                  </span>
+                ))}
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 export function UsersList() {
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null)
-  
+
   // Estado para edición
   const [editRole, setEditRole] = useState<UserRole>('viewer')
-  const [editPermissions, setEditPermissions] = useState({
-    can_create: false,
-    can_edit: false,
-    can_delete: false
-  })
-  
+  const [editModulePerms, setEditModulePerms] = useState<ModulePermissions>(DEFAULT_MODULE_PERMISSIONS)
+
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -72,42 +129,14 @@ export function UsersList() {
   const handleEditClick = (user: UserProfile) => {
     setSelectedUser(user)
     setEditRole(user.role)
-    setEditPermissions({
-      can_create: user.can_create,
-      can_edit: user.can_edit,
-      can_delete: user.can_delete
-    })
+    setEditModulePerms(user.module_permissions ?? DEFAULT_MODULE_PERMISSIONS)
     setSaveError(null)
     setSaveSuccess(false)
     setDialogOpen(true)
   }
 
-  const handlePermissionChange = (permission: keyof typeof editPermissions) => {
-    setEditPermissions(prev => ({
-      ...prev,
-      [permission]: !prev[permission]
-    }))
-  }
-
   const handleRoleChange = (role: UserRole) => {
     setEditRole(role)
-    
-    // Si el rol es admin o developer, todos los permisos están habilitados automáticamente
-    if (role === 'admin' || role === 'developer') {
-      setEditPermissions({
-        can_create: true,
-        can_edit: true,
-        can_delete: true
-      })
-    }
-    // Si el rol es viewer, todos los permisos están deshabilitados
-    else if (role === 'viewer') {
-      setEditPermissions({
-        can_create: false,
-        can_edit: false,
-        can_delete: false
-      })
-    }
   }
 
   const handleSavePermissions = async () => {
@@ -118,15 +147,17 @@ export function UsersList() {
     setSaveSuccess(false)
 
     try {
-      // Actualización directa a la base de datos
-      // RLS se encarga de verificar que solo admins puedan hacer esto
+      const isPrivileged = editRole === 'admin' || editRole === 'developer'
+      const pagos = isPrivileged ? { can_create: true, can_edit: true, can_delete: true } : editModulePerms.pagos
+
       const { error: updateError } = await supabase
         .from('user_profiles')
         .update({
           role: editRole,
-          can_create: editPermissions.can_create,
-          can_edit: editPermissions.can_edit,
-          can_delete: editPermissions.can_delete
+          can_create: pagos.can_create,
+          can_edit: pagos.can_edit,
+          can_delete: pagos.can_delete,
+          module_permissions: isPrivileged ? null : editModulePerms,
         })
         .eq('id', selectedUser.id)
 
@@ -303,32 +334,7 @@ export function UsersList() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-1 flex-wrap">
-                        {(user.role === 'admin' || user.role === 'developer') ? (
-                          <span className="text-xs text-muted-foreground">Todos los permisos</span>
-                        ) : (
-                          <>
-                            {user.can_create && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded">
-                                Crear
-                              </span>
-                            )}
-                            {user.can_edit && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded">
-                                Editar
-                              </span>
-                            )}
-                            {user.can_delete && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded">
-                                Eliminar
-                              </span>
-                            )}
-                            {!user.can_create && !user.can_edit && !user.can_delete && (
-                              <span className="text-xs text-muted-foreground">Sin permisos</span>
-                            )}
-                          </>
-                        )}
-                      </div>
+                      <ModulePermsBadges user={user} />
                     </TableCell>
                     <TableCell>
                       {user.last_sign_in_at ? (
@@ -423,70 +429,20 @@ export function UsersList() {
               </Select>
             </div>
 
-            {/* Permisos */}
-            {editRole === 'user' && (
-              <div className="space-y-3">
-                <Label>Permisos Específicos</Label>
-                
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <div className="font-medium text-sm">Crear registros</div>
-                    <div className="text-xs text-muted-foreground">Puede agregar nuevos pagos</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handlePermissionChange('can_create')}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      editPermissions.can_create ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        editPermissions.can_create ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
+            {/* Editor de módulos (solo para roles no privilegiados) */}
+            {editRole !== 'admin' && editRole !== 'developer' && (
+              <div className="space-y-3 border-t pt-3">
+                <div>
+                  <Label>Acceso por módulo</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Activa un módulo para habilitarlo. Puedes desactivar acciones específicas dentro de cada uno.
+                  </p>
                 </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <div className="font-medium text-sm">Editar registros</div>
-                    <div className="text-xs text-muted-foreground">Puede modificar pagos existentes</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handlePermissionChange('can_edit')}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      editPermissions.can_edit ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        editPermissions.can_edit ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <div className="font-medium text-sm">Eliminar registros</div>
-                    <div className="text-xs text-muted-foreground">Puede borrar pagos</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handlePermissionChange('can_delete')}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      editPermissions.can_delete ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        editPermissions.can_delete ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
+                <ModulePermissionsEditor
+                  value={editModulePerms}
+                  onChange={setEditModulePerms}
+                  disabled={saving}
+                />
               </div>
             )}
 

@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Truck,
   Layers,
+  Wallet,
 } from 'lucide-react'
 
 export type Section =
@@ -60,6 +61,7 @@ interface SidebarProps {
   isAdmin?: boolean
   canCreate?: boolean
   collapsed?: boolean
+  allowedModules?: string[] | null
 }
 
 export function Sidebar({
@@ -68,12 +70,15 @@ export function Sidebar({
   isAdmin = false,
   canCreate = true,
   collapsed = false,
+  allowedModules = null,
 }: SidebarProps) {
   const isAutoSection = activeSection.startsWith('automatizacion')
   const isServiciosSection = ['trailers', 'vehiculos', 'geocercas'].includes(activeSection)
+  const isFinanzasSection = ['pagos', 'calendario'].includes(activeSection)
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     ...(isAutoSection ? ['automatizacion'] : []),
     ...(isServiciosSection ? ['servicios'] : []),
+    ...(isFinanzasSection ? ['finanzas'] : []),
   ])
 
   const toggleGroup = (id: string) => {
@@ -93,22 +98,33 @@ export function Sidebar({
       requiresCreate: false,
     },
     {
-      type: 'item',
-      id: 'pagos',
-      label: 'Pagos',
-      icon: FileText,
-      description: 'Ver y registrar pagos',
+      type: 'group',
+      id: 'finanzas',
+      label: 'Finanzas',
+      icon: Wallet,
+      description: 'Pagos y Calendario',
       adminOnly: false,
       requiresCreate: false,
-    },
-    {
-      type: 'item',
-      id: 'calendario',
-      label: 'Calendario',
-      icon: Calendar,
-      description: 'Pagos recurrentes',
-      adminOnly: false,
-      requiresCreate: false,
+      children: [
+        {
+          type: 'item',
+          id: 'pagos',
+          label: 'Pagos',
+          icon: FileText,
+          description: 'Ver y registrar pagos',
+          adminOnly: false,
+          requiresCreate: false,
+        },
+        {
+          type: 'item',
+          id: 'calendario',
+          label: 'Calendario',
+          icon: Calendar,
+          description: 'Pagos recurrentes',
+          adminOnly: false,
+          requiresCreate: false,
+        },
+      ],
     },
     {
       type: 'group',
@@ -147,15 +163,6 @@ export function Sidebar({
           requiresCreate: false,
         },
       ],
-    },
-    {
-      type: 'item',
-      id: 'updates',
-      label: 'Actualizaciones',
-      icon: Megaphone,
-      description: 'Novedades del sistema',
-      adminOnly: false,
-      requiresCreate: false,
     },
     {
       type: 'group',
@@ -204,12 +211,38 @@ export function Sidebar({
       adminOnly: true,
       requiresCreate: false,
     },
+    {
+      type: 'item',
+      id: 'updates',
+      label: 'Actualizaciones',
+      icon: Megaphone,
+      description: 'Novedades del sistema',
+      adminOnly: false,
+      requiresCreate: false,
+    },
   ]
+
+  const canSeeModule = (id: string): boolean => {
+    if (allowedModules === null) return true
+    return allowedModules.includes(id)
+  }
 
   const visibleItems = menuItems.filter((item) => {
     if (item.adminOnly && !isAdmin) return false
     if (item.requiresCreate && !canCreate) return false
-    return true
+    // dashboard siempre visible
+    if (item.id === 'dashboard') return true
+    if (item.type === 'group') {
+      // el grupo es visible si está permitido directamente o algún hijo está permitido
+      return canSeeModule(item.id) || item.children.some((c) => canSeeModule(c.id))
+    }
+    return canSeeModule(item.id)
+  }).map((item) => {
+    if (item.type === 'group' && allowedModules !== null && !allowedModules.includes(item.id)) {
+      // el grupo no está directamente en la lista → filtrar sus hijos
+      return { ...item, children: item.children.filter((c) => canSeeModule(c.id)) }
+    }
+    return item
   })
 
   const renderFlatItem = (item: FlatItem, isChild = false) => {
