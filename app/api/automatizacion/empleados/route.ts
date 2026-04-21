@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { CAMPOS_VENCIMIENTO } from '@/lib/automatizacion/campos'
 
-const ODOO_URL = (process.env.ODOO_URL || process.env.URL || '').trim().replace(/\/$/, '')
+const ODOO_URL = (process.env.ODOO_URL || process.env.URL_ODOO || '').trim().replace(/\/$/, '')
 const ODOO_DB = (process.env.ODOO_DB || process.env.DB || '').trim()
 const ODOO_EMAIL = (process.env.ODOO_EMAIL || process.env.EMAIL || '').trim()
 const ODOO_API_KEY = (process.env.ODOO_API_KEY || process.env.API_KEY || '').trim()
