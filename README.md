@@ -1,12 +1,5 @@
 # PayBox - Sistema de Gestión de Gastos.
 
-**🚀 Inicio rápido**:
-- **Desarrolladores**: [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)
-- **Usuarios**: [PDF_OCR_USAGE_GUIDE.md](PDF_OCR_USAGE_GUIDE.md)
-- **Testers**: [TESTING_GUIDE.md](TESTING_GUIDE.md)
-
----
-
 ## 1. Resumen General de la Arquitectura
 Hemos diseñado un sistema de gestión de gastos robusto en Supabase. Su principal fortaleza es que combina un formulario de ingreso de datos fijo (para el OCR) con un formulario dinámico que se adapta a la categoría del gasto.
 
