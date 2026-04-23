@@ -465,18 +465,23 @@ export function AutomatizacionSection({ tipo }: Props) {
                 className="h-7 text-xs w-36"
               />
             </div>
-            {esVehiculo && (
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-muted-foreground whitespace-nowrap">Correo destino:</Label>
-                <Input
-                  value={editConfig.destination_email || ''}
-                  onChange={(e) => setEditConfig((p) => ({ ...p, destination_email: e.target.value }))}
-                  placeholder="alertas@empresa.com"
-                  type="email"
-                  className="h-7 text-xs w-52"
-                />
-              </div>
-            )}
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                {esVehiculo ? 'Correos destino:' : 'Correos jefes (copia):'}
+              </Label>
+              <Input
+                value={editConfig.destination_email || ''}
+                onChange={(e) => setEditConfig((p) => ({ ...p, destination_email: e.target.value }))}
+                placeholder="admin@empresa.com, gerente@empresa.com"
+                type="text"
+                className="h-7 text-xs w-72"
+              />
+              <span className="text-[10px] text-muted-foreground">
+                {esVehiculo
+                  ? 'Separa múltiples correos con coma'
+                  : 'Recibirán un resumen consolidado de todos los conductores'}
+              </span>
+            </div>
           </div>
 
           {/* Alertas globales */}

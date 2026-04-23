@@ -9,6 +9,10 @@
   NODE_VERSION = "20"
   NPM_VERSION = "10"
 
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 # Headers de seguridad
 [[headers]]
   for = "/*"

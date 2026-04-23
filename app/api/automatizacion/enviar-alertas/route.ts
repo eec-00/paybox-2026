@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { createClient } from '@supabase/supabase-js'
 import { CAMPOS_VENCIMIENTO, getCamposForTipo, isVehicleTipo, getDaysUntil, normalizeAlertas, getAlertasEfectivas } from '@/lib/automatizacion/campos'
+import { generateFlyerPng, type FlyerRow } from '@/lib/automatizacion/generateFlyer'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -66,7 +67,16 @@ async function odooCall<T>(
   return data.result as T
 }
 
-function buildEmailHtml(nombre: string, items: { label: string; fecha: string; dias: number }[]): string {
+function buildEmailHtml(nombre: string, items: { label: string; fecha: string; dias: number }[], hasFlyerImage = false): string {
+  const flyerBlock = hasFlyerImage
+    ? `<div style="text-align:center;margin:0 0 24px">
+        <img src="cid:flyer" alt="Resumen de vencimientos" style="max-width:100%;height:auto;display:block;margin:0 auto;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.12)" />
+       </div>
+       <div style="margin:0 0 20px;padding:10px 16px;background:#f0f4f8;border-radius:6px;font-size:12px;color:#6b7280;text-align:center">
+         Detalle completo a continuacion
+       </div>`
+    : ''
+
   const filas = items
     .map((c, idx) => {
       const bg = idx % 2 === 0 ? '#fffde7' : '#ffffff'
@@ -103,6 +113,7 @@ function buildEmailHtml(nombre: string, items: { label: string; fecha: string; d
 
   <!-- Body -->
   <div style="padding:24px 28px">
+    ${flyerBlock}
     <p style="margin:0 0 18px;font-size:14px;color:#44403c">
       Estimado(a) <strong>${nombre}</strong>, los siguientes documentos están próximos a vencer o ya han vencido.
       Por favor tome las acciones necesarias para su renovación.
@@ -302,12 +313,29 @@ export async function POST(req: NextRequest) {
       const allItems = alertasPorRegistro.flatMap((r) =>
         r.campos.map((c) => ({ label: `${r.registro.name} — ${c.label}`, fecha: c.fecha, dias: c.dias }))
       )
+      const flyerRows: FlyerRow[] = alertasPorRegistro.flatMap((r) =>
+        r.campos.map((c) => ({
+          unidad: r.registro.name || r.registro.license_plate || String(r.registro.id),
+          documento: c.label,
+          fecha: c.fecha,
+          dias: c.dias,
+        }))
+      )
+      let flyerBuffer: Buffer | null = null
+      try {
+        flyerBuffer = await generateFlyerPng(flyerRows, `${tipoLabel} — Vencimientos`)
+      } catch (imgErr) {
+        console.error('[flyer]', imgErr)
+      }
       try {
         await transporter.sendMail({
           from: `"Eemerson SAC" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
           to: destinationEmail,
           subject: `⚠️ Documentos próximos a vencer — ${tipoLabel} (${alertasPorRegistro.length} unidades)`,
-          html: buildEmailHtml(`${tipoLabel} — Flota Eemerson SAC`, allItems),
+          html: buildEmailHtml(`${tipoLabel} — Flota Eemerson SAC`, allItems, !!flyerBuffer),
+          attachments: flyerBuffer
+            ? [{ filename: 'vencimientos.png', content: flyerBuffer, cid: 'flyer', contentDisposition: 'inline' }]
+            : [],
         })
         // Log sent alerts
         for (const { registro, campos } of alertasPorRegistro) {
@@ -333,9 +361,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Conductores: un email por persona
-    const emailsParaEnviar = alertasPorRegistro
-
-    for (const { registro: empleado, campos } of emailsParaEnviar) {
+    for (const { registro: empleado, campos } of alertasPorRegistro) {
       try {
         await transporter.sendMail({
           from: `"Eemerson SAC" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
@@ -370,6 +396,24 @@ export async function POST(req: NextRequest) {
       } catch (err: any) {
         resultados.errores++
         resultados.detalles.push({ nombre: empleado.name, email: empleado.work_email, status: 'error', error: err.message })
+      }
+    }
+
+    // Correo consolidado a los jefes si hay destination_email configurado
+    if (destinationEmail && alertasPorRegistro.length > 0) {
+      const allItems = alertasPorRegistro.flatMap((r) =>
+        r.campos.map((c) => ({ label: `${r.registro.name} — ${c.label}`, fecha: c.fecha, dias: c.dias }))
+      )
+      try {
+        await transporter.sendMail({
+          from: `"Eemerson SAC" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+          to: destinationEmail,
+          subject: `⚠️ Resumen conductores — ${alertasPorRegistro.length} con documentos por vencer`,
+          html: buildEmailHtml(`Conductores — Flota Eemerson SAC`, allItems),
+        })
+        resultados.detalles.push({ nombre: 'Resumen jefes', email: destinationEmail, status: 'enviado', campos: allItems.length })
+      } catch (err: any) {
+        resultados.detalles.push({ nombre: 'Resumen jefes', email: destinationEmail, status: 'error', error: err.message })
       }
     }
 
