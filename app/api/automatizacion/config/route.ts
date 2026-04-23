@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { tipo, job_title, alertas, activo } = body
+    const { tipo, job_title, alertas, activo, destination_email } = body
 
     if (!tipo || !job_title) {
       return NextResponse.json({ error: 'tipo y job_title son requeridos' }, { status: 400 })
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabase
       .from('automatizacion_config')
       .upsert(
-        { tipo, job_title, alertas, activo, updated_at: new Date().toISOString() },
+        { tipo, job_title, alertas, activo, destination_email: destination_email ?? '', updated_at: new Date().toISOString() },
         { onConflict: 'tipo' }
       )
       .select()

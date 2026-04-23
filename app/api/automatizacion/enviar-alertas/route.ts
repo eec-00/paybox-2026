@@ -297,7 +297,8 @@ export async function POST(req: NextRequest) {
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: process.env.SMTP_SECURE === 'true',
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    })
+      family: 4, // fuerza IPv4 — evita ENETUNREACH en redes sin IPv6
+    } as Parameters<typeof nodemailer.createTransport>[0])
 
     const resultados = { enviados: 0, errores: 0, omitidos: 0, detalles: [] as any[] }
 

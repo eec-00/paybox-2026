@@ -7,6 +7,17 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import {
   AlertTriangle,
   Bell,
   ChevronDown,
@@ -405,15 +416,32 @@ export function AutomatizacionSection({ tipo }: Props) {
             {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             Descargar vencimientos
           </Button>
-          <Button
-            size="sm"
-            onClick={handleSendAlerts}
-            disabled={sending || loading}
-            className="gap-1.5 bg-primary hover:bg-primary/90"
-          >
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-            Enviar alertas
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="sm"
+                disabled={sending || loading}
+                className="gap-1.5 bg-primary hover:bg-primary/90"
+              >
+                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                Enviar correos
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Confirmar envío de correos?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Se enviarán alertas de vencimientos a todos los destinatarios configurados para{' '}
+                  <strong>{titulo}</strong>. Solo se enviarán correos para documentos que aún no
+                  hayan sido notificados en este umbral.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleSendAlerts}>Sí, enviar ahora</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 

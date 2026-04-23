@@ -1,4 +1,6 @@
 import { createElement as h } from 'react'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import satori from 'satori'
 import { Resvg } from '@resvg/resvg-js'
 
@@ -26,10 +28,13 @@ export async function generateFlyerPng(
   rows: FlyerRow[],
   titulo = 'Vencimientos Proximos'
 ): Promise<Buffer> {
-  const [regular, bold] = await Promise.all([
-    fetch('https://fonts.gstatic.com/s/lato/v24/S6uyw4BMUTPHjx4wXiWtFCc.woff2').then((r) => r.arrayBuffer()),
-    fetch('https://fonts.gstatic.com/s/lato/v24/S6u9w4BMUTPHh6UVSwiPGQ3q5d0.woff2').then((r) => r.arrayBuffer()),
-  ])
+  const fontsDir = join(process.cwd(), 'public', 'fonts')
+  const readFont = (name: string): ArrayBuffer => {
+    const buf = readFileSync(join(fontsDir, name))
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+  }
+  const regular = readFont('lato-regular.ttf')
+  const bold = readFont('lato-bold.ttf')
 
   const colStyle = (extra: object = {}) => ({
     flex: 1,

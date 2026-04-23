@@ -2,9 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    unoptimized: true, // Desactivar optimización de imágenes para Netlify
+    unoptimized: true,
   },
-  /* config options here */
+  serverExternalPackages: ['@resvg/resvg-js', 'satori'],
 };
 
 export default nextConfig;
