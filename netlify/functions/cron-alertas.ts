@@ -3,16 +3,17 @@
 //
 // HORA DE ENVÍO: edita el campo `schedule` debajo (formato cron UTC)
 //   Ejemplos hora Perú (UTC-5):
+//     4am  Peru → "0 9 * * *"   ← actual
 //     7am  Peru → "0 12 * * *"
 //     8am  Peru → "0 13 * * *"
-//     9am  Peru → "0 14 * * *"  ← actual
+//     9am  Peru → "0 14 * * *"
 //     10am Peru → "0 15 * * *"
 //
 // Para cambiar la hora: edita `schedule`, guarda y haz redeploy en Netlify.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const config = {
-  schedule: '0 14 * * *', // 9am hora Perú (UTC-5)
+  schedule: '0 9 * * *', // 4am hora Perú (UTC-5)
 }
 
 export default async function handler() {
