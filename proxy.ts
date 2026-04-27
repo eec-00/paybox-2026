@@ -1,7 +1,15 @@
-import { type NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 export default async function proxy(request: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET
+  if (
+    cronSecret &&
+    request.nextUrl.pathname.startsWith('/api/automatizacion/') &&
+    request.headers.get('x-cron-secret') === cronSecret
+  ) {
+    return NextResponse.next()
+  }
   return await updateSession(request)
 }
 
