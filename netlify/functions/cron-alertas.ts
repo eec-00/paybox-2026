@@ -1,8 +1,8 @@
 import { schedule } from '@netlify/functions'
 
 // 4:15am hora Peru (UTC-5) = 9:15am UTC
-export const handler = schedule('15 9 * * *', async () => {
-  const baseUrl = (process.env.URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+export const handler = schedule('26 9 * * *', async () => {
+  const baseUrl = (process.env.URL || process.env.NEXT_PUBLIC_APP_URL || 'https://paybox.eemersonsac.com').replace(/\/$/, '')
   const secret = process.env.CRON_SECRET || ''
 
   const tipos = ['tractos', 'carretas', 'conductores'] as const
