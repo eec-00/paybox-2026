@@ -1,7 +1,7 @@
 import { schedule } from '@netlify/functions'
 
-// 4am hora Peru (UTC-5) = 9am UTC
-export const handler = schedule('0 9 * * *', async () => {
+// 4:15am hora Peru (UTC-5) = 9:15am UTC
+export const handler = schedule('15 9 * * *', async () => {
   const baseUrl = (process.env.URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
   const secret = process.env.CRON_SECRET || ''
 
