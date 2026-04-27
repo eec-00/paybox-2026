@@ -20,8 +20,10 @@ import {
 import {
   AlertTriangle,
   Bell,
+  Check,
   ChevronDown,
   ChevronRight,
+  Copy,
   Download,
   Loader2,
   Mail,
@@ -80,7 +82,7 @@ export function AutomatizacionSection({ tipo }: Props) {
   // Config
   const [config, setConfig] = useState<AutomatizacionConfig>({
     tipo,
-    job_title: tipo === 'conductores' ? 'Conductor' : tipo === 'tractos' ? 'Camión' : 'Semirremolque Plataforma',
+    job_title: tipo === 'conductores' ? 'Conductor, Director Ejecutivo' : tipo === 'tractos' ? 'Camión' : 'Semirremolque Plataforma',
     alertas: DEFAULT_ALERTAS,
     activo: true,
     destination_email: '',
@@ -97,6 +99,9 @@ export function AutomatizacionSection({ tipo }: Props) {
   const [busqueda, setBusqueda] = useState('')
   const [soloProximos, setSoloProximos] = useState(false)
 
+  // Copy email feedback
+  const [copiedId, setCopiedId] = useState<number | null>(null)
+
   // Alerts actions
   const [preview, setPreview] = useState<PreviewItem[] | null>(null)
   const [showPreview, setShowPreview] = useState(false)
@@ -109,6 +114,10 @@ export function AutomatizacionSection({ tipo }: Props) {
       const res = await fetch(`/api/automatizacion/config?tipo=${tipo}`)
       if (res.ok) {
         const raw = await res.json()
+        // Migración: config antigua solo tenía "Conductor"; incluir Director Ejecutivo automáticamente
+        if (tipo === 'conductores' && raw.job_title === 'Conductor') {
+          raw.job_title = 'Conductor, Director Ejecutivo'
+        }
         const normalized = { ...raw, alertas: normalizeAlertas(raw.alertas) }
         setConfig(normalized)
         setEditConfig(normalized)
@@ -324,11 +333,16 @@ export function AutomatizacionSection({ tipo }: Props) {
   }
 
   const registrosFiltrados = registros.filter((reg) => {
-    const secondField = esVehiculo ? reg.license_plate : reg.work_email
+    // Odoo devuelve `false` para campos vacíos — normalizar a string vacío
+    const nameStr = (reg.name || '') as string
+    const secondField = esVehiculo
+      ? ((reg.license_plate || '') as string)
+      : ((reg.work_email || '') as string)
+    const q = busqueda.toLowerCase()
     const matchBusqueda =
       !busqueda ||
-      reg.name?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      secondField?.toLowerCase().includes(busqueda.toLowerCase())
+      nameStr.toLowerCase().includes(q) ||
+      secondField.toLowerCase().includes(q)
 
     if (!matchBusqueda) return false
 
@@ -482,16 +496,19 @@ export function AutomatizacionSection({ tipo }: Props) {
               />
               <Label htmlFor="activo-switch" className="text-sm">Automatización activa</Label>
             </div>
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex flex-col gap-1 ml-auto">
               <Label className="text-xs text-muted-foreground whitespace-nowrap">
-                {esVehiculo ? 'Filtro nombre:' : 'Puesto Odoo:'}
+                {esVehiculo ? 'Filtro nombre:' : 'Puesto(s) Odoo:'}
               </Label>
               <Input
                 value={editConfig.job_title}
                 onChange={(e) => setEditConfig((p) => ({ ...p, job_title: e.target.value }))}
-                placeholder={esVehiculo ? 'Ej: Tracto' : 'Ej: Conductor'}
-                className="h-7 text-xs w-36"
+                placeholder={esVehiculo ? 'Ej: Tracto' : 'Ej: Conductor, Director Ejecutivo'}
+                className="h-7 text-xs w-64"
               />
+              {!esVehiculo && (
+                <span className="text-[10px] text-muted-foreground">Separa múltiples puestos con coma</span>
+              )}
             </div>
             <div className="flex flex-col gap-1">
               <Label className="text-xs text-muted-foreground whitespace-nowrap">
@@ -786,11 +803,34 @@ export function AutomatizacionSection({ tipo }: Props) {
                   const stickyBg = i % 2 === 0 ? 'bg-background' : 'bg-muted/60'
                   return (
                     <tr key={reg.id} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
-                      <td className={`sticky left-0 z-20 px-3 py-2 font-medium border-r border-border/50 whitespace-nowrap max-w-40 truncate ${stickyBg}`}>
+                      <td
+                        title={reg.name}
+                        className={`sticky left-0 z-20 px-3 py-2 font-medium border-r border-border/50 whitespace-nowrap max-w-40 truncate ${stickyBg}`}
+                      >
                         {reg.name}
                       </td>
-                      <td className={`sticky left-40 z-20 px-3 py-2 text-muted-foreground border-r border-border/50 whitespace-nowrap max-w-[140px] truncate ${stickyBg}`}>
-                        {esVehiculo ? (reg.license_plate || '—') : (reg.work_email || '—')}
+                      <td className={`sticky left-40 z-20 px-3 py-2 border-r border-border/50 whitespace-nowrap max-w-[160px] ${stickyBg}`}>
+                        <div className="flex items-center gap-1">
+                          {!esVehiculo && reg.work_email && (
+                            <button
+                              title="Copiar correo"
+                              onClick={() => {
+                                navigator.clipboard.writeText(reg.work_email)
+                                setCopiedId(reg.id)
+                                setTimeout(() => setCopiedId(null), 1800)
+                              }}
+                              className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                            >
+                              {copiedId === reg.id
+                                ? <Check className="h-3 w-3 text-green-600" />
+                                : <Copy className="h-3 w-3" />
+                              }
+                            </button>
+                          )}
+                          <span className="truncate text-muted-foreground text-xs">
+                            {esVehiculo ? (reg.license_plate || '—') : (reg.work_email || '—')}
+                          </span>
+                        </div>
                       </td>
                       {camposDeTipo.map((campo) => {
                         const fecha = reg[campo.key]

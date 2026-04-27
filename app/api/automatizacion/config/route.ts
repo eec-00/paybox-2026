@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     if (error || !data) {
       return NextResponse.json({
         tipo,
-        job_title: 'Conductor',
+        job_title: tipo === 'conductores' ? 'Conductor, Director Ejecutivo' : 'Conductor',
         alertas: DEFAULT_ALERTAS,
         activo: true,
       })
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   } catch {
     return NextResponse.json({
       tipo,
-      job_title: 'Conductor',
+      job_title: tipo === 'conductores' ? 'Conductor, Director Ejecutivo' : 'Conductor',
       alertas: DEFAULT_ALERTAS,
       activo: true,
     })

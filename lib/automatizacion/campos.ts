@@ -11,7 +11,7 @@ export const CAMPOS_VENCIMIENTO: CampoVencimiento[] = [
   { key: 'x_studio_antecedentes_policiales_vence', label: 'Antecedentes Policiales' },
   { key: 'x_studio_sctr', label: 'SCTR' },
   { key: 'x_studio_curso_bsico', label: 'Curso Básico' },
-  { key: 'x_studio_altura_curso', label: 'Altura Curso' },
+  { key: 'x_studio_altura_curso_1', label: 'Altura Curso' },
   { key: 'x_studio_pbip_1', label: 'PBIP' },
   { key: 'x_studio_mp', label: 'MP' },
   { key: 'x_studio_normativa_mtc', label: 'Normativa MTC' },
@@ -73,7 +73,7 @@ export const CAMPOS_VENCIMIENTO_TRACTOS: CampoVencimiento[] = [
   { key: 'x_studio_dpw', label: 'DPW' },
   { key: 'x_studio_chvg', label: 'CHVG' },
   { key: 'x_studio_chve', label: 'CHVE' },
-  { key: 'x_studio_rt_g', label: 'RT G' },
+  { key: 'x_studio_rt_g', label: 'Revision tecnica general' },
   { key: 'x_studio_rt_mp', label: 'RT MP' },
   { key: 'x_studio_pol_imo', label: 'POL. IMO' },
 ]

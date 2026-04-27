@@ -169,14 +169,15 @@ async function fetchRegistros(uid: number, tipo: string, filtro: string): Promis
     const map = new Map(studio.map((r) => [r.id, r]))
     return base.map((v) => ({ ...v, ...(map.get(v.id) || {}) }))
   } else {
-    // hr.employee — filtrar por job_title
+    // hr.employee — filtrar por job_title (soporta múltiples separados por coma)
+    const titles = filtro.split(',').map((t: string) => t.trim()).filter(Boolean)
     let base = await odooCall<any[]>(uid, 'hr.employee', 'search_read',
-      [[['job_title', '=', filtro]]],
+      [[['job_title', 'in', titles]]],
       { fields: ['id', 'name', 'work_email'], limit: 500 }
     ) || []
     if (base.length === 0) {
       base = await odooCall<any[]>(uid, 'hr.employee', 'search_read',
-        [[['job_title', 'ilike', filtro]]],
+        [[['job_title', 'ilike', titles[0]]]],
         { fields: ['id', 'name', 'work_email'], limit: 500 }
       ) || []
     }

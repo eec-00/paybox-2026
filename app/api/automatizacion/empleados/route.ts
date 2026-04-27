@@ -61,34 +61,35 @@ async function odooCall<T>(
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const jobTitle = searchParams.get('job_title') || 'Conductor'
+  const jobTitleParam = searchParams.get('job_title') || 'Conductor'
+  // Soporta múltiples puestos separados por coma, ej: "Conductor, Director Ejecutivo"
+  const titles = jobTitleParam.split(',').map((t) => t.trim()).filter(Boolean)
 
   try {
     const uid = await odooAuth()
 
-    // Paso 1: obtener todos los empleados con el job_title indicado (igual que odoo-axis-options)
+    // Paso 1: obtener todos los empleados con cualquiera de los job_title indicados
     const baseFields = ['id', 'name', 'work_email', 'job_title']
     const empleadosBase = await odooCall<any[]>(
       uid,
       'hr.employee',
       'search_read',
-      [[['job_title', '=', jobTitle]]],
+      [[['job_title', 'in', titles]]],
       { fields: baseFields, limit: 500, order: 'name asc' }
     )
 
     if (!empleadosBase || empleadosBase.length === 0) {
-      // Fallback: búsqueda parcial por si el valor tiene variaciones
+      // Fallback: búsqueda parcial por el primer puesto
       const parcial = await odooCall<any[]>(
         uid,
         'hr.employee',
         'search_read',
-        [[['job_title', 'ilike', jobTitle]]],
+        [[['job_title', 'ilike', titles[0]]]],
         { fields: baseFields, limit: 500, order: 'name asc' }
       )
       if (!parcial || parcial.length === 0) {
-        return NextResponse.json({ empleados: [], debug: `Sin resultados para job_title="${jobTitle}"` })
+        return NextResponse.json({ empleados: [], debug: `Sin resultados para job_title in [${titles.join(', ')}]` })
       }
-      // continuar con resultados parciales
       return NextResponse.json({ empleados: parcial })
     }
 
