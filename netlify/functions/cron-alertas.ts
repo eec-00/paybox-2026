@@ -1,23 +1,8 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Netlify Scheduled Function — envío automático diario de alertas de vencimiento
-//
-// HORA DE ENVÍO: edita el campo `schedule` debajo (formato cron UTC)
-//   Ejemplos hora Perú (UTC-5):
-//     4am  Peru → "0 9 * * *"   ← actual
-//     7am  Peru → "0 12 * * *"
-//     8am  Peru → "0 13 * * *"
-//     9am  Peru → "0 14 * * *"
-//     10am Peru → "0 15 * * *"
-//
-// Para cambiar la hora: edita `schedule`, guarda y haz redeploy en Netlify.
-// ─────────────────────────────────────────────────────────────────────────────
+import { schedule } from '@netlify/functions'
 
-export const config = {
-  schedule: '0 9 * * *', // 4am hora Perú (UTC-5)
-}
-
-export default async function handler() {
-  const baseUrl = process.env.URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+// 4am hora Peru (UTC-5) = 9am UTC
+export const handler = schedule('0 9 * * *', async () => {
+  const baseUrl = (process.env.URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
   const secret = process.env.CRON_SECRET || ''
 
   const tipos = ['tractos', 'carretas', 'conductores'] as const
@@ -42,7 +27,8 @@ export default async function handler() {
     }
   }
 
-  return new Response(JSON.stringify({ ok: true, results }), {
-    headers: { 'Content-Type': 'application/json' },
-  })
-}
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ ok: true, results }),
+  }
+})
