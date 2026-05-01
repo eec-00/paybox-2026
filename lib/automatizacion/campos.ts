@@ -73,8 +73,10 @@ export const CAMPOS_VENCIMIENTO_TRACTOS: CampoVencimiento[] = [
   { key: 'x_studio_dpw', label: 'DPW' },
   { key: 'x_studio_chvg', label: 'CHVG' },
   { key: 'x_studio_chve', label: 'CHVE' },
+  { key: 'x_studio_soat', label: 'SOAT' },
   { key: 'x_studio_rt_g', label: 'Revision tecnica general' },
   { key: 'x_studio_rt_mp', label: 'RT MP' },
+  { key: 'x_studio_poliza', label: 'Póliza' },
   { key: 'x_studio_pol_imo', label: 'POL. IMO' },
 ]
 
@@ -82,10 +84,8 @@ export const CAMPOS_VENCIMIENTO_CARRETAS: CampoVencimiento[] = [
   { key: 'x_studio_dpw', label: 'DPW' },
   { key: 'x_studio_chvg', label: 'CHVG' },
   { key: 'x_studio_chve', label: 'CHVE' },
-  { key: 'x_studio_soat', label: 'SOAT' },
   { key: 'x_studio_rt_g', label: 'RT G' },
   { key: 'x_studio_rt_mp', label: 'RT MP' },
-  { key: 'x_studio_poliza', label: 'Póliza' },
   { key: 'x_studio_pol_imo', label: 'POL. IMO' },
 ]
 
