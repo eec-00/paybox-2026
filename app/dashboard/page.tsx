@@ -39,6 +39,7 @@ export default function DashboardPage() {
   const [trailerToEdit, setTrailerToEdit] = useState<any>(null)
   const [showNavitelSection, setShowNavitelSection] = useState(false)
   const [isDeveloper, setIsDeveloper] = useState(false)
+  const [profileName, setProfileName] = useState<string | null>(null)
   const [isAdminUser, setIsAdminUser] = useState(false)
   const [canCreate, setCanCreate] = useState(false)
   const [allowedModules, setAllowedModules] = useState<string[] | null>(null)
@@ -125,6 +126,7 @@ export default function DashboardPage() {
         // Verificar si es developer
         const profile = await getCurrentUserProfile()
         setIsDeveloper(profile?.role === 'developer')
+        setProfileName(profile?.full_name || null)
 
         // Verificar admin
         const adminStatus = await isAdmin()
@@ -225,7 +227,7 @@ export default function DashboardPage() {
               <div className="h-8 w-px bg-white/30"></div>
               <div>
                 <p className="text-sm text-white font-medium">
-                  Bienvenido, {user.user_metadata?.full_name || user.email}
+                  Bienvenido, {profileName || user.user_metadata?.full_name || user.email}
                 </p>
               </div>
             </div>
