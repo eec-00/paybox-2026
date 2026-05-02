@@ -31,6 +31,7 @@ export type Section =
   | 'automatizacion-tractos'
   | 'automatizacion-carretas'
   | 'automatizacion-conductores'
+  | 'automatizacion-facturas'
 
 interface FlatItem {
   type: 'item'
@@ -197,6 +198,15 @@ export function Sidebar({
           label: 'Carretas',
           icon: Truck,
           description: 'Documentos carretas',
+          adminOnly: false,
+          requiresCreate: false,
+        },
+        {
+          type: 'item',
+          id: 'automatizacion-facturas',
+          label: 'Facturas',
+          icon: FileText,
+          description: 'Facturas de clientes',
           adminOnly: false,
           requiresCreate: false,
         },

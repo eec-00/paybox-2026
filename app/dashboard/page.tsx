@@ -18,6 +18,7 @@ import { TrailersTable } from '@/components/TrailersTable'
 import { TrailerForm } from '@/components/TrailerForm'
 import { Sidebar, type Section } from '@/components/Sidebar'
 import { AutomatizacionSection } from '@/components/AutomatizacionSection'
+import { FacturasSection } from '@/components/FacturasSection'
 import { CalendarSection } from '@/components/CalendarSection'
 import { UpdatesNotification } from '@/components/UpdatesNotification'
 import { UpdatesManagement } from '@/components/UpdatesManagement'
@@ -661,6 +662,10 @@ export default function DashboardPage() {
 
             {activeSection === 'automatizacion-carretas' && (
               <AutomatizacionSection tipo="carretas" />
+            )}
+
+            {activeSection === 'automatizacion-facturas' && (
+              <FacturasSection />
             )}
 
             {activeSection === 'administracion' && (
