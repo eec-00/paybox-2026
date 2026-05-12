@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import {
   FileText,
   UserCog,
-  Car,
+  Link2,
   LayoutDashboard,
   Megaphone,
   Calendar,
@@ -23,7 +23,7 @@ export type Section =
   | 'pagos'
   | 'calendario'
   | 'trailers'
-  | 'vehiculos'
+  | 'geoenlaces'
   | 'geocercas'
   | 'tutoriales'
   | 'administracion'
@@ -74,7 +74,7 @@ export function Sidebar({
   allowedModules = null,
 }: SidebarProps) {
   const isAutoSection = activeSection.startsWith('automatizacion')
-  const isServiciosSection = ['trailers', 'vehiculos', 'geocercas'].includes(activeSection)
+  const isServiciosSection = ['trailers', 'geoenlaces', 'geocercas'].includes(activeSection)
   const isFinanzasSection = ['pagos', 'calendario'].includes(activeSection)
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     ...(isAutoSection ? ['automatizacion'] : []),
@@ -147,10 +147,10 @@ export function Sidebar({
         },
         {
           type: 'item',
-          id: 'vehiculos',
-          label: 'Vehículos',
-          icon: Car,
-          description: 'Flota GPS Navitel',
+          id: 'geoenlaces',
+          label: 'Geoenlaces',
+          icon: Link2,
+          description: 'Flota y geoenlaces GPS',
           adminOnly: false,
           requiresCreate: false,
         },

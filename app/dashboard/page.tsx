@@ -25,7 +25,7 @@ import { UpdatesManagement } from '@/components/UpdatesManagement'
 import { UpdatesList } from '@/components/UpdatesList'
 import { SyncOdooModal } from '@/components/SyncOdooModal'
 import { isAdmin, getUserPermissions, getCurrentUserProfile } from '@/lib/utils/auth'
-import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText, Megaphone, Calendar as CalendarIcon, Filter, Search, XCircle, ChevronDown, ChevronUp, MapPin } from 'lucide-react'
+import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText, Megaphone, Calendar as CalendarIcon, Filter, Search, XCircle, ChevronDown, ChevronUp, MapPin, Link2 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import Image from 'next/image'
@@ -582,13 +582,13 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {activeSection === 'vehiculos' && (
+            {activeSection === 'geoenlaces' && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Car className="h-6 w-6 text-primary" />
+                  <Link2 className="h-6 w-6 text-primary" />
                   <div>
-                    <h2 className="text-2xl font-bold text-primary">Vehículos</h2>
-                    <p className="text-muted-foreground">Visualiza la flota de vehículos GPS de Navitel</p>
+                    <h2 className="text-2xl font-bold text-primary">Geoenlaces</h2>
+                    <p className="text-muted-foreground">Flota GPS Navitel · Crea geoenlaces para uno o varios vehículos</p>
                   </div>
                 </div>
                 <VehiclesList />
