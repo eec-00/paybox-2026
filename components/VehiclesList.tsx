@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   Car, RefreshCw, Search, AlertCircle, Link2, ExternalLink, Clock,
-  Copy, CheckCircle, Share2, Calendar, Zap,
+  Copy, CheckCircle, Share2, Calendar, Zap, Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -63,6 +63,7 @@ export function VehiclesList() {
   const [geolinks, setGeolinks] = useState<GeoLinkData[]>([])
   const [loadingGeolinks, setLoadingGeolinks] = useState(true)
   const [geolinksError, setGeolinksError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   const fetchVehicles = async () => {
     setLoading(true)
@@ -185,6 +186,24 @@ export function VehiclesList() {
       setGeoLinkError(err instanceof Error ? err.message : 'Error desconocido')
     } finally {
       setCreatingLink(false)
+    }
+  }
+
+  const handleDeleteGeolink = async (id: number) => {
+    setDeletingId(id)
+    try {
+      const response = await fetch('/api/navitel/geolink/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      const data = await response.json()
+      if (!data.success) throw new Error(data.error || 'Error al eliminar')
+      setGeolinks(prev => prev.filter(g => g.id !== id))
+    } catch (err) {
+      setGeolinksError(err instanceof Error ? err.message : 'Error al eliminar geoenlace')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -662,6 +681,16 @@ export function VehiclesList() {
                         title="Compartir"
                       >
                         <Share2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDeleteGeolink(geolink.id)}
+                        disabled={deletingId === geolink.id}
+                        title="Eliminar geoenlace"
+                      >
+                        {deletingId === geolink.id
+                          ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          : <Trash2 className="h-3.5 w-3.5" />}
                       </Button>
                     </div>
                   </div>
