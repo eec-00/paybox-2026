@@ -24,6 +24,7 @@ import { UpdatesNotification } from '@/components/UpdatesNotification'
 import { UpdatesManagement } from '@/components/UpdatesManagement'
 import { UpdatesList } from '@/components/UpdatesList'
 import { SyncOdooModal } from '@/components/SyncOdooModal'
+import { ProfileSettingsModal } from '@/components/ProfileSettingsModal'
 import { isAdmin, getUserPermissions, getCurrentUserProfile } from '@/lib/utils/auth'
 import { LogOut, Shield, Car, PlayCircle, Menu, X, PlusCircle, FileText, Megaphone, Calendar as CalendarIcon, Filter, Search, XCircle, ChevronDown, ChevronUp, MapPin, Link2 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -44,6 +45,7 @@ export default function DashboardPage() {
   const [isAdminUser, setIsAdminUser] = useState(false)
   const [canCreate, setCanCreate] = useState(false)
   const [allowedModules, setAllowedModules] = useState<string[] | null>(null)
+  const [showProfileModal, setShowProfileModal] = useState(false)
 
   // Estados de filtros para Pagos
   const [startDate, setStartDate] = useState('')
@@ -184,6 +186,14 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <ProfileSettingsModal
+        open={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        userName={profileName}
+        userEmail={user?.email ?? null}
+        onNameUpdated={(name) => setProfileName(name)}
+      />
+
       {/* Header reorganizado */}
       <header className="border-b bg-gradient-to-r from-primary via-primary to-primary/95 shadow-lg sticky top-0 z-50">
         <div className="px-3 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between gap-2">
@@ -263,6 +273,9 @@ export default function DashboardPage() {
           canCreate={canCreate}
           collapsed={sidebarCollapsed}
           allowedModules={allowedModules}
+          userName={profileName}
+          userEmail={user?.email ?? null}
+          onProfileClick={() => setShowProfileModal(true)}
         />
 
         {/* Main Content */}

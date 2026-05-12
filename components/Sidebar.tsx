@@ -16,6 +16,7 @@ import {
   Truck,
   Layers,
   Wallet,
+  Settings,
 } from 'lucide-react'
 
 export type Section =
@@ -63,6 +64,9 @@ interface SidebarProps {
   canCreate?: boolean
   collapsed?: boolean
   allowedModules?: string[] | null
+  userName?: string | null
+  userEmail?: string | null
+  onProfileClick?: () => void
 }
 
 export function Sidebar({
@@ -72,6 +76,9 @@ export function Sidebar({
   canCreate = true,
   collapsed = false,
   allowedModules = null,
+  userName = null,
+  userEmail = null,
+  onProfileClick,
 }: SidebarProps) {
   const isAutoSection = activeSection.startsWith('automatizacion')
   const isServiciosSection = ['trailers', 'geoenlaces', 'geocercas'].includes(activeSection)
@@ -360,32 +367,68 @@ export function Sidebar({
     )
   }
 
+  const initials = (userName ?? userEmail ?? '?')
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('')
+
   return (
     <aside
       className={cn(
-        'bg-primary text-primary-foreground border-r border-primary/20 shadow-2xl transition-all duration-300 overflow-y-auto',
-        'fixed left-0 top-16 h-[calc(100vh-4rem)] z-40 w-72',
-        'md:static md:h-auto md:min-h-[calc(100vh-73px)] md:z-auto md:overflow-visible',
+        'bg-primary text-primary-foreground border-r border-primary/20 shadow-2xl transition-all duration-300',
+        'fixed left-0 top-16 h-[calc(100vh-4rem)] z-40 w-72 flex flex-col',
+        'md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:z-auto',
         collapsed
           ? '-translate-x-full md:translate-x-0 md:w-20'
           : 'translate-x-0 md:w-64'
       )}
     >
-      <div className={cn('p-3 space-y-1.5', collapsed && 'px-2.5 py-3')}>
+      {/* Menu items — scrollable */}
+      <div className={cn('flex-1 overflow-y-auto p-3 space-y-1.5', collapsed && 'px-2.5 py-3')}>
         {visibleItems.map((item) =>
           item.type === 'group' ? renderGroupItem(item) : renderFlatItem(item)
         )}
       </div>
 
-      {!collapsed && (
-        <div className="px-3 mt-6 pt-6 border-t border-primary-foreground/20">
-          <div className="text-xs text-primary-foreground/60 space-y-0.5">
-            <p>💡 Tip: Usa el OCR para</p>
-            <p className="pl-4">extraer datos</p>
-            <p className="pl-4">automáticamente</p>
+      {/* Profile / Settings — pinned bottom */}
+      <div className="border-t border-primary-foreground/20 p-2 shrink-0">
+        <button
+          onClick={onProfileClick}
+          title={collapsed ? (userName ?? userEmail ?? 'Perfil') : undefined}
+          className={cn(
+            'w-full flex items-center gap-2.5 p-2 rounded-lg transition-all group relative',
+            'hover:bg-primary-foreground/10',
+            collapsed && 'justify-center'
+          )}
+        >
+          {/* Avatar */}
+          <div className="w-8 h-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center font-bold text-xs shrink-0">
+            {initials}
           </div>
-        </div>
-      )}
+
+          {!collapsed && (
+            <>
+              <div className="text-left flex-1 min-w-0">
+                <p className="text-sm font-medium truncate leading-tight">
+                  {userName ?? userEmail ?? 'Usuario'}
+                </p>
+                {userName && (
+                  <p className="text-xs text-primary-foreground/60 truncate">{userEmail}</p>
+                )}
+              </div>
+              <Settings className="h-4 w-4 shrink-0 text-primary-foreground/50 group-hover:text-primary-foreground/80 transition-colors" />
+            </>
+          )}
+
+          {collapsed && (
+            <div className="absolute left-full ml-2 px-2 py-1 bg-primary text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-30 shadow-lg">
+              <div className="font-medium">{userName ?? userEmail ?? 'Perfil'}</div>
+              <div className="text-xs text-white/70">Configuración y perfil</div>
+            </div>
+          )}
+        </button>
+      </div>
     </aside>
   )
 }

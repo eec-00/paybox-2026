@@ -150,6 +150,30 @@ export async function deleteUserProfile(userId: string): Promise<{ success: bool
 }
 
 /**
+ * Actualiza el perfil del usuario actual (nombre)
+ */
+export async function updateMyProfile(
+  updates: { full_name?: string }
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autenticado' }
+
+  const { error } = await supabase
+    .from('user_profiles')
+    .update(updates)
+    .eq('id', user.id)
+
+  if (error) {
+    console.error('Error updating own profile:', error)
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}
+
+/**
  * Crea un nuevo usuario con email pre-verificado (solo para admins)
  * @param email Email del nuevo usuario
  * @param password Contraseña del nuevo usuario
