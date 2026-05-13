@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, DollarSign, TrendingUp, Calendar, CreditCard, User, PieChart } from 'lucide-react'
+import { fetchAllRows } from '@/lib/supabase/fetchAll'
 
 interface DashboardStats {
   totalPayments: number
@@ -66,15 +67,13 @@ export function Dashboard() {
       const today = new Date().toISOString().split('T')[0]
       const currentMonth = new Date().toISOString().slice(0, 7)
 
-      const { data: payments, error: paymentsError } = await supabase
-        .from('registros')
-        .select('*')
-        .order('fecha_y_hora_pago', { ascending: false })
-
-      if (paymentsError) {
-        console.error('Error en consulta de registros:', paymentsError)
-        throw paymentsError
-      }
+      const payments = await fetchAllRows<any>((from, to) =>
+        supabase
+          .from('registros')
+          .select('*')
+          .order('fecha_y_hora_pago', { ascending: false })
+          .range(from, to)
+      )
 
       const { data: categories, error: categoriesError } = await supabase
         .from('categorias')
@@ -88,10 +87,10 @@ export function Dashboard() {
         categories?.map(c => [c.id, c.categoria_nombre]) || []
       )
 
-      const enrichedPayments = payments?.map(p => ({
+      const enrichedPayments = payments.map(p => ({
         ...p,
         categoria_nombre: categoriesMap.get(p.categoria_id) || 'Sin categoría'
-      })) || []
+      }))
 
       // Helper: separar monto por moneda
       const isSoles = (p: any) => !p.moneda || p.moneda === 'soles'

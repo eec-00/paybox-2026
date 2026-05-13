@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Download, FileSpreadsheet, AlertTriangle, Loader2, Calendar as CalendarIcon, Users, Settings2, Columns, Tags, Info, ImageIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { fetchAllRows } from '@/lib/supabase/fetchAll'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
@@ -121,9 +122,16 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
     const handleExport = async () => {
         setExporting(true)
         try {
-            let query = supabase
-                .from('registros')
-                .select(`
+            if (selectedCategories.length === 0) {
+                alert("Debe seleccionar al menos una categoría.")
+                setExporting(false)
+                return
+            }
+
+            const registros = await fetchAllRows<any>((from, to) => {
+                let q = supabase
+                    .from('registros')
+                    .select(`
           *,
           categoria:categoria_id (
             id,
@@ -131,38 +139,27 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
             categoria_nombre
           )
         `)
-                .order('fecha_y_hora_pago', { ascending: false })
+                    .order('fecha_y_hora_pago', { ascending: false })
 
-            // Date filter
-            if (dateRangeType !== 'all') {
-                if (startDate) query = query.gte('fecha_y_hora_pago', startDate)
-                if (endDate) query = query.lte('fecha_y_hora_pago', `${endDate}T23:59:59`)
-            }
+                if (dateRangeType !== 'all') {
+                    if (startDate) q = q.gte('fecha_y_hora_pago', startDate)
+                    if (endDate) q = q.lte('fecha_y_hora_pago', `${endDate}T23:59:59`)
+                }
 
-            // User filter
-            if (selectedUserFilter === 'me' && currentUser) {
-                query = query.eq('creado_por', currentUser.id)
-            } else if (selectedUserFilter !== 'all') {
-                query = query.eq('creado_por', selectedUserFilter)
-            }
+                if (selectedUserFilter === 'me' && currentUser) {
+                    q = q.eq('creado_por', currentUser.id)
+                } else if (selectedUserFilter !== 'all') {
+                    q = q.eq('creado_por', selectedUserFilter)
+                }
 
-            // Categories filter
-            // If not all categories are selected, apply filter
-            if (selectedCategories.length === 0) {
-                alert("Debe seleccionar al menos una categoría.")
-                setExporting(false)
-                return
-            }
+                if (selectedCategories.length !== categories.length) {
+                    q = q.in('categoria_id', selectedCategories)
+                }
 
-            if (selectedCategories.length !== categories.length) {
-                query = query.in('categoria_id', selectedCategories)
-            }
+                return q.range(from, to)
+            })
 
-            const { data: registros, error } = await query
-
-            if (error) throw error
-
-            if (!registros || registros.length === 0) {
+            if (registros.length === 0) {
                 alert("No hay registros para exportar con los filtros seleccionados.")
                 setExporting(false)
                 return
