@@ -17,6 +17,7 @@ import {
   Layers,
   Wallet,
   Settings,
+  ClipboardList,
 } from 'lucide-react'
 
 export type Section =
@@ -33,6 +34,7 @@ export type Section =
   | 'automatizacion-carretas'
   | 'automatizacion-conductores'
   | 'automatizacion-facturas'
+  | 'servicios-transporte'
 
 interface FlatItem {
   type: 'item'
@@ -81,7 +83,7 @@ export function Sidebar({
   onProfileClick,
 }: SidebarProps) {
   const isAutoSection = activeSection.startsWith('automatizacion')
-  const isServiciosSection = ['trailers', 'geoenlaces', 'geocercas'].includes(activeSection)
+  const isServiciosSection = ['trailers', 'geoenlaces', 'geocercas', 'servicios-transporte'].includes(activeSection)
   const isFinanzasSection = ['pagos', 'calendario'].includes(activeSection)
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     ...(isAutoSection ? ['automatizacion'] : []),
@@ -143,6 +145,15 @@ export function Sidebar({
       adminOnly: false,
       requiresCreate: false,
       children: [
+        {
+          type: 'item',
+          id: 'servicios-transporte',
+          label: 'Servicios',
+          icon: ClipboardList,
+          description: 'Servicios de transporte Odoo',
+          adminOnly: false,
+          requiresCreate: false,
+        },
         {
           type: 'item',
           id: 'trailers',

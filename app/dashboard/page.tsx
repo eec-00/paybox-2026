@@ -20,6 +20,7 @@ import { Sidebar, type Section } from '@/components/Sidebar'
 import { AutomatizacionSection } from '@/components/AutomatizacionSection'
 import { FacturasSection } from '@/components/FacturasSection'
 import { CalendarSection } from '@/components/CalendarSection'
+import { ServiciosSection } from '@/components/ServiciosSection'
 import { UpdatesNotification } from '@/components/UpdatesNotification'
 import { UpdatesManagement } from '@/components/UpdatesManagement'
 import { UpdatesList } from '@/components/UpdatesList'
@@ -663,6 +664,10 @@ export default function DashboardPage() {
                 {/* Lista de actualizaciones para todos */}
                 <UpdatesList />
               </div>
+            )}
+
+            {activeSection === 'servicios-transporte' && (
+              <ServiciosSection />
             )}
 
             {activeSection === 'automatizacion-conductores' && (
