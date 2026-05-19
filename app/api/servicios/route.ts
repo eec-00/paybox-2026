@@ -169,3 +169,55 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json()
+
+    // conductores → lista de empleados para el select
+    if (body.action === 'conductores') {
+      const uid = await odooAuth()
+      const empleados = await odooCall<{ id: number; name: string }[]>(
+        uid,
+        'hr.employee',
+        'search_read',
+        [[['active', '=', true]]],
+        { fields: ['id', 'name'], order: 'name asc', limit: 300 }
+      )
+      return NextResponse.json({ empleados })
+    }
+
+    // flota → lista de vehículos para selects de placa
+    if (body.action === 'flota') {
+      const uid = await odooAuth()
+      const vehiculos = await odooCall<{
+        id: number
+        name: string
+        license_plate: string
+        category_id: [number, string] | false
+      }[]>(
+        uid,
+        'fleet.vehicle',
+        'search_read',
+        [[['active', '=', true]]],
+        { fields: ['id', 'name', 'license_plate', 'category_id'], order: 'license_plate asc', limit: 500 }
+      )
+      return NextResponse.json({ vehiculos })
+    }
+
+    // Editar tarea
+    const { id, fields } = body as { id: number; fields: Record<string, unknown> }
+    if (!id || !fields || Object.keys(fields).length === 0) {
+      return NextResponse.json({ error: 'id y fields requeridos' }, { status: 400 })
+    }
+
+    const uid = await odooAuth()
+    await odooCall(uid, 'project.task', 'write', [[id], fields])
+
+    return NextResponse.json({ ok: true })
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error('Error POST /api/servicios:', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
+}

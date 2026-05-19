@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { RefreshCw, Search, XCircle, Truck, CheckSquare, Square } from 'lucide-react'
+import { RefreshCw, Search, XCircle, Truck, CheckSquare, Square, Pencil } from 'lucide-react'
+import { ServiciosEditModal } from '@/components/ServiciosEditModal'
 
 interface OdooTask {
   id: number
@@ -35,10 +34,7 @@ interface OdooTask {
   x_studio_termino_de_carga_descarga: number | false
 }
 
-interface OdooStage {
-  id: number
-  name: string
-}
+interface OdooStage { id: number; name: string }
 
 function formatOdooTime(value: number | false): string {
   if (!value && value !== 0) return '—'
@@ -85,12 +81,14 @@ const PAGE_SIZE = 50
 export function ServiciosSection() {
   const [tasks, setTasks] = useState<OdooTask[]>([])
   const [stages, setStages] = useState<OdooStage[]>([])
+  const [validFields, setValidFields] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState('all')
   const [importFilter, setImportFilter] = useState<'all' | 'yes' | 'no'>('all')
   const [page, setPage] = useState(1)
+  const [editingTask, setEditingTask] = useState<OdooTask | null>(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -104,6 +102,7 @@ export function ServiciosSection() {
       const data = await res.json()
       setTasks(data.tasks ?? [])
       setStages(data.stages ?? [])
+      setValidFields(data.validFields ?? [])
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -147,6 +146,16 @@ export function ServiciosSection() {
   const hasFilters = search || stageFilter !== 'all' || importFilter !== 'all'
 
   return (
+    <>
+    {editingTask && (
+      <ServiciosEditModal
+        task={editingTask as unknown as Record<string, unknown>}
+        validFields={validFields}
+        stages={stages}
+        onClose={() => setEditingTask(null)}
+        onSaved={() => { setEditingTask(null); fetchData() }}
+      />
+    )}
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -239,7 +248,8 @@ export function ServiciosSection() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[200px]">Código / Nombre</TableHead>
+                    <TableHead className="w-10" />
+                  <TableHead className="whitespace-nowrap font-bold text-xs min-w-[200px]">Código / Nombre</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[160px]">Etapa</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[180px]">Cliente</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[110px]">F. Programación</TableHead>
@@ -264,7 +274,7 @@ export function ServiciosSection() {
                 <TableBody>
                   {paginated.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={20} className="text-center py-12 text-muted-foreground text-sm">
+                      <TableCell colSpan={21} className="text-center py-12 text-muted-foreground text-sm">
                         No se encontraron servicios con los filtros aplicados
                       </TableCell>
                     </TableRow>
@@ -273,6 +283,17 @@ export function ServiciosSection() {
                       const stageName = task.stage_id ? task.stage_id[1] : ''
                       return (
                         <TableRow key={task.id} className="hover:bg-muted/30 text-xs">
+                          <TableCell className="p-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-primary"
+                              onClick={() => setEditingTask(task)}
+                              title="Editar"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
                           <TableCell className="font-medium max-w-[280px]">
                             <span className="line-clamp-2 leading-snug" title={task.name}>
                               {task.name}
@@ -343,5 +364,6 @@ export function ServiciosSection() {
         </>
       )}
     </div>
+    </>
   )
 }
