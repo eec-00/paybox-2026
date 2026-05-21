@@ -8,8 +8,10 @@ import { Dashboard } from '@/components/Dashboard'
 import { PaymentForm } from '@/components/PaymentForm'
 import { PaymentsTable } from '@/components/PaymentsTable'
 import { ExportExcelModal } from '@/components/ExportExcelModal'
-import { UserManagement } from '@/components/UserManagement'
+import { NormalUserForm } from '@/components/UserManagement'
 import { UsersList } from '@/components/UsersList'
+import { ConductoresList } from '@/components/ConductoresList'
+import { ConductorForm } from '@/components/UserManagement'
 import { VehiclesList } from '@/components/VehiclesList'
 import { ZonesList } from '@/components/ZonesList'
 import { ZoneEvents } from '@/components/ZoneEvents'
@@ -127,8 +129,13 @@ export default function DashboardPage() {
       } else {
         setUser(user)
 
-        // Verificar si es developer
+        // Conductores van a su portal
         const profile = await getCurrentUserProfile()
+        if (profile?.role === 'conductor') {
+          router.push('/conductor/servicios')
+          return
+        }
+
         setIsDeveloper(profile?.role === 'developer')
         setProfileName(profile?.full_name || null)
 
@@ -686,31 +693,49 @@ export default function DashboardPage() {
               <FacturasSection />
             )}
 
-            {activeSection === 'administracion' && (
+            {(activeSection === 'administracion' || activeSection === 'administracion-usuarios') && (
               <div className="space-y-6">
                 {(isAdminUser || isDeveloper) ? (
                   <>
                     <div className="flex items-center gap-2">
                       <Shield className="h-6 w-6 text-secondary" />
                       <div>
-                        <h2 className="text-2xl font-bold text-primary">Panel de Administración</h2>
-                        <p className="text-muted-foreground">Gestiona usuarios y permisos del sistema</p>
+                        <h2 className="text-2xl font-bold text-primary">Usuarios Core</h2>
+                        <p className="text-muted-foreground">Equipo interno con acceso al dashboard</p>
                       </div>
                     </div>
-
-                    {/* Lista de usuarios existentes */}
                     <UsersList />
-
-                    {/* Formulario para crear nuevos usuarios */}
-                    <UserManagement />
+                    <NormalUserForm />
                   </>
                 ) : (
                   <div className="text-center py-12">
                     <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-foreground mb-2">Acceso Restringido</h3>
-                    <p className="text-muted-foreground">
-                      Solo los administradores y developers pueden acceder a esta sección
-                    </p>
+                    <p className="text-muted-foreground">Solo los administradores pueden acceder a esta sección</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeSection === 'administracion-conductores' && (
+              <div className="space-y-6">
+                {(isAdminUser || isDeveloper) ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-6 w-6 text-secondary" />
+                      <div>
+                        <h2 className="text-2xl font-bold text-primary">Conductores</h2>
+                        <p className="text-muted-foreground">Choferes con acceso al Portal del Conductor</p>
+                      </div>
+                    </div>
+                    <ConductoresList />
+                    <ConductorForm />
+                  </>
+                ) : (
+                  <div className="text-center py-12">
+                    <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-foreground mb-2">Acceso Restringido</h3>
+                    <p className="text-muted-foreground">Solo los administradores pueden acceder a esta sección</p>
                   </div>
                 )}
               </div>

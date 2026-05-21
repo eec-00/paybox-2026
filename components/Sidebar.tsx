@@ -18,6 +18,7 @@ import {
   Wallet,
   Settings,
   ClipboardList,
+  Users,
 } from 'lucide-react'
 
 export type Section =
@@ -29,6 +30,8 @@ export type Section =
   | 'geocercas'
   | 'tutoriales'
   | 'administracion'
+  | 'administracion-usuarios'
+  | 'administracion-conductores'
   | 'updates'
   | 'automatizacion-tractos'
   | 'automatizacion-carretas'
@@ -85,10 +88,12 @@ export function Sidebar({
   const isAutoSection = activeSection.startsWith('automatizacion')
   const isServiciosSection = ['trailers', 'geoenlaces', 'geocercas', 'servicios-transporte'].includes(activeSection)
   const isFinanzasSection = ['pagos', 'calendario'].includes(activeSection)
+  const isAdminSection = activeSection.startsWith('administracion')
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     ...(isAutoSection ? ['automatizacion'] : []),
     ...(isServiciosSection ? ['servicios'] : []),
     ...(isFinanzasSection ? ['finanzas'] : []),
+    ...(isAdminSection ? ['administracion'] : []),
   ])
 
   const toggleGroup = (id: string) => {
@@ -231,13 +236,33 @@ export function Sidebar({
       ],
     },
     {
-      type: 'item',
+      type: 'group',
       id: 'administracion',
       label: 'Administración',
       icon: UserCog,
-      description: 'Gestionar usuarios',
+      description: 'Usuarios y conductores',
       adminOnly: true,
       requiresCreate: false,
+      children: [
+        {
+          type: 'item',
+          id: 'administracion-usuarios' as Section,
+          label: 'Usuarios Core',
+          icon: Users,
+          description: 'Equipo de la empresa',
+          adminOnly: true,
+          requiresCreate: false,
+        },
+        {
+          type: 'item',
+          id: 'administracion-conductores' as Section,
+          label: 'Conductores',
+          icon: Truck,
+          description: 'Choferes del portal',
+          adminOnly: true,
+          requiresCreate: false,
+        },
+      ],
     },
     {
       type: 'item',

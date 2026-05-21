@@ -111,6 +111,7 @@ export function UsersList() {
       const { data, error: fetchError } = await supabase
         .from('user_profiles')
         .select('*')
+        .neq('role', 'conductor')
         .order('created_at', { ascending: false })
 
       if (fetchError) {

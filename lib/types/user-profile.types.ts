@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'user' | 'viewer' | 'developer'
+export type UserRole = 'admin' | 'user' | 'viewer' | 'developer' | 'conductor'
 
 export interface ModuleAccess {
   enabled: boolean
@@ -28,6 +28,9 @@ export interface UserProfile {
   can_edit: boolean
   can_delete: boolean
   module_permissions: ModulePermissions | null
+  dni: string | null
+  odoo_employee_id: number | null
+  odoo_employee_name: string | null
   created_at: string
   updated_at: string
   last_sign_in_at: string | null

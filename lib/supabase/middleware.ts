@@ -67,15 +67,17 @@ export async function updateSession(request: NextRequest) {
     console.error('Auth error in middleware:', error)
   }
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/register') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  const isPublicPath =
+    request.nextUrl.pathname.startsWith('/login') ||
+    request.nextUrl.pathname.startsWith('/conductor/login') ||
+    request.nextUrl.pathname.startsWith('/register') ||
+    request.nextUrl.pathname.startsWith('/auth')
+
+  if (!user && !isPublicPath) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    url.pathname = request.nextUrl.pathname.startsWith('/conductor')
+      ? '/conductor/login'
+      : '/login'
     return NextResponse.redirect(url)
   }
 
