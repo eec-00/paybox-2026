@@ -31,6 +31,21 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "maskable",
       },
     ],
+    id: "/dashboard",
+    screenshots: [
+      {
+        src: "/screenshot-desktop.png",
+        sizes: "2100x1600",
+        type: "image/png",
+        form_factor: "wide",
+      },
+      {
+        src: "/screenshot-mobile.png",
+        sizes: "1170x2531",
+        type: "image/png",
+        form_factor: "narrow",
+      },
+    ],
     categories: ["business", "finance", "productivity"],
     prefer_related_applications: false,
   };
