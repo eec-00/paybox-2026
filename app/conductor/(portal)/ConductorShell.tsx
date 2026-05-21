@@ -176,9 +176,9 @@ export function ConductorShell({ conductorName, children }: Props) {
   )
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       {/* ── Header ── */}
-      <header className="h-14 bg-[#1a2332] text-white flex items-center justify-between px-4 sticky top-0 z-50 border-b border-white/5">
+      <header className="h-14 shrink-0 bg-[#1a2332] text-white flex items-center justify-between px-4 z-50 border-b border-white/5">
         <div className="flex items-center gap-3">
           {/* Mobile hamburger */}
           <button
@@ -219,7 +219,7 @@ export function ConductorShell({ conductorName, children }: Props) {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0">
         {/* ── Mobile overlay ── */}
         {mobileOpen && (
           <div
@@ -231,15 +231,15 @@ export function ConductorShell({ conductorName, children }: Props) {
         {/* ── Sidebar ── */}
         <aside
           className={cn(
-            'bg-[#1a2332] border-r border-white/5 flex flex-col transition-all duration-300',
+            'bg-[#1a2332] border-r border-white/5 flex flex-col shrink-0 overflow-y-auto transition-all duration-300',
+            // Mobile: fixed overlay
             'fixed left-0 top-14 h-[calc(100vh-3.5rem)] z-40',
-            'md:sticky md:top-14 md:h-[calc(100vh-3.5rem)] md:z-auto',
+            // Desktop: in-flow, full height
+            'md:static md:h-full md:z-auto',
             collapsed ? 'md:w-[68px]' : 'md:w-60',
             mobileOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0'
           )}
         >
-          {/* Sidebar top padding */}
-          <div className="pt-3" />
           {sidebarContent}
         </aside>
 
