@@ -25,12 +25,12 @@ interface ServicioTask {
   x_studio_almacen_de_destino?: string
   x_studio_es_importacin?: boolean
   x_studio_es_importacion?: boolean
-  x_studio_ingreso_a_almacen_de_retiro?: string
-  x_studio_salida_de_almacen_de_retiro?: string
-  x_studio_llegada_a_cliente?: string
-  x_studio_ingreso_a_planta?: string
-  x_studio_inicio_carga_descarga?: string
-  x_studio_termino_de_carga_descarga?: string
+  x_studio_ingreso_a_almacen_de_retiro?: string | number | false
+  x_studio_salida_de_almacen_de_retiro?: string | number | false
+  x_studio_llegada_a_cliente?: string | number | false
+  x_studio_ingreso_a_planta?: string | number | false
+  x_studio_inicio_carga_descarga?: string | number | false
+  x_studio_termino_de_carga_descarga?: string | number | false
 }
 
 interface Stats {
@@ -53,8 +53,14 @@ function formatMonthLabel(str: string) {
   return `${MESES[m - 1]} ${y}`
 }
 
-function formatTime(val: string | false | undefined): string {
-  if (!val || val === 'false') return '—'
+function formatTime(val: string | number | false | undefined): string {
+  if (val === null || val === undefined || val === false || val === '' || val === 'false') return '—'
+  const num = Number(val)
+  if (!isNaN(num) && !String(val).includes(':')) {
+    const hours = Math.floor(num)
+    const minutes = Math.round((num - hours) * 60)
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+  }
   const match = String(val).match(/(\d{2}:\d{2})/)
   return match ? match[1] : String(val)
 }
@@ -92,8 +98,14 @@ function getContainer(task: ServicioTask): string {
   return task.x_studio_nmero_de_contenedor || task.x_studio_numero_de_contenedor || '—'
 }
 
+function extractPlaca(val: unknown): string {
+  if (!val || val === false) return '—'
+  const str = Array.isArray(val) ? String((val as [number, string])[1] || '') : String(val)
+  return str.split('/').pop()?.trim() || str
+}
+
 function getTracto(task: ServicioTask): string {
-  return task.x_studio_placa_camion || task.x_studio_placa_camin || '—'
+  return extractPlaca(task.x_studio_placa_camion || task.x_studio_placa_camin)
 }
 
 function getAlmacenRetiro(task: ServicioTask): string {
@@ -112,7 +124,7 @@ function getTiempos(task: ServicioTask) {
     { label: 'Ingreso a planta', value: formatTime(task.x_studio_ingreso_a_planta) },
     { label: 'Inicio carga/descarga', value: formatTime(task.x_studio_inicio_carga_descarga) },
     { label: 'Fin carga/descarga', value: formatTime(task.x_studio_termino_de_carga_descarga) },
-  ].filter(t => t.value !== '—')
+  ]
 }
 
 export default function ConductorServiciosPage() {
@@ -281,7 +293,7 @@ export default function ConductorServiciosPage() {
         const tiempos = getTiempos(task)
         const container = getContainer(task)
         const tracto = getTracto(task)
-        const carreta = task.x_studio_placa_carreta || '—'
+        const carreta = extractPlaca(task.x_studio_placa_carreta)
         const booking = task.x_studio_referencia_booking || '—'
         const agencia = task.x_studio_agencia || '—'
         const almacenRetiro = getAlmacenRetiro(task)
@@ -348,41 +360,38 @@ export default function ConductorServiciosPage() {
                   <div className="flex items-center gap-3 bg-white rounded-xl px-3.5 py-2.5 border border-gray-100">
                     <Truck className="h-4 w-4 text-[#f5a623] shrink-0" />
                     <div className="flex gap-4 text-xs">
-                      <div>
-                        <span className="text-gray-400">Tracto </span>
-                        <span className="font-bold text-[#1a2332]">{tracto}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-400">Carreta </span>
-                        <span className="font-bold text-[#1a2332]">{carreta}</span>
-                      </div>
+                      {tracto !== '—' && (
+                        <div>
+                          <span className="text-gray-400">Tracto </span>
+                          <span className="font-bold text-[#1a2332]">{tracto}</span>
+                        </div>
+                      )}
+                      {carreta !== '—' && (
+                        <div>
+                          <span className="text-gray-400">Carreta </span>
+                          <span className="font-bold text-[#1a2332]">{carreta}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Almacenes */}
-                  {(almacenRetiro !== '—' || almacenDestino !== '—') && (
-                    <div className="flex items-start gap-3 bg-white rounded-xl px-3.5 py-2.5 border border-gray-100">
-                      <Building2 className="h-4 w-4 text-[#f5a623] shrink-0 mt-0.5" />
-                      <div className="text-xs space-y-1">
-                        {almacenRetiro !== '—' && (
-                          <p>
-                            <span className="text-gray-400">Retiro: </span>
-                            <span className="font-semibold text-[#1a2332]">{almacenRetiro}</span>
-                          </p>
-                        )}
-                        {almacenDestino !== '—' && (
-                          <p>
-                            <span className="text-gray-400">Destino: </span>
-                            <span className="font-semibold text-[#1a2332]">{almacenDestino}</span>
-                          </p>
-                        )}
-                      </div>
+                  <div className="flex items-start gap-3 bg-white rounded-xl px-3.5 py-2.5 border border-gray-100">
+                    <Building2 className="h-4 w-4 text-[#f5a623] shrink-0 mt-0.5" />
+                    <div className="text-xs space-y-1">
+                      <p>
+                        <span className="text-gray-400">Retiro: </span>
+                        <span className="font-semibold text-[#1a2332]">{almacenRetiro}</span>
+                      </p>
+                      <p>
+                        <span className="text-gray-400">Destino: </span>
+                        <span className="font-semibold text-[#1a2332]">{almacenDestino}</span>
+                      </p>
                     </div>
-                  )}
+                  </div>
 
                   {/* Tiempos operativos */}
-                  {tiempos.length > 0 && (
-                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                  <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
                       <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-gray-100">
                         <Clock className="h-3.5 w-3.5 text-[#f5a623]" />
                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tiempos operativos</span>
@@ -396,7 +405,6 @@ export default function ConductorServiciosPage() {
                         ))}
                       </div>
                     </div>
-                  )}
                 </div>
               </div>
             )}

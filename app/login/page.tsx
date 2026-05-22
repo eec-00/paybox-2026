@@ -205,6 +205,22 @@ export default function LoginPage() {
                 Contacta al administrador
               </span>
             </div>
+
+            <div className="relative flex items-center gap-3 my-1">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-gray-400 shrink-0">o</span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+
+            <a
+              href="/conductor/login"
+              className="w-full flex items-center justify-center gap-2 border border-[#1a2332]/20 hover:border-[#1a2332]/50 hover:bg-[#1a2332]/5 text-[#1a2332] font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+              </svg>
+              Soy conductor
+            </a>
           </form>
         </div>
       </div>

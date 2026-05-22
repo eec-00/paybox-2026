@@ -12,7 +12,6 @@ export default function ConductorLoginPage() {
   const [passwordError, setPasswordError] = useState('')
   const [serverError, setServerError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [showPass, setShowPass] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -48,275 +47,156 @@ export default function ConductorLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-[#0f1825]">
-      {/* ── Left panel (desktop only) ── */}
-      <div className="hidden lg:flex flex-col justify-between w-[52%] relative overflow-hidden bg-[#1a2332] p-12">
-        {/* Road grid pattern */}
-        <svg className="absolute inset-0 w-full h-full opacity-[0.06]" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
-              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#f5a623" strokeWidth="0.8"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
-        </svg>
+    <div className="min-h-screen flex items-center justify-center overflow-hidden p-4">
+      <div className="w-full relative max-w-5xl overflow-hidden flex flex-col md:flex-row shadow-xl rounded-2xl">
 
-        {/* Diagonal accent strip */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'linear-gradient(135deg, transparent 60%, rgba(245,166,35,0.07) 100%)',
-          }}
-        />
+        {/* Degradado superior */}
+        <div className="w-full h-full z-2 absolute bg-linear-to-t from-transparent to-black pointer-events-none" />
 
-        {/* Decorative circle */}
-        <div
-          className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(245,166,35,0.12) 0%, transparent 70%)' }}
-        />
-        <div
-          className="absolute -top-20 -left-20 w-72 h-72 rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(245,166,35,0.06) 0%, transparent 70%)' }}
-        />
-
-        {/* Logo top */}
-        <div className="relative flex items-center gap-3">
-          <Image src="/logo.png" alt="Eemerson SAC" width={40} height={40} className="object-contain" />
-          <span className="text-white/80 text-sm font-medium tracking-wide">Eemerson SAC</span>
+        {/* Franjas blur decorativas */}
+        <div className="flex absolute z-2 overflow-hidden backdrop-blur-2xl pointer-events-none">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="h-160 z-2 w-16 opacity-30 overflow-hidden"
+              style={{
+                background:
+                  'linear-gradient(90deg, #ffffff00 0%, #000000 69%, #ffffff30 100%)',
+              }}
+            />
+          ))}
         </div>
 
-        {/* Center content */}
-        <div className="relative space-y-6">
-          {/* Route dots decoration */}
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-2 h-2 rounded-full bg-[#f5a623]" />
-            <span className="flex-1 h-px border-t border-dashed border-[#f5a623]/30" />
-            <span className="w-2 h-2 rounded-full bg-[#f5a623]/40" />
-            <span className="flex-1 h-px border-t border-dashed border-[#f5a623]/20" />
-            <span className="w-2 h-2 rounded-full bg-[#f5a623]/20" />
-          </div>
+        {/* Círculo azul decorativo */}
+        <div className="w-60 h-60 bg-[#2563eb] absolute z-1 rounded-full bottom-0 left-0 pointer-events-none" />
+        <div className="w-32 h-20 bg-white absolute z-1 rounded-full bottom-0 left-0 pointer-events-none" />
+        <div className="w-32 h-20 bg-white absolute z-1 rounded-full bottom-0 left-0 pointer-events-none" />
 
-          <h1
-            className="text-4xl xl:text-5xl font-extrabold text-white leading-tight"
-            style={{ fontFamily: 'Montserrat, sans-serif', letterSpacing: '-0.02em' }}
-          >
-            Portal del<br />
-            <span style={{ color: '#f5a623' }}>Conductor</span>
+        {/* ── Panel izquierdo ── */}
+        <div className="bg-[#1a2332] text-white p-8 md:p-12 md:w-1/2 relative rounded-bl-3xl overflow-hidden">
+          <h1 className="text-2xl md:text-3xl font-medium leading-tight z-10 tracking-tight relative">
+            Portal del Conductor — Eemerson SAC
           </h1>
-          <p className="text-white/50 text-base leading-relaxed max-w-xs">
-            Consulta tus servicios asignados, documentos vigentes y más desde un solo lugar.
-          </p>
-
-          {/* Stats chips */}
-          <div className="flex gap-3 flex-wrap pt-2">
-            {[
-              { label: 'Servicios', icon: '🚛' },
-              { label: 'Documentos', icon: '📋' },
-              { label: 'Historial', icon: '📅' },
-            ].map(({ label, icon }) => (
-              <div
-                key={label}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-white/60 text-xs"
-              >
-                <span>{icon}</span>
-                <span>{label}</span>
-              </div>
-            ))}
-          </div>
         </div>
 
-        {/* Bottom */}
-        <p className="relative text-white/25 text-xs">
-          © {new Date().getFullYear()} Eemerson SAC · Todos los derechos reservados
-        </p>
-      </div>
+        {/* ── Panel derecho – Formulario ── */}
+        <div className="p-8 md:p-12 md:w-1/2 flex flex-col bg-white z-99 text-[#1a2332]">
 
-      {/* ── Right panel / form ── */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-10 relative">
-        {/* Mobile background pattern */}
-        <svg className="absolute inset-0 w-full h-full opacity-[0.04] lg:hidden" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="grid2" width="60" height="60" patternUnits="userSpaceOnUse">
-              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#f5a623" strokeWidth="0.8"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid2)" />
-        </svg>
-
-        <div className="w-full max-w-sm relative">
-          {/* Mobile logo */}
-          <div className="lg:hidden flex flex-col items-center mb-10">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4 shadow-xl">
-              <Image src="/logo.png" alt="Eemerson SAC" width={36} height={36} className="object-contain" />
+          {/* Logo */}
+          <div className="flex flex-col items-start mb-8">
+            <div className="mb-4">
+              <Image
+                src="/logo.png"
+                alt="Eemerson SAC"
+                width={48}
+                height={48}
+                className="object-contain"
+              />
             </div>
-            <h1
-              className="text-2xl font-extrabold text-white"
-              style={{ fontFamily: 'Montserrat, sans-serif' }}
+            <h2 className="text-3xl font-medium mb-2 tracking-tight">
+              Iniciar Sesión
+            </h2>
+            <p className="text-left opacity-80 text-sm">
+              Ingresa tu DNI y contraseña para continuar
+            </p>
+          </div>
+
+          {/* Formulario */}
+          <form className="flex flex-col gap-4" onSubmit={handleLogin} noValidate>
+
+            {/* DNI */}
+            <div>
+              <label htmlFor="dni" className="block text-sm mb-2">
+                Número de DNI
+              </label>
+              <input
+                type="text"
+                id="dni"
+                inputMode="numeric"
+                maxLength={8}
+                placeholder="12345678"
+                className={`text-sm w-full py-2 px-3 border rounded-lg focus:outline-none focus:ring-1 bg-white text-black focus:ring-[#2563eb] transition-colors ${
+                  dniError ? 'border-red-500' : 'border-gray-300'
+                }`}
+                value={dni}
+                onChange={(e) => setDni(e.target.value.replace(/\D/g, ''))}
+                disabled={loading}
+              />
+              {dniError && (
+                <p className="text-red-500 text-xs mt-1">{dniError}</p>
+              )}
+            </div>
+
+            {/* Contraseña */}
+            <div>
+              <label htmlFor="password" className="block text-sm mb-2">
+                Contraseña
+              </label>
+              <input
+                type="password"
+                id="password"
+                placeholder="••••••••"
+                className={`text-sm w-full py-2 px-3 border rounded-lg focus:outline-none focus:ring-1 bg-white text-black focus:ring-[#2563eb] transition-colors ${
+                  passwordError ? 'border-red-500' : 'border-gray-300'
+                }`}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+              />
+              {passwordError && (
+                <p className="text-red-500 text-xs mt-1">{passwordError}</p>
+              )}
+            </div>
+
+            {/* Error servidor */}
+            {serverError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+                {serverError}
+              </div>
+            )}
+
+            {/* Botón */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Portal del <span style={{ color: '#f5a623' }}>Conductor</span>
-            </h1>
-            <p className="text-white/40 text-sm mt-1">Eemerson SAC</p>
-          </div>
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Cargando...
+                </span>
+              ) : (
+                'Iniciar Sesión'
+              )}
+            </button>
 
-          {/* Form card */}
-          <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-            {/* Gold top bar */}
-            <div className="h-1 bg-gradient-to-r from-[#f5a623] via-[#fdb44b] to-[#f5a623]" />
-
-            <div className="p-8">
-              {/* Desktop heading inside card */}
-              <div className="hidden lg:block mb-7">
-                <h2
-                  className="text-xl font-bold text-[#1a2332]"
-                  style={{ fontFamily: 'Montserrat, sans-serif' }}
-                >
-                  Iniciar sesión
-                </h2>
-                <p className="text-sm text-gray-400 mt-0.5">Ingresa tu DNI y contraseña</p>
-              </div>
-
-              <div className="lg:hidden mb-6">
-                <h2
-                  className="text-xl font-bold text-[#1a2332]"
-                  style={{ fontFamily: 'Montserrat, sans-serif' }}
-                >
-                  Iniciar sesión
-                </h2>
-                <p className="text-sm text-gray-400 mt-0.5">Ingresa tu DNI y contraseña</p>
-              </div>
-
-              <form className="flex flex-col gap-5" onSubmit={handleLogin} noValidate>
-                {/* DNI field */}
-                <div>
-                  <label htmlFor="dni" className="block text-xs font-semibold text-[#1a2332]/70 uppercase tracking-wider mb-2">
-                    Número de DNI
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="5" width="20" height="14" rx="2"/>
-                        <line x1="16" y1="2" x2="16" y2="8"/>
-                        <line x1="8" y1="2" x2="8" y2="8"/>
-                        <circle cx="12" cy="13" r="2"/>
-                      </svg>
-                    </span>
-                    <input
-                      type="text"
-                      id="dni"
-                      inputMode="numeric"
-                      maxLength={8}
-                      placeholder="12345678"
-                      className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl text-sm bg-gray-50 text-[#1a2332] placeholder:text-gray-300 focus:outline-none focus:bg-white transition-all duration-200 ${
-                        dniError
-                          ? 'border-red-400 focus:border-red-500'
-                          : 'border-gray-100 focus:border-[#f5a623]'
-                      }`}
-                      value={dni}
-                      onChange={(e) => setDni(e.target.value.replace(/\D/g, ''))}
-                      disabled={loading}
-                    />
-                  </div>
-                  {dniError && (
-                    <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                      {dniError}
-                    </p>
-                  )}
-                </div>
-
-                {/* Password field */}
-                <div>
-                  <label htmlFor="password" className="block text-xs font-semibold text-[#1a2332]/70 uppercase tracking-wider mb-2">
-                    Contraseña
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                      </svg>
-                    </span>
-                    <input
-                      type={showPass ? 'text' : 'password'}
-                      id="password"
-                      placeholder="••••••••"
-                      className={`w-full pl-10 pr-12 py-3 border-2 rounded-xl text-sm bg-gray-50 text-[#1a2332] placeholder:text-gray-300 focus:outline-none focus:bg-white transition-all duration-200 ${
-                        passwordError
-                          ? 'border-red-400 focus:border-red-500'
-                          : 'border-gray-100 focus:border-[#f5a623]'
-                      }`}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={loading}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPass(v => !v)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors"
-                      tabIndex={-1}
-                    >
-                      {showPass ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                          <line x1="1" y1="1" x2="23" y2="23"/>
-                        </svg>
-                      ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                          <circle cx="12" cy="12" r="3"/>
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                  {passwordError && (
-                    <p className="text-red-500 text-xs mt-1.5 flex items-center gap-1">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                      {passwordError}
-                    </p>
-                  )}
-                </div>
-
-                {serverError && (
-                  <div className="flex items-start gap-2.5 bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl text-sm">
-                    <svg className="w-4 h-4 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
-                    {serverError}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed mt-1 relative overflow-hidden group"
-                  style={{ background: loading ? '#e09615' : '#f5a623' }}
-                >
-                  <span
-                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                    style={{ background: 'linear-gradient(135deg, #f5a623, #e09615)' }}
-                  />
-                  <span className="relative flex items-center justify-center gap-2">
-                    {loading ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Ingresando...
-                      </>
-                    ) : 'Ingresar'}
-                  </span>
-                </button>
-              </form>
+            <div className="text-center text-gray-600 text-sm">
+              ¿Sin acceso?{' '}
+              <span className="text-[#1a2332] font-medium underline cursor-default">
+                Contacta al administrador
+              </span>
             </div>
 
-            {/* Footer strip */}
-            <div className="bg-gray-50 border-t border-gray-100 px-8 py-4">
-              <p className="text-center text-xs text-gray-400">
-                ¿Sin acceso? Contacta al administrador.
-              </p>
+            <div className="relative flex items-center gap-3 my-1">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-xs text-gray-400 shrink-0">o</span>
+              <div className="flex-1 h-px bg-gray-200" />
             </div>
-          </div>
+
+            <a
+              href="/login"
+              className="w-full flex items-center justify-center gap-2 border border-[#1a2332]/20 hover:border-[#1a2332]/50 hover:bg-[#1a2332]/5 text-[#1a2332] font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+              Ir al sistema principal
+            </a>
+          </form>
         </div>
       </div>
     </div>
