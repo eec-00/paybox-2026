@@ -60,27 +60,22 @@ const CANDIDATE_X_FIELDS = [
   // OPERATIVA TRANSPORTE
   'x_studio_fecha_de_la_programacin',
   'x_studio_hora_de_cita',
-  'x_studio_placa_camin',
-  'x_studio_placa_camion',
+  'x_studio_placa',
   'x_studio_placa_carreta',
   'x_studio_conductor',
-  'x_studio_referencia_booking',
+  'x_studio_referenciabooking',
   'x_studio_agencia',
   'x_studio_nmero_de_contenedor',
-  'x_studio_numero_de_contenedor',
-  'x_studio_almacn_de_retiro',
   'x_studio_almacen_de_retiro',
-  'x_studio_almacn_de_destino',
   'x_studio_almacen_de_destino',
-  'x_studio_es_importacin',
   'x_studio_es_importacion',
   // TIEMPOS OPERATIVOS
-  'x_studio_ingreso_a_almacen_de_retiro',
+  'x_studio_ingreso_a_almacen_de_retiro_1',
   'x_studio_salida_de_almacen_de_retiro',
   'x_studio_llegada_a_cliente',
   'x_studio_ingreso_a_planta',
-  'x_studio_inicio_carga_descarga',
-  'x_studio_termino_de_carga_descarga',
+  'x_studio_inicio_cargadescarga',
+  'x_studio_termino_de_descarga',
 ]
 
 async function getValidFields(uid: number): Promise<string[]> {
@@ -212,9 +207,22 @@ export async function POST(request: Request) {
     }
 
     const uid = await odooAuth()
-    await odooCall(uid, 'project.task', 'write', [[id], fields])
 
-    return NextResponse.json({ ok: true })
+    // Validate fields exist before writing — invalid fields → skip silently
+    const fieldNames = Object.keys(fields)
+    const existingMeta = await odooCall<Record<string, unknown>>(
+      uid, 'project.task', 'fields_get', [fieldNames], { attributes: ['type'] }
+    )
+    const validFields = Object.fromEntries(
+      Object.entries(fields).filter(([k]) => k in existingMeta)
+    )
+    const skipped = fieldNames.filter(k => !(k in existingMeta))
+
+    if (Object.keys(validFields).length > 0) {
+      await odooCall(uid, 'project.task', 'write', [[id], validFields])
+    }
+
+    return NextResponse.json({ ok: true, ...(skipped.length ? { skipped } : {}) })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error)
     console.error('Error POST /api/servicios:', msg)
