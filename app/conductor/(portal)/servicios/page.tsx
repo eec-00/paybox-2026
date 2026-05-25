@@ -205,7 +205,23 @@ export default function ConductorServiciosPage() {
           setTasks(prev => prev.map(t => t.id === taskId ? { ...t, [step.field]: value } : t))
         }
       }
-      setServiceSteps(prev => ({ ...prev, [taskId]: stepIndex + 1 }))
+      const nextStep = stepIndex + 1
+      setServiceSteps(prev => ({ ...prev, [taskId]: nextStep }))
+
+      // Last step done → change stage in Odoo
+      if (nextStep >= STEPS.length) {
+        fetch('/api/servicios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: taskId, action: 'finalize' }),
+        }).then(r => r.json()).then(data => {
+          if (data.stageId) {
+            setTasks(prev => prev.map(t =>
+              t.id === taskId ? { ...t, stage_id: [data.stageId, data.stageName] as [number, string] } : t
+            ))
+          }
+        }).catch(() => {})
+      }
     } catch {
       setServiceSteps(prev => ({ ...prev, [taskId]: stepIndex + 1 }))
     } finally {

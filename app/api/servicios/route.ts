@@ -170,6 +170,23 @@ export async function POST(request: Request) {
     const body = await request.json()
 
     // conductores → lista de empleados para el select
+    // Finalizar servicio → busca stage "Servicio Finalizado" y lo asigna
+    if (body.action === 'finalize') {
+      const { id } = body as { id: number }
+      const uid = await odooAuth()
+      const stages = await odooCall<{ id: number; name: string }[]>(
+        uid, 'project.task.type', 'search_read',
+        [[['name', 'ilike', 'finaliz']]],
+        { fields: ['id', 'name'], limit: 5 }
+      )
+      if (!stages.length) {
+        return NextResponse.json({ error: 'No se encontró etapa "Servicio Finalizado"' }, { status: 404 })
+      }
+      const stage = stages[0]
+      await odooCall(uid, 'project.task', 'write', [[id], { stage_id: stage.id }])
+      return NextResponse.json({ ok: true, stageId: stage.id, stageName: stage.name })
+    }
+
     if (body.action === 'conductores') {
       const uid = await odooAuth()
       const empleados = await odooCall<{ id: number; name: string }[]>(
