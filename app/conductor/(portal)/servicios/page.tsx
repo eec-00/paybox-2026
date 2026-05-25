@@ -6,6 +6,7 @@ import {
   Truck, Clock, Building2, RefreshCw, PackageSearch,
   Play, CheckCircle2, SkipForward, ArrowLeft,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -63,6 +64,19 @@ function formatMonthLabel(str: string) {
 function nowAsOdooFloat(): number {
   const now = new Date()
   return now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600
+}
+
+type GeoLocation = { lat: number; lng: number; accuracy: number }
+
+function getLocation(): Promise<GeoLocation | null> {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) { resolve(null); return }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+      () => resolve(null),
+      { timeout: 8000, maximumAge: 0, enableHighAccuracy: true }
+    )
+  })
 }
 function formatTime(val: string | number | false | undefined): string {
   if (val === null || val === undefined || val === false || val === '' || val === 'false') return '—'
@@ -196,13 +210,31 @@ export default function ConductorServiciosPage() {
       if (action === 'mark') {
         const step = STEPS[stepIndex]
         const value = nowAsOdooFloat()
-        const res = await fetch('/api/servicios', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: taskId, fields: { [step.field]: value } }),
-        })
+
+        // Capture location + save time in parallel
+        const [res, location] = await Promise.all([
+          fetch('/api/servicios', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: taskId, fields: { [step.field]: value } }),
+          }),
+          getLocation(),
+        ])
+
         if (res.ok) {
           setTasks(prev => prev.map(t => t.id === taskId ? { ...t, [step.field]: value } : t))
+        }
+
+        if (location) {
+          const supabase = createClient()
+          supabase.from('service_locations').insert({
+            task_id: taskId,
+            step_index: stepIndex,
+            step_label: step.label,
+            lat: location.lat,
+            lng: location.lng,
+            accuracy: location.accuracy,
+          }).then(() => {})
         }
       }
       const nextStep = stepIndex + 1

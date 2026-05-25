@@ -4,8 +4,11 @@ import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { RefreshCw, Search, XCircle, Truck, CheckSquare, Square, Pencil } from 'lucide-react'
+import { RefreshCw, Search, XCircle, Truck, CheckSquare, Square, Pencil, MapPin } from 'lucide-react'
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
+import { createClient } from '@/lib/supabase/client'
+
+type LocationMap = Record<number, Record<number, { lat: number; lng: number }>>
 
 interface OdooTask {
   id: number
@@ -89,6 +92,7 @@ export function ServiciosSection() {
   const [importFilter, setImportFilter] = useState<'all' | 'yes' | 'no'>('all')
   const [page, setPage] = useState(1)
   const [editingTask, setEditingTask] = useState<OdooTask | null>(null)
+  const [locations, setLocations] = useState<LocationMap>({})
 
   const fetchData = async () => {
     setLoading(true)
@@ -100,9 +104,28 @@ export function ServiciosSection() {
         throw new Error(body.error || 'Error al cargar servicios')
       }
       const data = await res.json()
-      setTasks(data.tasks ?? [])
+      const loadedTasks: OdooTask[] = data.tasks ?? []
+      setTasks(loadedTasks)
       setStages(data.stages ?? [])
       setValidFields(data.validFields ?? [])
+
+      // Fetch locations for all tasks
+      if (loadedTasks.length > 0) {
+        const supabase = createClient()
+        const ids = loadedTasks.map(t => t.id)
+        const { data: locs } = await supabase
+          .from('service_locations')
+          .select('task_id, step_index, lat, lng')
+          .in('task_id', ids)
+        if (locs) {
+          const map: LocationMap = {}
+          for (const l of locs) {
+            if (!map[l.task_id]) map[l.task_id] = {}
+            map[l.task_id][l.step_index] = { lat: l.lat, lng: l.lng }
+          }
+          setLocations(map)
+        }
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -331,12 +354,12 @@ export function ServiciosSection() {
                               : <Square className="h-4 w-4 text-muted-foreground/40 mx-auto" />
                             }
                           </TableCell>
-                          <TableCell className="text-center font-mono whitespace-nowrap">{formatOdooTime(task.x_studio_ingreso_a_almacen_de_retiro)}</TableCell>
-                          <TableCell className="text-center font-mono whitespace-nowrap">{formatOdooTime(task.x_studio_salida_de_almacen_de_retiro)}</TableCell>
-                          <TableCell className="text-center font-mono whitespace-nowrap">{formatOdooTime(task.x_studio_llegada_a_cliente)}</TableCell>
-                          <TableCell className="text-center font-mono whitespace-nowrap">{formatOdooTime(task.x_studio_ingreso_a_planta)}</TableCell>
-                          <TableCell className="text-center font-mono whitespace-nowrap">{formatOdooTime(task.x_studio_inicio_carga_descarga)}</TableCell>
-                          <TableCell className="text-center font-mono whitespace-nowrap">{formatOdooTime(task.x_studio_termino_de_carga_descarga)}</TableCell>
+                          <TimeCell time={task.x_studio_ingreso_a_almacen_de_retiro} loc={locations[task.id]?.[0]} />
+                          <TimeCell time={task.x_studio_salida_de_almacen_de_retiro}        loc={locations[task.id]?.[1]} />
+                          <TimeCell time={task.x_studio_llegada_a_cliente}                  loc={locations[task.id]?.[2]} />
+                          <TimeCell time={task.x_studio_ingreso_a_planta}                   loc={locations[task.id]?.[3]} />
+                          <TimeCell time={task.x_studio_inicio_carga_descarga}              loc={locations[task.id]?.[4]} />
+                          <TimeCell time={task.x_studio_termino_de_carga_descarga}          loc={locations[task.id]?.[5]} />
                         </TableRow>
                       )
                     })
@@ -365,5 +388,25 @@ export function ServiciosSection() {
       )}
     </div>
     </>
+  )
+}
+
+function TimeCell({ time, loc }: { time: number | false; loc?: { lat: number; lng: number } }) {
+  const formatted = formatOdooTime(time)
+  return (
+    <TableCell className="text-center whitespace-nowrap">
+      <span className="font-mono">{formatted}</span>
+      {loc && (
+        <a
+          href={`https://maps.google.com/?q=${loc.lat},${loc.lng}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center ml-1 text-blue-500 hover:text-blue-700"
+          title={`${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}`}
+        >
+          <MapPin className="h-3 w-3" />
+        </a>
+      )}
+    </TableCell>
   )
 }
