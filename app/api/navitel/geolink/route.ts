@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 const NAVITEL_API_BASE = process.env.NAVITEL_API_BASE || 'https://control.navitelgps.com/api-v2'
 const NAVITEL_CREDENTIALS = {
@@ -108,6 +109,31 @@ export async function POST(request: NextRequest) {
       hashExpiry = 0
       throw new Error(createData.error?.message || 'Error al crear geoenlace en Navitel')
     }
+
+    // Log historial — best effort, no bloquea respuesta
+    try {
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single()
+
+        const duracion_horas = (endDate.getTime() - now.getTime()) / (1000 * 60 * 60)
+        const vehiculos = trackers.map((t: { id: number; label: string }) => t.label).join(', ')
+
+        await supabase.from('geoenlaces_historial').insert({
+          user_id: user.id,
+          user_email: user.email ?? '',
+          user_name: profile?.full_name ?? null,
+          vehiculos,
+          duracion_horas: Math.round(duracion_horas * 100) / 100,
+          expira_at: endDate.toISOString(),
+        })
+      }
+    } catch { /* historial failure no interrumpe el flujo */ }
 
     return NextResponse.json({
       success: true,

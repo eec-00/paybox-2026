@@ -13,13 +13,23 @@ import {
 } from '@/components/ui/dialog'
 import {
   Car, RefreshCw, Search, AlertCircle, Link2, ExternalLink, Clock,
-  Copy, CheckCircle, Share2, Calendar, Zap, Trash2,
+  Copy, CheckCircle, Share2, Calendar, Zap, Trash2, History, User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Vehicle {
   id: number
   label: string
+}
+
+interface HistorialEntry {
+  id: string
+  created_at: string
+  user_email: string
+  user_name: string | null
+  vehiculos: string
+  duracion_horas: number | null
+  expira_at: string | null
 }
 
 interface GeoLinkData {
@@ -65,6 +75,11 @@ export function VehiclesList() {
   const [geolinksError, setGeolinksError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
+  const [historial, setHistorial] = useState<HistorialEntry[]>([])
+  const [loadingHistorial, setLoadingHistorial] = useState(false)
+  const [historialError, setHistorialError] = useState<string | null>(null)
+  const [historialOpen, setHistorialOpen] = useState(false)
+
   const fetchVehicles = async () => {
     setLoading(true)
     setError(null)
@@ -99,6 +114,24 @@ export function VehiclesList() {
       setGeolinksError('Error de conexión con el servidor')
     } finally {
       setLoadingGeolinks(false)
+    }
+  }
+
+  const fetchHistorial = async () => {
+    setLoadingHistorial(true)
+    setHistorialError(null)
+    try {
+      const response = await fetch('/api/navitel/geolink/historial')
+      const data = await response.json()
+      if (data.success) {
+        setHistorial(data.historial)
+      } else {
+        setHistorialError(data.error || 'Error al cargar historial')
+      }
+    } catch {
+      setHistorialError('Error de conexión con el servidor')
+    } finally {
+      setLoadingHistorial(false)
     }
   }
 
@@ -231,6 +264,13 @@ export function VehiclesList() {
 
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' })
+
+  const formatDuration = (horas: number | null) => {
+    if (horas === null) return '—'
+    if (horas < 1) return `${Math.round(horas * 60)} min`
+    if (horas % 1 === 0) return `${horas}h`
+    return `${horas.toFixed(1)}h`
+  }
 
   const isExpired = (geolink: GeoLinkData) =>
     !!geolink.lifetime && new Date(geolink.lifetime.to) < new Date()
@@ -555,6 +595,93 @@ export function VehiclesList() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog: Historial */}
+      <Dialog open={historialOpen} onOpenChange={setHistorialOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Historial de geoenlaces
+            </DialogTitle>
+            <DialogDescription>
+              Registro de creación — solo lectura
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {loadingHistorial && (
+              <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+                <RefreshCw className="h-5 w-5 animate-spin" />
+                <span className="text-sm">Cargando historial...</span>
+              </div>
+            )}
+            {historialError && (
+              <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{historialError}</span>
+              </div>
+            )}
+            {!loadingHistorial && !historialError && historial.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-10 gap-2 text-muted-foreground">
+                <History className="h-8 w-8 opacity-30" />
+                <p className="text-sm">Sin registros aún</p>
+              </div>
+            )}
+            {!loadingHistorial && !historialError && historial.length > 0 && (
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-background">
+                  <tr className="border-b border-border/60">
+                    <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Usuario</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Vehículo(s)</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Duración</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Fecha y hora</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historial.map(entry => (
+                    <tr key={entry.id} className="border-b border-border/30 hover:bg-muted/20 transition-colors">
+                      <td className="py-2.5 px-3">
+                        <div className="flex items-center gap-1.5">
+                          <User className="h-3 w-3 text-muted-foreground shrink-0" />
+                          <div>
+                            {entry.user_name && (
+                              <p className="text-xs font-medium leading-tight">{entry.user_name}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground leading-tight">{entry.user_email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex flex-wrap gap-1">
+                          {entry.vehiculos.split(', ').map((v, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded text-xs font-medium"
+                            >
+                              <Car className="h-2.5 w-2.5" />
+                              {v}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span className="inline-flex items-center gap-1 text-xs text-foreground">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          {formatDuration(entry.duracion_horas)}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-xs text-muted-foreground whitespace-nowrap">
+                        {formatDate(entry.created_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Geoenlaces Activos */}
       <Card className="mt-4 border-border/60">
         <CardHeader className="pb-3">
@@ -570,13 +697,25 @@ export function VehiclesList() {
                 </p>
               </div>
             </div>
-            <Button
-              variant="outline" size="sm" className="h-8 w-8 p-0"
-              onClick={fetchGeolinks} disabled={loadingGeolinks}
-              title="Actualizar"
-            >
-              <RefreshCw className={cn('h-3.5 w-3.5', loadingGeolinks && 'animate-spin')} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline" size="sm" className="h-8 w-8 p-0"
+                onClick={fetchGeolinks} disabled={loadingGeolinks}
+                title="Actualizar"
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5', loadingGeolinks && 'animate-spin')} />
+              </Button>
+              <Button
+                variant="outline" size="sm" className="h-8 w-8 p-0"
+                onClick={() => {
+                  setHistorialOpen(true)
+                  if (historial.length === 0 && !loadingHistorial) fetchHistorial()
+                }}
+                title="Ver historial"
+              >
+                <History className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </CardHeader>
 

@@ -156,21 +156,21 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
   const F = {
     programacion: pick(validFields, 'x_studio_fecha_de_la_programacin', 'x_studio_fecha_de_la_programacion'),
     horaCita:     pick(validFields, 'x_studio_hora_de_cita'),
-    placaCamion:  pick(validFields, 'x_studio_placa_camion', 'x_studio_placa_camin'),
+    placaCamion:  pick(validFields, 'x_studio_placa', 'x_studio_placa_camion', 'x_studio_placa_camin'),
     placaCarreta: pick(validFields, 'x_studio_placa_carreta'),
     conductor:    pick(validFields, 'x_studio_conductor'),
-    refBooking:   pick(validFields, 'x_studio_referencia_booking'),
+    refBooking:   pick(validFields, 'x_studio_referenciabooking', 'x_studio_referencia_booking'),
     agencia:      pick(validFields, 'x_studio_agencia'),
     nContenedor:  pick(validFields, 'x_studio_numero_de_contenedor', 'x_studio_nmero_de_contenedor'),
     almRetiro:    pick(validFields, 'x_studio_almacen_de_retiro', 'x_studio_almacn_de_retiro'),
     almDestino:   pick(validFields, 'x_studio_almacen_de_destino', 'x_studio_almacn_de_destino'),
     esImport:     pick(validFields, 'x_studio_es_importacion', 'x_studio_es_importacin'),
-    ingAlmacen:   pick(validFields, 'x_studio_ingreso_a_almacen_de_retiro'),
+    ingAlmacen:   pick(validFields, 'x_studio_ingreso_a_almacen_de_retiro_1', 'x_studio_ingreso_a_almacen_de_retiro'),
     salAlmacen:   pick(validFields, 'x_studio_salida_de_almacen_de_retiro'),
     llegCliente:  pick(validFields, 'x_studio_llegada_a_cliente'),
     ingPlanta:    pick(validFields, 'x_studio_ingreso_a_planta'),
-    inicioCD:     pick(validFields, 'x_studio_inicio_carga_descarga'),
-    terminoCD:    pick(validFields, 'x_studio_termino_de_carga_descarga'),
+    inicioCD:     pick(validFields, 'x_studio_inicio_cargadescarga', 'x_studio_inicio_carga_descarga'),
+    terminoCD:    pick(validFields, 'x_studio_termino_de_descarga', 'x_studio_termino_de_carga_descarga'),
   }
 
   // Whether placa fields are many2one (value is [id, name]) or char

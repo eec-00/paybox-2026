@@ -17,7 +17,6 @@ import {
   Layers,
   Wallet,
   Settings,
-  ClipboardList,
   Users,
 } from 'lucide-react'
 
@@ -153,15 +152,6 @@ export function Sidebar({
         {
           type: 'item',
           id: 'servicios-transporte',
-          label: 'Servicios',
-          icon: ClipboardList,
-          description: 'Servicios de transporte Odoo',
-          adminOnly: false,
-          requiresCreate: false,
-        },
-        {
-          type: 'item',
-          id: 'trailers',
           label: 'Trailers',
           icon: Truck,
           description: 'Gestión de Trailers',

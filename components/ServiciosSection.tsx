@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { RefreshCw, Search, XCircle, Truck, CheckSquare, Square, Pencil, MapPin } from 'lucide-react'
+import { RefreshCw, Search, XCircle, Truck, Pencil, MapPin } from 'lucide-react'
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
 import { createClient } from '@/lib/supabase/client'
 
@@ -19,22 +19,22 @@ interface OdooTask {
   // OPERATIVA TRANSPORTE
   x_studio_fecha_de_la_programacin: string | false
   x_studio_hora_de_cita: number | false
-  x_studio_placa_camin: string | false
-  x_studio_placa_carreta: string | false
+  x_studio_placa: [number, string] | false
+  x_studio_placa_carreta: [number, string] | false
   x_studio_conductor: [number, string] | false
-  x_studio_referencia_booking: string | false
+  x_studio_referenciabooking: string | false
   x_studio_agencia: string | false
   x_studio_nmero_de_contenedor: string | false
-  x_studio_almacn_de_retiro: [number, string] | false
-  x_studio_almacn_de_destino: [number, string] | false
-  x_studio_es_importacin: boolean
+  x_studio_almacen_de_retiro: [number, string] | false
+  x_studio_almacen_de_destino: [number, string] | false
+  x_studio_es_importacion: boolean
   // TIEMPOS OPERATIVOS
-  x_studio_ingreso_a_almacen_de_retiro: number | false
+  x_studio_ingreso_a_almacen_de_retiro_1: number | false
   x_studio_salida_de_almacen_de_retiro: number | false
   x_studio_llegada_a_cliente: number | false
   x_studio_ingreso_a_planta: number | false
-  x_studio_inicio_carga_descarga: number | false
-  x_studio_termino_de_carga_descarga: number | false
+  x_studio_inicio_cargadescarga: number | false
+  x_studio_termino_de_descarga: number | false
 }
 
 interface OdooStage { id: number; name: string }
@@ -58,25 +58,33 @@ function m2oName(value: [number, string] | false): string {
   return value[1]
 }
 
-const STAGE_COLORS: Record<string, string> = {
-  'nueva solicitud': 'bg-blue-100 text-blue-800',
-  'pre-operativo': 'bg-amber-100 text-amber-800',
-  'en ruta': 'bg-orange-100 text-orange-800',
-  'en cliente': 'bg-green-100 text-green-800',
-  facturación: 'bg-indigo-100 text-indigo-800',
-  facturacion: 'bg-indigo-100 text-indigo-800',
-  cerrado: 'bg-gray-200 text-gray-600',
+
+const STAGE_DOT_COLORS: Record<string, string> = {
+  'nueva solicitud': 'bg-blue-500',
+  'pre-operativo': 'bg-amber-500',
+  'en ruta': 'bg-orange-500',
+  'en cliente': 'bg-green-500',
+  'facturación': 'bg-indigo-500',
+  'facturacion': 'bg-indigo-500',
+  'cerrado': 'bg-gray-400',
 }
 
-function stageColor(name: string): string {
+function stageDotColor(name: string): string {
   const key = name.toLowerCase().trim()
-  for (const [k, v] of Object.entries(STAGE_COLORS)) {
+  for (const [k, v] of Object.entries(STAGE_DOT_COLORS)) {
     if (key.includes(k)) return v
   }
   if (key.includes('pendiente') || key.includes('cierre') || key.includes('devolu')) {
-    return 'bg-purple-100 text-purple-800'
+    return 'bg-purple-500'
   }
-  return 'bg-gray-100 text-gray-700'
+  return 'bg-gray-400'
+}
+
+function extractPlacaLast6(val: [number, string] | false): string {
+  if (!val) return '—'
+  const name = val[1]
+  if (!name) return '—'
+  return name.slice(-6).trim() || '—'
 }
 
 const PAGE_SIZE = 50
@@ -142,16 +150,16 @@ export function ServiciosSection() {
         const stageName = t.stage_id ? t.stage_id[1] : ''
         if (stageName !== stageFilter) return false
       }
-      if (importFilter === 'yes' && !t.x_studio_es_importacin) return false
-      if (importFilter === 'no' && t.x_studio_es_importacin) return false
+      if (importFilter === 'yes' && !t.x_studio_es_importacion) return false
+      if (importFilter === 'no' && t.x_studio_es_importacion) return false
       if (!q) return true
       const searchable = [
         t.name,
         m2oName(t.partner_id),
         m2oName(t.x_studio_conductor),
         t.x_studio_nmero_de_contenedor || '',
-        t.x_studio_referencia_booking || '',
-        t.x_studio_placa_camin || '',
+        t.x_studio_referenciabooking || '',
+        Array.isArray(t.x_studio_placa) ? t.x_studio_placa[1] : '',
         t.x_studio_agencia || '',
       ].join(' ').toLowerCase()
       return searchable.includes(q)
@@ -266,26 +274,37 @@ export function ServiciosSection() {
       {/* Table */}
       {!loading && !error && (
         <>
+          {/* Stage legend */}
+          {stages.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 pb-1 text-[11px] text-muted-foreground">
+              {stages.map((s) => (
+                <span key={s.id} className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${stageDotColor(s.name)}`} />
+                  {s.name}
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className="border rounded-xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
                     <TableHead className="w-10" />
-                  <TableHead className="whitespace-nowrap font-bold text-xs min-w-[200px]">Código / Nombre</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[160px]">Etapa</TableHead>
+                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[100px]">Código</TableHead>
+                    <TableHead className="whitespace-nowrap font-bold text-xs w-10 text-center">Etapa</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[180px]">Cliente</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[110px]">F. Programación</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px]">Hora Cita</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[110px]">Placa Camión</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[110px]">Placa Carreta</TableHead>
+                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[80px]">Placa Camión</TableHead>
+                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[80px]">Placa Carreta</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[180px]">Conductor</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[130px]">Ref/Booking</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[120px]">Agencia</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[140px]">N° Contenedor</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[200px]">Almacén Retiro</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[200px]">Almacén Destino</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[80px] text-center">Import.</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Ing. Almacén</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Sal. Almacén</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Llegada Cliente</TableHead>
@@ -297,13 +316,14 @@ export function ServiciosSection() {
                 <TableBody>
                   {paginated.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={21} className="text-center py-12 text-muted-foreground text-sm">
+                      <TableCell colSpan={20} className="text-center py-12 text-muted-foreground text-sm">
                         No se encontraron servicios con los filtros aplicados
                       </TableCell>
                     </TableRow>
                   ) : (
                     paginated.map((task) => {
                       const stageName = task.stage_id ? task.stage_id[1] : ''
+                      const code = task.name.includes(' - ') ? task.name.split(' - ')[0] : task.name
                       return (
                         <TableRow key={task.id} className="hover:bg-muted/30 text-xs">
                           <TableCell className="p-1">
@@ -317,49 +337,42 @@ export function ServiciosSection() {
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           </TableCell>
-                          <TableCell className="font-medium max-w-[280px]">
-                            <span className="line-clamp-2 leading-snug" title={task.name}>
-                              {task.name}
-                            </span>
+                          <TableCell className="font-medium whitespace-nowrap" title={task.name}>
+                            {code}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="text-center">
                             {stageName ? (
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${stageColor(stageName)}`}>
-                                {stageName}
-                              </span>
+                              <span
+                                className={`inline-block w-3 h-3 rounded-full ${stageDotColor(stageName)}`}
+                                title={stageName}
+                              />
                             ) : '—'}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">{m2oName(task.partner_id)}</TableCell>
                           <TableCell className="whitespace-nowrap">{formatDate(task.x_studio_fecha_de_la_programacin)}</TableCell>
                           <TableCell className="text-center whitespace-nowrap">{formatOdooTime(task.x_studio_hora_de_cita)}</TableCell>
-                          <TableCell className="whitespace-nowrap font-mono">{task.x_studio_placa_camin || '—'}</TableCell>
-                          <TableCell className="whitespace-nowrap font-mono">{task.x_studio_placa_carreta || '—'}</TableCell>
+                          <TableCell className="whitespace-nowrap font-mono">{extractPlacaLast6(task.x_studio_placa)}</TableCell>
+                          <TableCell className="whitespace-nowrap font-mono">{extractPlacaLast6(task.x_studio_placa_carreta)}</TableCell>
                           <TableCell className="whitespace-nowrap">{m2oName(task.x_studio_conductor)}</TableCell>
-                          <TableCell className="whitespace-nowrap">{task.x_studio_referencia_booking || '—'}</TableCell>
+                          <TableCell className="whitespace-nowrap">{task.x_studio_referenciabooking || '—'}</TableCell>
                           <TableCell className="whitespace-nowrap">{task.x_studio_agencia || '—'}</TableCell>
                           <TableCell className="whitespace-nowrap font-mono">{task.x_studio_nmero_de_contenedor || '—'}</TableCell>
                           <TableCell className="max-w-[220px]">
-                            <span className="line-clamp-2 leading-snug text-[11px]" title={m2oName(task.x_studio_almacn_de_retiro)}>
-                              {m2oName(task.x_studio_almacn_de_retiro)}
+                            <span className="line-clamp-2 leading-snug text-[11px]" title={m2oName(task.x_studio_almacen_de_retiro)}>
+                              {m2oName(task.x_studio_almacen_de_retiro)}
                             </span>
                           </TableCell>
                           <TableCell className="max-w-[220px]">
-                            <span className="line-clamp-2 leading-snug text-[11px]" title={m2oName(task.x_studio_almacn_de_destino)}>
-                              {m2oName(task.x_studio_almacn_de_destino)}
+                            <span className="line-clamp-2 leading-snug text-[11px]" title={m2oName(task.x_studio_almacen_de_destino)}>
+                              {m2oName(task.x_studio_almacen_de_destino)}
                             </span>
                           </TableCell>
-                          <TableCell className="text-center">
-                            {task.x_studio_es_importacin
-                              ? <CheckSquare className="h-4 w-4 text-green-600 mx-auto" />
-                              : <Square className="h-4 w-4 text-muted-foreground/40 mx-auto" />
-                            }
-                          </TableCell>
-                          <TimeCell time={task.x_studio_ingreso_a_almacen_de_retiro} loc={locations[task.id]?.[0]} />
-                          <TimeCell time={task.x_studio_salida_de_almacen_de_retiro}        loc={locations[task.id]?.[1]} />
-                          <TimeCell time={task.x_studio_llegada_a_cliente}                  loc={locations[task.id]?.[2]} />
-                          <TimeCell time={task.x_studio_ingreso_a_planta}                   loc={locations[task.id]?.[3]} />
-                          <TimeCell time={task.x_studio_inicio_carga_descarga}              loc={locations[task.id]?.[4]} />
-                          <TimeCell time={task.x_studio_termino_de_carga_descarga}          loc={locations[task.id]?.[5]} />
+                          <TimeCell time={task.x_studio_ingreso_a_almacen_de_retiro_1} loc={locations[task.id]?.[0]} />
+                          <TimeCell time={task.x_studio_salida_de_almacen_de_retiro}   loc={locations[task.id]?.[1]} />
+                          <TimeCell time={task.x_studio_llegada_a_cliente}             loc={locations[task.id]?.[2]} />
+                          <TimeCell time={task.x_studio_ingreso_a_planta}              loc={locations[task.id]?.[3]} />
+                          <TimeCell time={task.x_studio_inicio_cargadescarga}          loc={locations[task.id]?.[4]} />
+                          <TimeCell time={task.x_studio_termino_de_descarga}           loc={locations[task.id]?.[5]} />
                         </TableRow>
                       )
                     })
