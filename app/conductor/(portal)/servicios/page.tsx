@@ -5,6 +5,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Truck, Clock, Building2, RefreshCw, PackageSearch,
   Play, CheckCircle2, SkipForward, ArrowLeft,
+  FileText, Download, Loader2, AlertCircle,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -142,6 +143,142 @@ function getTiempos(task: ServicioTask) {
     { label: 'Inicio carga/descarga',  value: formatTime(task.x_studio_inicio_cargadescarga) },
     { label: 'Fin carga/descarga',     value: formatTime(task.x_studio_termino_de_descarga) },
   ]
+}
+
+// ─── Guias Section ───────────────────────────────────────────────────────────
+
+interface OdooAttachment {
+  id: number | string
+  name: string
+  mimetype: string
+  file_size: number
+  fieldName?: string
+  hasData: boolean
+}
+
+function GuiasSection({ taskId }: { taskId: number }) {
+  const [attachments, setAttachments] = useState<OdooAttachment[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState<number | string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    fetch(`/api/conductor/servicios/${taskId}/attachments`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return
+        if (data.error) setError(data.error)
+        else setAttachments(data.attachments || [])
+      })
+      .catch(e => { if (!cancelled) setError(e.message) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [taskId])
+
+  const handleOpen = async (att: OdooAttachment) => {
+    if (!att.hasData) return
+    setDownloading(att.id)
+    try {
+      const res = await fetch(`/api/conductor/servicios/${taskId}/attachments/${att.id}`)
+      if (!res.ok) throw new Error('Error al obtener archivo')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
+    } catch {
+      alert('No se pudo abrir el archivo')
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  const handleDownload = async (att: OdooAttachment) => {
+    if (!att.hasData) return
+    setDownloading(att.id)
+    try {
+      const res = await fetch(`/api/conductor/servicios/${taskId}/attachments/${att.id}`)
+      if (!res.ok) throw new Error('Error al descargar archivo')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = att.name
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 5000)
+    } catch {
+      alert('No se pudo descargar el archivo')
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 px-3.5 py-3 flex items-center gap-2">
+        <Loader2 className="h-3.5 w-3.5 text-gray-300 animate-spin shrink-0" />
+        <span className="text-xs text-gray-400">Cargando documentos...</span>
+      </div>
+    )
+  }
+
+  if (error || !attachments || attachments.length === 0) return null
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-gray-100">
+        <FileText className="h-3.5 w-3.5 text-[#f5a623]" />
+        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Documentos adjuntos</span>
+      </div>
+      <div className="divide-y divide-gray-50">
+        {attachments.map(att => {
+          const isPdf = att.mimetype === 'application/pdf'
+          const isImage = att.mimetype.startsWith('image/')
+          const isLoading = downloading === att.id
+          // Strip extension from name for label, show it separately
+          const label = att.name.replace(/\.[^.]+$/, '')
+          const ext = att.name.match(/\.[^.]+$/)?.[0]?.toUpperCase().replace('.', '') || ''
+          return (
+            <div key={String(att.id)} className={`flex items-center gap-3 px-3.5 py-2.5 ${!att.hasData ? 'opacity-50' : ''}`}>
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${!att.hasData ? 'bg-gray-50' : isPdf ? 'bg-red-50' : isImage ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                <FileText className={`h-3.5 w-3.5 ${!att.hasData ? 'text-gray-300' : isPdf ? 'text-red-500' : isImage ? 'text-blue-500' : 'text-gray-400'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-semibold truncate ${att.hasData ? 'text-[#1a2332]' : 'text-gray-400'}`}>{label}</p>
+                <p className="text-[10px] text-gray-400">
+                  {att.hasData
+                    ? att.file_size > 0 ? `${ext} · ${(att.file_size / 1024).toFixed(0)} KB` : ext
+                    : 'Sin archivo'
+                  }
+                </p>
+              </div>
+              {att.hasData && (
+                <div className="flex gap-1.5 shrink-0">
+                  <button
+                    onClick={() => handleOpen(att)}
+                    disabled={isLoading}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#f5a623] text-white text-[10px] font-bold disabled:opacity-50 active:scale-95 transition-transform"
+                  >
+                    {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
+                    Ver
+                  </button>
+                  <button
+                    onClick={() => handleDownload(att)}
+                    disabled={isLoading}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-500 text-[10px] font-bold disabled:opacity-50 active:scale-95 transition-transform"
+                  >
+                    <Download className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 // ─── Main component ──────────────────────────────────────────────────────────
@@ -380,6 +517,9 @@ export default function ConductorServiciosPage() {
               ))}
             </div>
           </div>
+
+          {/* Documentos adjuntos */}
+          <GuiasSection taskId={task.id} />
         </div>
 
         {/* Sticky workflow controls */}
@@ -690,6 +830,8 @@ export default function ConductorServiciosPage() {
                       ))}
                     </div>
                   </div>
+
+                  <GuiasSection taskId={task.id} />
                 </div>
               </div>
             )}
