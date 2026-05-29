@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 import Image from 'next/image'
 
 export default function ConductorLoginPage() {
@@ -10,14 +10,18 @@ export default function ConductorLoginPage() {
   const [password, setPassword] = useState('')
   const [dniError, setDniError] = useState('')
   const [passwordError, setPasswordError] = useState('')
-  const [serverError, setServerError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const supabase = createClient()
+
+  const getErrorMessage = (msg: string) => {
+    if (/invalid login credentials/i.test(msg)) return 'DNI o contraseña incorrectos.'
+    if (/too many requests/i.test(msg)) return 'Demasiados intentos. Espera unos minutos.'
+    if (/network/i.test(msg)) return 'Sin conexión. Verifica tu internet.'
+    return 'Error al iniciar sesión. Contacta al administrador.'
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setServerError(null)
     setDniError('')
     setPasswordError('')
 
@@ -37,10 +41,9 @@ export default function ConductorLoginPage() {
       const email = `${dni.trim()}@conductor.local`
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      router.push('/conductor/servicios')
-      router.refresh()
-    } catch {
-      setServerError('DNI o contraseña incorrectos.')
+      window.location.href = '/conductor/servicios'
+    } catch (error: any) {
+      toast.error(getErrorMessage(error.message || ''))
     } finally {
       setLoading(false)
     }
@@ -147,13 +150,6 @@ export default function ConductorLoginPage() {
                 <p className="text-red-500 text-xs mt-1">{passwordError}</p>
               )}
             </div>
-
-            {/* Error servidor */}
-            {serverError && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-                {serverError}
-              </div>
-            )}
 
             {/* Botón */}
             <button

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 import Image from 'next/image'
 
 export default function LoginPage() {
@@ -10,9 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [emailError, setEmailError] = useState('')
   const [passwordError, setPasswordError] = useState('')
-  const [serverError, setServerError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const supabase = createClient()
 
   const validateEmail = (value: string) =>
@@ -20,9 +18,16 @@ export default function LoginPage() {
 
   const validatePassword = (value: string) => value.length >= 6
 
+  const getErrorMessage = (msg: string) => {
+    if (/invalid login credentials/i.test(msg)) return 'Correo o contraseña incorrectos.'
+    if (/email not confirmed/i.test(msg)) return 'Correo no confirmado. Contacta al administrador.'
+    if (/too many requests/i.test(msg)) return 'Demasiados intentos. Espera unos minutos.'
+    if (/network/i.test(msg)) return 'Sin conexión. Verifica tu internet.'
+    return 'Error al iniciar sesión. Intenta de nuevo.'
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setServerError(null)
 
     let valid = true
     if (!validateEmail(email)) {
@@ -43,10 +48,9 @@ export default function LoginPage() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      router.push('/dashboard')
-      router.refresh()
+      window.location.href = '/dashboard'
     } catch (error: any) {
-      setServerError(error.message || 'Error al iniciar sesión')
+      toast.error(getErrorMessage(error.message || ''))
     } finally {
       setLoading(false)
     }
@@ -159,13 +163,6 @@ export default function LoginPage() {
                 </p>
               )}
             </div>
-
-            {/* Error del servidor */}
-            {serverError && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm animate-fade-in">
-                {serverError}
-              </div>
-            )}
 
             {/* Botón */}
             <button

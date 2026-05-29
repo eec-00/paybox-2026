@@ -11,6 +11,22 @@ export interface Categoria {
   created_at?: string
 }
 
+export interface GastoConductor {
+  id: string
+  servicio_id: number
+  servicio_nombre: string
+  conductor_id: string
+  conductor_nombre: string
+  descripcion: string
+  monto: number
+  moneda: 'soles' | 'dolares'
+  fotos: string[]
+  foto_pago?: string | null
+  estado: 'pendiente' | 'pagado'
+  created_at: string
+  pagado_at?: string | null
+}
+
 export interface CalendarioPago {
   id: string
   fecha: string
@@ -27,6 +43,9 @@ export interface CalendarioPago {
   creado_por?: string
   grupo_id?: string | null
   created_at?: string
+  tipo?: 'gasto_fijo' | 'gasto_conductor'
+  gasto_conductor_id?: string | null
+  gasto_conductor?: GastoConductor | null
 }
 
 export interface Registro {

@@ -21,15 +21,19 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Checkbox } from '@/components/ui/checkbox'
-import { Calendar as CalendarIcon, List, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react'
-import { CalendarioPago } from '@/lib/types/database.types'
+import { Calendar as CalendarIcon, List, Plus, Trash2, CheckCircle2, AlertCircle, RefreshCw, Receipt, Eye } from 'lucide-react'
+import { CalendarioPago, GastoConductor } from '@/lib/types/database.types'
 import { getUserPermissions } from '@/lib/utils/auth'
 
 export function CalendarSection() {
     const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
+    const [listTab, setListTab] = useState<'fijos' | 'conductores'>('fijos')
     const [pagos, setPagos] = useState<CalendarioPago[]>([])
     const [loading, setLoading] = useState(true)
     const [canCreate, setCanCreate] = useState(false)
+
+    // Detail modal for gasto conductor
+    const [detailGasto, setDetailGasto] = useState<GastoConductor | null>(null)
 
     // Date states for the calendar
     const [currentDate, setCurrentDate] = useState(new Date())
@@ -76,7 +80,7 @@ export function CalendarSection() {
         try {
             const { data, error } = await supabase
                 .from('calendario_pagos')
-                .select('*')
+                .select('*, gasto_conductor:gastos_conductor(*)')
                 .order('fecha', { ascending: true })
 
             if (error) throw error
@@ -216,6 +220,18 @@ export function CalendarSection() {
         }
     }
 
+    const gastoPagoColor = (pago: CalendarioPago) => {
+        if (pago.estado === 'pagado') return 'bg-green-100/50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+        if (pago.tipo === 'gasto_conductor') return 'bg-primary/10 text-primary dark:bg-primary/20'
+        return 'bg-blue-100/50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+    }
+
+    const gastoPagoBorder = (pago: CalendarioPago) => {
+        if (pago.estado === 'pagado') return 'bg-green-50/50 border-green-200 dark:bg-green-900/10 dark:border-green-800'
+        if (pago.tipo === 'gasto_conductor') return 'bg-primary/5 border-primary/20 dark:bg-primary/10'
+        return 'bg-blue-50/50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800'
+    }
+
     // Helper functions for Calendar
     const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate()
     const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay()
@@ -257,7 +273,15 @@ export function CalendarSection() {
                     </div>
                     <div className="space-y-0.5 sm:space-y-1 flex-1 hidden sm:block">
                         {dayPagos.slice(0, 3).map(pago => (
-                            <div key={pago.id} className={`text-[10px] p-1 rounded-sm flex flex-col gap-0.5 ${pago.estado === 'pagado' ? 'bg-green-100/50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-blue-100/50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'}`}>
+                            <div
+                                key={pago.id}
+                                className={`text-[10px] p-1 rounded-sm flex flex-col gap-0.5 cursor-pointer hover:opacity-80 ${gastoPagoColor(pago)}`}
+                                onClick={() => {
+                                    if (pago.tipo === 'gasto_conductor' && pago.gasto_conductor) {
+                                        setDetailGasto(pago.gasto_conductor)
+                                    }
+                                }}
+                            >
                                 <div className="font-semibold truncate" title={pago.nombre_pago}>{pago.nombre_pago}</div>
                                 <div className="flex justify-between items-center">
                                     <span>
@@ -284,8 +308,17 @@ export function CalendarSection() {
                                     </DialogHeader>
                                     <div className="max-h-[60vh] overflow-y-auto space-y-2 pr-2 my-2">
                                         {dayPagos.map(pago => (
-                                            <div key={pago.id} className={`text-sm p-3 rounded-md flex flex-col gap-1.5 border ${pago.estado === 'pagado' ? 'bg-green-50/50 border-green-200 dark:bg-green-900/10 dark:border-green-800' : 'bg-blue-50/50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800'}`}>
-                                                <div className="font-semibold">{pago.nombre_pago}</div>
+                                            <div key={pago.id} className={`text-sm p-3 rounded-md flex flex-col gap-1.5 border ${gastoPagoBorder(pago)}`}>
+                                                <div className="flex items-center gap-2">
+                                                    {pago.tipo === 'gasto_conductor' && <Receipt className="w-3.5 h-3.5 text-primary shrink-0" />}
+                                                    <span className="font-semibold">{pago.nombre_pago}</span>
+                                                </div>
+                                                {pago.tipo === 'gasto_conductor' && pago.gasto_conductor && (
+                                                    <div className="text-xs text-muted-foreground space-y-0.5">
+                                                        <p><span className="font-medium">Conductor:</span> {pago.gasto_conductor.conductor_nombre}</p>
+                                                        <p><span className="font-medium">Servicio:</span> {pago.gasto_conductor.servicio_nombre}</p>
+                                                    </div>
+                                                )}
                                                 {pago.descripcion && (
                                                     <div className="text-xs text-muted-foreground line-clamp-2">{pago.descripcion}</div>
                                                 )}
@@ -302,6 +335,15 @@ export function CalendarSection() {
                                                         )}
                                                     </div>
                                                 </div>
+                                                {pago.tipo === 'gasto_conductor' && pago.gasto_conductor?.fotos?.length ? (
+                                                    <div className="flex gap-1.5 mt-1 flex-wrap">
+                                                        {pago.gasto_conductor.fotos.map((url, i) => (
+                                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                                                <img src={url} alt={`foto ${i+1}`} className="w-12 h-12 object-cover rounded-md border border-primary/10 hover:opacity-80 transition-opacity" />
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                ) : null}
                                             </div>
                                         ))}
                                     </div>
@@ -342,69 +384,120 @@ export function CalendarSection() {
     }
 
     const renderList = () => {
+        const fijosPagos = pagos.filter(p => p.tipo !== 'gasto_conductor')
+        const conductoresPagos = pagos.filter(p => p.tipo === 'gasto_conductor')
+        const visiblePagos = listTab === 'conductores' ? conductoresPagos : fijosPagos
+
         return (
-            <div className="rounded-md border overflow-x-auto">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="whitespace-nowrap">Fecha</TableHead>
-                            <TableHead>Nombre</TableHead>
-                            <TableHead className="whitespace-nowrap">Monto</TableHead>
-                            <TableHead className="hidden md:table-cell">Factura</TableHead>
-                            <TableHead>Estado</TableHead>
-                            {canCreate && <TableHead className="text-right">Acciones</TableHead>}
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {pagos.length === 0 ? (
+            <div className="space-y-3">
+                {/* List tabs */}
+                <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
+                    <button
+                        onClick={() => setListTab('fijos')}
+                        className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${listTab === 'fijos' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                        Gastos fijos ({fijosPagos.length})
+                    </button>
+                    <button
+                        onClick={() => setListTab('conductores')}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${listTab === 'conductores' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                        <Receipt className="w-3 h-3" /> Conductores ({conductoresPagos.length})
+                    </button>
+                </div>
+
+                <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                        <TableHeader>
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                    No hay pagos programados.
-                                </TableCell>
+                                <TableHead className="whitespace-nowrap">Fecha límite</TableHead>
+                                <TableHead>
+                                    {listTab === 'conductores' ? 'Conductor / Servicio' : 'Nombre'}
+                                </TableHead>
+                                <TableHead className="whitespace-nowrap">Monto</TableHead>
+                                {listTab === 'fijos' && <TableHead className="hidden md:table-cell">Factura</TableHead>}
+                                <TableHead>Estado</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
-                        ) : (
-                            pagos.map(pago => (
-                                <TableRow key={pago.id}>
-                                    <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">{new Date(pago.fecha + 'T12:00:00').toLocaleDateString('es-PE')}</TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-1 text-sm">
-                                            <span className="font-medium">{pago.nombre_pago}</span>
-                                            {pago.frecuencia !== 'unica' && <span title={pago.frecuencia}><RefreshCw className="w-3 h-3 text-muted-foreground" /></span>}
-                                        </div>
-                                        {pago.descripcion && <div className="text-xs text-muted-foreground line-clamp-1">{pago.descripcion}</div>}
+                        </TableHeader>
+                        <TableBody>
+                            {visiblePagos.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                        {listTab === 'conductores' ? 'No hay gastos de conductores.' : 'No hay gastos fijos programados.'}
                                     </TableCell>
-                                    <TableCell className="text-sm whitespace-nowrap">
-                                        {pago.monto_variable ? <span className="text-muted-foreground italic text-xs">A definir</span> : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`}
-                                    </TableCell>
-                                    <TableCell className="hidden md:table-cell text-sm">{pago.numero_factura || '-'}</TableCell>
-                                    <TableCell>
-                                        {pago.estado === 'pagado' ? (
-                                            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                                                <CheckCircle2 className="w-4 h-4" /> Pagado
-                                            </span>
-                                        ) : (
-                                            <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
-                                                <AlertCircle className="w-4 h-4" /> Pendiente
-                                            </span>
-                                        )}
-                                    </TableCell>
-                                    {canCreate && (
-                                        <TableCell className="text-right">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                onClick={() => handleDeleteClick(pago)}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </TableCell>
-                                    )}
                                 </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
+                            ) : (
+                                visiblePagos.map(pago => (
+                                    <TableRow key={pago.id} className={pago.tipo === 'gasto_conductor' ? 'bg-primary/5 hover:bg-primary/10' : ''}>
+                                        <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">{new Date(pago.fecha + 'T12:00:00').toLocaleDateString('es-PE')}</TableCell>
+                                        <TableCell>
+                                            {pago.tipo === 'gasto_conductor' && pago.gasto_conductor ? (
+                                                <div>
+                                                    <div className="flex items-center gap-1.5 text-sm font-medium">
+                                                        <Receipt className="w-3 h-3 text-primary shrink-0" />
+                                                        {pago.gasto_conductor.conductor_nombre}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground line-clamp-1">{pago.gasto_conductor.servicio_nombre}</div>
+                                                    <div className="text-xs text-muted-foreground line-clamp-1">{pago.gasto_conductor.descripcion}</div>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    <div className="flex items-center gap-1 text-sm">
+                                                        <span className="font-medium">{pago.nombre_pago}</span>
+                                                        {pago.frecuencia !== 'unica' && <span title={pago.frecuencia}><RefreshCw className="w-3 h-3 text-muted-foreground" /></span>}
+                                                    </div>
+                                                    {pago.descripcion && <div className="text-xs text-muted-foreground line-clamp-1">{pago.descripcion}</div>}
+                                                </div>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-sm whitespace-nowrap font-semibold">
+                                            {pago.monto_variable ? <span className="text-muted-foreground italic text-xs">A definir</span> : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`}
+                                        </TableCell>
+                                        {listTab === 'fijos' && (
+                                            <TableCell className="hidden md:table-cell text-sm">{pago.numero_factura || '-'}</TableCell>
+                                        )}
+                                        <TableCell>
+                                            {pago.estado === 'pagado' ? (
+                                                <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                                                    <CheckCircle2 className="w-4 h-4" /> Pagado
+                                                </span>
+                                            ) : (
+                                                <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
+                                                    <AlertCircle className="w-4 h-4" /> Pendiente
+                                                </span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex items-center justify-end gap-1">
+                                                {pago.tipo === 'gasto_conductor' && pago.gasto_conductor && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-muted-foreground"
+                                                        onClick={() => setDetailGasto(pago.gasto_conductor!)}
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </Button>
+                                                )}
+                                                {canCreate && pago.tipo !== 'gasto_conductor' && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                        onClick={() => handleDeleteClick(pago)}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
             </div>
         )
     }
@@ -420,7 +513,7 @@ export function CalendarSection() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                     <div className="bg-muted p-1 rounded-md flex">
                         <Button
                             variant={viewMode === 'calendar' ? 'default' : 'ghost'}
@@ -633,6 +726,54 @@ export function CalendarSection() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* ── Gasto Conductor Detail Modal ─────────────────────── */}
+            <Dialog open={!!detailGasto} onOpenChange={(open) => { if (!open) setDetailGasto(null) }}>
+                <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-primary">
+                            <Receipt className="w-5 h-5" /> Gasto de Conductor
+                        </DialogTitle>
+                        <DialogDescription>Detalle del gasto registrado por el conductor.</DialogDescription>
+                    </DialogHeader>
+                    {detailGasto && (
+                        <div className="space-y-4 pt-2">
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Conductor</p><p className="font-semibold">{detailGasto.conductor_nombre}</p></div>
+                                <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Estado</p>
+                                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${detailGasto.estado === 'pagado' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                        {detailGasto.estado === 'pagado' ? <><CheckCircle2 className="w-3 h-3" />Pagado</> : <><AlertCircle className="w-3 h-3" />Pendiente</>}
+                                    </span>
+                                </div>
+                                <div className="col-span-2"><p className="text-xs text-muted-foreground uppercase tracking-wide">Servicio</p><p className="font-semibold">{detailGasto.servicio_nombre}</p></div>
+                                <div className="col-span-2"><p className="text-xs text-muted-foreground uppercase tracking-wide">Descripción</p><p className="font-medium">{detailGasto.descripcion}</p></div>
+                                <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Monto</p><p className="font-bold text-xl text-primary">{detailGasto.moneda === 'soles' ? 'S/' : '$'} {detailGasto.monto}</p></div>
+                                <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Fecha</p><p className="font-semibold">{new Date(detailGasto.created_at).toLocaleDateString('es-PE')}</p></div>
+                            </div>
+                            {detailGasto.fotos?.length > 0 && (
+                                <div>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Comprobantes del gasto</p>
+                                    <div className="flex gap-2 flex-wrap">
+                                        {detailGasto.fotos.map((url, i) => (
+                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group">
+                                                <img src={url} alt={`comprobante ${i+1}`} className="w-20 h-20 object-cover rounded-lg border border-primary/10 group-hover:opacity-80 transition-opacity" />
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detailGasto.foto_pago && (
+                                <div>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Voucher de pago</p>
+                                    <a href={detailGasto.foto_pago} target="_blank" rel="noopener noreferrer">
+                                        <img src={detailGasto.foto_pago} alt="voucher pago" className="w-24 h-24 object-cover rounded-lg border border-green-200 hover:opacity-80 transition-opacity" />
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             <AlertDialog open={deleteConfig.open} onOpenChange={(open) => setDeleteConfig(prev => ({ ...prev, open }))}>
                 <AlertDialogContent>

@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
   Truck, Clock, Building2, RefreshCw, PackageSearch,
   Play, CheckCircle2, SkipForward, ArrowLeft,
   FileText, Download, Loader2, AlertCircle,
+  Receipt, Plus, Trash2, Camera, X,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -20,8 +21,56 @@ const STEPS = [
   { label: 'Ingreso a cliente',     field: 'x_studio_ingreso_a_planta' },
   { label: 'Inicio carga/descarga', field: 'x_studio_inicio_cargadescarga' },
   { label: 'Fin carga/descarga',    field: 'x_studio_termino_de_descarga' },
-  { label: 'Salida de cliente',     field: 'x_studio_salida_de_cliente' },
+  { label: 'Salida de cliente',     field: 'x_studio_salida_cliente' },
 ]
+
+interface GastoItem {
+  id: string
+  descripcion: string
+  monto: string
+  moneda: 'soles' | 'dolares'
+  fotos: string[]
+}
+
+interface NewGastoForm {
+  descripcion: string
+  monto: string
+  moneda: 'soles' | 'dolares'
+  files: File[]
+  previews: string[]
+  uploading: boolean
+}
+
+interface GastoExistente {
+  id: string
+  descripcion: string
+  monto: number
+  moneda: 'soles' | 'dolares'
+  fotos: string[]
+  created_at: string
+}
+
+const EMPTY_GASTO: NewGastoForm = {
+  descripcion: '',
+  monto: '',
+  moneda: 'soles',
+  files: [],
+  previews: [],
+  uploading: false,
+}
+
+async function uploadGastoFoto(file: File): Promise<string> {
+  const supabase = createClient()
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+  const path = `gastos-conductor/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const { error } = await supabase.storage.from('comprobantes').upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  })
+  if (error) throw error
+  const { data } = supabase.storage.from('comprobantes').getPublicUrl(path)
+  return data.publicUrl
+}
 
 interface ServicioTask {
   id: number
@@ -46,7 +95,7 @@ interface ServicioTask {
   x_studio_ingreso_a_planta?: number | false
   x_studio_inicio_cargadescarga?: number | false
   x_studio_termino_de_descarga?: number | false
-  x_studio_salida_de_cliente?: number | false
+  x_studio_salida_cliente?: number | false
 }
 
 interface Stats {
@@ -111,7 +160,7 @@ function getStageStyle(stage: string) {
   if (lower.includes('cancel'))
     return { badge: 'bg-red-50 text-red-700 border border-red-200', dot: 'bg-red-500' }
   if (lower.includes('factura'))
-    return { badge: 'bg-violet-50 text-violet-700 border border-violet-200', dot: 'bg-violet-500' }
+    return { badge: 'bg-indigo-50 text-indigo-700 border border-indigo-200', dot: 'bg-indigo-500' }
   if (lower.includes('nueva') || lower.includes('solicitud'))
     return { badge: 'bg-sky-50 text-sky-700 border border-sky-200', dot: 'bg-sky-500' }
   if (lower.includes('devolu') || lower.includes('cierre') || lower.includes('pendiente'))
@@ -150,7 +199,7 @@ function getTiempos(task: ServicioTask) {
     { label: 'Ingreso a cliente',      value: formatTime(task.x_studio_ingreso_a_planta) },
     { label: 'Inicio carga/descarga',  value: formatTime(task.x_studio_inicio_cargadescarga) },
     { label: 'Fin carga/descarga',     value: formatTime(task.x_studio_termino_de_descarga) },
-    { label: 'Salida de cliente',      value: formatTime(task.x_studio_salida_de_cliente) },
+    { label: 'Salida de cliente',      value: formatTime(task.x_studio_salida_cliente) },
   ]
 }
 
@@ -304,6 +353,15 @@ export default function ConductorServiciosPage() {
   const [saving, setSaving] = useState(false)
   const [activeServiceId, setActiveServiceId] = useState<number | null>(null)
 
+  // Gastos flow
+  const [gastosForTaskId, setGastosForTaskId] = useState<number | null>(null)
+  const [gastosItems, setGastosItems] = useState<GastoItem[]>([])
+  const [gastosSubmitting, setGastosSubmitting] = useState(false)
+  const [addingGasto, setAddingGasto] = useState(false)
+  const [newGasto, setNewGasto] = useState<NewGastoForm>(EMPTY_GASTO)
+  const [servicioGastosMap, setServicioGastosMap] = useState<Record<number, GastoExistente[]>>({})
+  const [loadingGastosMap, setLoadingGastosMap] = useState<Record<number, boolean>>({})
+
   const fetchServicios = useCallback(async (month: string) => {
     setLoading(true)
     setError(null)
@@ -313,6 +371,16 @@ export default function ConductorServiciosPage() {
       if (!res.ok) throw new Error(data.error || 'Error al cargar servicios')
       setTasks(data.tasks || [])
       setStats(data.stats || null)
+      // Initialize completed services from DB
+      if (data.completedServiceIds?.length) {
+        setServiceSteps(prev => {
+          const next = { ...prev }
+          for (const id of data.completedServiceIds as number[]) {
+            if ((prev[id] ?? -1) < STEPS.length) next[id] = STEPS.length
+          }
+          return next
+        })
+      }
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -321,6 +389,14 @@ export default function ConductorServiciosPage() {
   }, [])
 
   useEffect(() => { fetchServicios(currentMonth) }, [currentMonth, fetchServicios])
+
+  useEffect(() => {
+    if (activeServiceId === null) return
+    const step = serviceSteps[activeServiceId] ?? -1
+    if (step >= STEPS.length && servicioGastosMap[activeServiceId] === undefined) {
+      fetchGastosForService(activeServiceId)
+    }
+  }, [activeServiceId, serviceSteps])
 
   const prevMonth = () => {
     const d = parseMonth(currentMonth)
@@ -386,8 +462,18 @@ export default function ConductorServiciosPage() {
       const nextStep = stepIndex + 1
       setServiceSteps(prev => ({ ...prev, [taskId]: nextStep }))
 
-      // Last step done → change stage in Odoo
+      // Last step done → persist completion + change stage in Odoo
       if (nextStep >= STEPS.length) {
+        createClient().auth.getUser().then(({ data: authData }) => {
+          if (authData.user) {
+            const t = tasks.find(x => x.id === taskId)
+            const codigo = t ? (t.name.includes(' - ') ? t.name.split(' - ')[0] : t.name) : String(taskId)
+            createClient()
+              .from('conductor_servicios_completados')
+              .upsert({ conductor_id: authData.user.id, servicio_id: taskId, servicio_nombre: codigo })
+              .then(() => {})
+          }
+        })
         fetch('/api/servicios', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -408,11 +494,336 @@ export default function ConductorServiciosPage() {
     }
   }
 
+  const fetchGastosForService = async (taskId: number) => {
+    setLoadingGastosMap(prev => ({ ...prev, [taskId]: true }))
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('gastos_conductor')
+        .select('id, descripcion, monto, moneda, fotos, created_at')
+        .eq('servicio_id', taskId)
+        .order('created_at', { ascending: true })
+      if (data) setServicioGastosMap(prev => ({ ...prev, [taskId]: data }))
+    } finally {
+      setLoadingGastosMap(prev => ({ ...prev, [taskId]: false }))
+    }
+  }
+
+  const handleAgregarGastos = (taskId: number) => {
+    setGastosItems([])
+    setAddingGasto(false)
+    setNewGasto(EMPTY_GASTO)
+    setGastosForTaskId(taskId)
+    setActiveServiceId(null)
+  }
+
+  const handleGastoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    const remaining = 2 - newGasto.files.length
+    const toAdd = files.slice(0, remaining)
+    const previews = toAdd.map(f => URL.createObjectURL(f))
+    setNewGasto(prev => ({
+      ...prev,
+      files: [...prev.files, ...toAdd],
+      previews: [...prev.previews, ...previews],
+    }))
+    e.target.value = ''
+  }
+
+  const handleRemoveGastoFile = (idx: number) => {
+    setNewGasto(prev => ({
+      ...prev,
+      files: prev.files.filter((_, i) => i !== idx),
+      previews: prev.previews.filter((_, i) => i !== idx),
+    }))
+  }
+
+  const handleAddGasto = async () => {
+    if (!newGasto.descripcion.trim() || !newGasto.monto) return
+    setNewGasto(prev => ({ ...prev, uploading: true }))
+    try {
+      const uploadedUrls: string[] = []
+      for (const file of newGasto.files) {
+        const url = await uploadGastoFoto(file)
+        uploadedUrls.push(url)
+      }
+      setGastosItems(prev => [...prev, {
+        id: crypto.randomUUID(),
+        descripcion: newGasto.descripcion.trim(),
+        monto: newGasto.monto,
+        moneda: newGasto.moneda,
+        fotos: uploadedUrls,
+      }])
+      setNewGasto(EMPTY_GASTO)
+      setAddingGasto(false)
+    } catch {
+      alert('Error al subir las fotos. Inténtalo de nuevo.')
+    } finally {
+      setNewGasto(prev => ({ ...prev, uploading: false }))
+    }
+  }
+
+  const handleRemoveGastoItem = (id: string) => {
+    setGastosItems(prev => prev.filter(g => g.id !== id))
+  }
+
+  const handleSubmitGastos = async () => {
+    if (!gastosForTaskId) return
+    const task = tasks.find(t => t.id === gastosForTaskId)
+    if (!task) return
+    if (gastosItems.length === 0) {
+      const tid = gastosForTaskId
+      setGastosForTaskId(null)
+      setActiveServiceId(tid)
+      return
+    }
+    setGastosSubmitting(true)
+    try {
+      const servicioNombre = task.name
+      for (const item of gastosItems) {
+        await fetch('/api/conductor/gastos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            servicioId: gastosForTaskId,
+            servicioNombre,
+            descripcion: item.descripcion,
+            monto: item.monto,
+            moneda: item.moneda,
+            fotos: item.fotos,
+          }),
+        })
+      }
+      await fetchGastosForService(gastosForTaskId)
+    } catch {
+      alert('Error al guardar gastos. Inténtalo de nuevo.')
+    } finally {
+      setGastosSubmitting(false)
+      const tid = gastosForTaskId
+      setGastosForTaskId(null)
+      setGastosItems([])
+      setActiveServiceId(tid)
+    }
+  }
+
   // id of the task currently in-progress (step 0-5), if any
   const inProgressId = Object.entries(serviceSteps).find(
     ([, step]) => step >= 0 && step < STEPS.length
   )?.[0]
   const inProgressTaskId = inProgressId ? Number(inProgressId) : null
+
+  // ── Gastos registration view ─────────────────────────────────────────────
+  if (gastosForTaskId !== null) {
+    const task = tasks.find(t => t.id === gastosForTaskId)
+    const serviceName = task ? task.name : `Servicio #${gastosForTaskId}`
+
+    return (
+      <div className="flex flex-col" style={{ minHeight: 'calc(100dvh - 4rem)' }}>
+        {/* Top bar */}
+        <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+          <button
+            onClick={() => { const tid = gastosForTaskId; setGastosForTaskId(null); setGastosItems([]); setAddingGasto(false); setNewGasto(EMPTY_GASTO); setActiveServiceId(tid) }}
+            className="w-9 h-9 rounded-xl flex items-center justify-center bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 text-gray-500" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-gray-400 font-medium">Gastos del servicio</p>
+            <p className="text-sm font-bold text-[#1a2332] truncate">{serviceName}</p>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 space-y-3 pb-32">
+          {/* Existing gastos (read-only) */}
+          {(() => {
+            const existing = servicioGastosMap[gastosForTaskId] || []
+            const loadingEx = loadingGastosMap[gastosForTaskId]
+            if (loadingEx) return (
+              <div className="text-xs text-gray-400 text-center py-2">Cargando gastos anteriores...</div>
+            )
+            if (existing.length === 0) return null
+            return (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ya registrados</p>
+                {existing.map(g => (
+                  <div key={g.id} className="bg-gray-50 rounded-xl border border-gray-100 px-3.5 py-2.5 flex gap-3 items-start">
+                    {g.fotos?.length > 0 && (
+                      <img src={g.fotos[0]} alt="foto" className="w-10 h-10 rounded-lg object-cover border border-gray-100 shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-[#1a2332] line-clamp-1">{g.descripcion}</p>
+                      <p className="text-xs font-bold text-[#f5a623] mt-0.5">
+                        {g.moneda === 'soles' ? 'S/' : '$'} {g.monto.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                <div className="border-t border-gray-100 pt-1" />
+              </div>
+            )
+          })()}
+
+          {/* Added gastos list */}
+          {gastosItems.length > 0 && (
+            <div className="space-y-2">
+              {gastosItems.map((item, idx) => (
+                <div key={item.id} className="bg-white rounded-xl border border-gray-100 px-3.5 py-3 flex gap-3 items-start">
+                  {item.fotos.length > 0 && (
+                    <img src={item.fotos[0]} alt="foto" className="w-12 h-12 rounded-lg object-cover border border-gray-100 shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-[#1a2332] line-clamp-2">{item.descripcion}</p>
+                    <p className="text-sm font-bold text-[#f5a623] mt-0.5">
+                      {item.moneda === 'soles' ? 'S/' : '$'} {parseFloat(item.monto).toFixed(2)}
+                    </p>
+                    {item.fotos.length > 1 && (
+                      <p className="text-[10px] text-gray-400 mt-0.5">{item.fotos.length} fotos</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleRemoveGastoItem(item.id)}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors shrink-0"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {gastosItems.length === 0 && !addingGasto && (
+            <div className="bg-white rounded-2xl border border-dashed border-gray-200 py-10 text-center">
+              <Receipt className="h-8 w-8 text-gray-200 mx-auto mb-2" />
+              <p className="text-sm text-gray-400 font-medium">Sin gastos agregados</p>
+              <p className="text-xs text-gray-300 mt-1">Agrega cada compra por separado</p>
+            </div>
+          )}
+
+          {/* Add gasto form */}
+          {addingGasto ? (
+            <div className="bg-white rounded-2xl border border-[#f5a623]/40 shadow-sm p-4 space-y-3">
+              <p className="text-xs font-bold text-[#f5a623] uppercase tracking-widest">Nuevo gasto</p>
+
+              {/* Photos */}
+              <div>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1.5">Foto(s) del comprobante (máx. 2)</p>
+                <div className="flex gap-2 flex-wrap">
+                  {newGasto.previews.map((src, i) => (
+                    <div key={i} className="relative w-16 h-16">
+                      <img src={src} alt={`foto ${i+1}`} className="w-full h-full object-cover rounded-lg border border-gray-100" />
+                      <button
+                        onClick={() => handleRemoveGastoFile(i)}
+                        className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 bg-red-500 rounded-full flex items-center justify-center"
+                      >
+                        <X className="h-2.5 w-2.5 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                  {newGasto.previews.length < 2 && (
+                    <label className="w-16 h-16 rounded-lg border-2 border-dashed border-[#f5a623]/40 flex flex-col items-center justify-center gap-0.5 cursor-pointer hover:border-[#f5a623] transition-colors">
+                      <Camera className="h-4 w-4 text-[#f5a623]/60" />
+                      <span className="text-[9px] text-[#f5a623]/60 font-medium">Foto</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleGastoFileChange}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Descripción *</p>
+                <textarea
+                  rows={2}
+                  placeholder="Ej: Almuerzo, peaje, hotel..."
+                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:border-[#f5a623]/60 focus:ring-1 focus:ring-[#f5a623]/20"
+                  value={newGasto.descripcion}
+                  onChange={e => setNewGasto(prev => ({ ...prev, descripcion: e.target.value }))}
+                />
+              </div>
+
+              {/* Amount */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Monto *</p>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#f5a623]/60 focus:ring-1 focus:ring-[#f5a623]/20"
+                    value={newGasto.monto}
+                    onChange={e => setNewGasto(prev => ({ ...prev, monto: e.target.value }))}
+                  />
+                </div>
+                <div className="w-24">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Moneda</p>
+                  <select
+                    className="w-full text-sm border border-gray-200 rounded-xl px-2 py-2 focus:outline-none focus:border-[#f5a623]/60 bg-white"
+                    value={newGasto.moneda}
+                    onChange={e => setNewGasto(prev => ({ ...prev, moneda: e.target.value as 'soles' | 'dolares' }))}
+                  >
+                    <option value="soles">S/</option>
+                    <option value="dolares">$</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => { setAddingGasto(false); setNewGasto(EMPTY_GASTO) }}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 text-sm font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleAddGasto}
+                  disabled={newGasto.uploading || !newGasto.descripcion.trim() || !newGasto.monto}
+                  className="flex-1 py-2.5 rounded-xl bg-[#f5a623] text-white text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform"
+                >
+                  {newGasto.uploading ? (
+                    <span className="flex items-center justify-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />Subiendo...</span>
+                  ) : 'Agregar'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAddingGasto(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-[#f5a623]/40 text-[#f5a623] text-sm font-semibold hover:bg-[#f5a623]/10 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Agregar gasto
+            </button>
+          )}
+        </div>
+
+        {/* Bottom bar */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-4">
+          <button
+            onClick={handleSubmitGastos}
+            disabled={gastosSubmitting}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#1a2332] text-white text-sm font-bold disabled:opacity-60 active:scale-95 transition-transform"
+          >
+            {gastosSubmitting ? (
+              <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
+            ) : gastosItems.length === 0 ? (
+              'Terminar sin gastos'
+            ) : (
+              <><CheckCircle2 className="h-4 w-4" />Guardar {gastosItems.length} gasto{gastosItems.length !== 1 ? 's' : ''}</>
+            )}
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // ── Active service view ──────────────────────────────────────────────────
   if (activeServiceId !== null) {
@@ -564,9 +975,29 @@ export default function ConductorServiciosPage() {
               </div>
             )
           ) : (
-            <div className="flex items-center justify-center gap-2 py-3 text-emerald-600">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="text-sm font-bold">Servicio completado</span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2 py-1 text-emerald-600">
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="text-sm font-bold">Servicio completado</span>
+              </div>
+              {(() => {
+                const existing = servicioGastosMap[task.id] || []
+                const loadingEx = loadingGastosMap[task.id]
+                if (loadingEx) return <p className="text-xs text-center text-gray-400">Cargando gastos...</p>
+                if (existing.length > 0) return (
+                  <p className="text-xs text-center text-gray-400">
+                    {existing.length} gasto{existing.length !== 1 ? 's' : ''} registrado{existing.length !== 1 ? 's' : ''}
+                  </p>
+                )
+                return null
+              })()}
+              <button
+                onClick={() => handleAgregarGastos(task.id)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#f5a623]/40 text-[#f5a623] text-sm font-semibold hover:bg-[#f5a623]/10 active:scale-95 transition-transform"
+              >
+                <Receipt className="h-4 w-4" />
+                {(servicioGastosMap[task.id]?.length ?? 0) > 0 ? 'Ver / Agregar gastos' : 'Registrar gastos'}
+              </button>
             </div>
           )}
         </div>

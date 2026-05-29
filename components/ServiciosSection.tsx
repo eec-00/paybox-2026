@@ -37,7 +37,7 @@ interface OdooTask {
   x_studio_ingreso_a_planta: number | false
   x_studio_inicio_cargadescarga: number | false
   x_studio_termino_de_descarga: number | false
-  x_studio_salida_de_cliente: number | false
+  x_studio_salida_cliente: number | false
 }
 
 interface OdooStage { id: number; name: string }
@@ -381,7 +381,7 @@ export function ServiciosSection() {
                           <TimeCell time={task.x_studio_ingreso_a_planta}              loc={locations[task.id]?.[5]} />
                           <TimeCell time={task.x_studio_inicio_cargadescarga}          loc={locations[task.id]?.[6]} />
                           <TimeCell time={task.x_studio_termino_de_descarga}           loc={locations[task.id]?.[7]} />
-                          <TimeCell time={task.x_studio_salida_de_cliente}             loc={locations[task.id]?.[8]} />
+                          <TimeCell time={task.x_studio_salida_cliente}             loc={locations[task.id]?.[8]} />
                         </TableRow>
                       )
                     })

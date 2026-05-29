@@ -18,6 +18,7 @@ import {
   Wallet,
   Settings,
   Users,
+  Receipt,
 } from 'lucide-react'
 
 export type Section =
@@ -37,6 +38,7 @@ export type Section =
   | 'automatizacion-conductores'
   | 'automatizacion-facturas'
   | 'servicios-transporte'
+  | 'gastos-conductores'
 
 interface FlatItem {
   type: 'item'
@@ -86,7 +88,7 @@ export function Sidebar({
 }: SidebarProps) {
   const isAutoSection = activeSection.startsWith('automatizacion')
   const isServiciosSection = ['trailers', 'geoenlaces', 'geocercas', 'servicios-transporte'].includes(activeSection)
-  const isFinanzasSection = ['pagos', 'calendario'].includes(activeSection)
+  const isFinanzasSection = ['pagos', 'calendario', 'gastos-conductores'].includes(activeSection)
   const isAdminSection = activeSection.startsWith('administracion')
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     ...(isAutoSection ? ['automatizacion'] : []),
@@ -135,6 +137,15 @@ export function Sidebar({
           label: 'Calendario',
           icon: Calendar,
           description: 'Pagos recurrentes',
+          adminOnly: false,
+          requiresCreate: false,
+        },
+        {
+          type: 'item',
+          id: 'gastos-conductores',
+          label: 'Gastos Conductores',
+          icon: Receipt,
+          description: 'Gastos registrados por conductores',
           adminOnly: false,
           requiresCreate: false,
         },

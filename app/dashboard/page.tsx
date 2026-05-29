@@ -23,6 +23,7 @@ import { AutomatizacionSection } from '@/components/AutomatizacionSection'
 import { FacturasSection } from '@/components/FacturasSection'
 import { CalendarSection } from '@/components/CalendarSection'
 import { ServiciosSection } from '@/components/ServiciosSection'
+import { GastosConductorSection } from '@/components/GastosConductorSection'
 import { UpdatesNotification } from '@/components/UpdatesNotification'
 import { UpdatesManagement } from '@/components/UpdatesManagement'
 import { UpdatesList } from '@/components/UpdatesList'
@@ -515,6 +516,10 @@ export default function DashboardPage() {
 
             {activeSection === 'calendario' && (
               <CalendarSection />
+            )}
+
+            {activeSection === 'gastos-conductores' && (
+              <GastosConductorSection />
             )}
 
             {activeSection === 'trailers' && (

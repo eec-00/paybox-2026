@@ -78,7 +78,7 @@ const CANDIDATE_X_FIELDS = [
   'x_studio_ingreso_a_planta',
   'x_studio_inicio_cargadescarga',
   'x_studio_termino_de_descarga',
-  'x_studio_salida_de_cliente',
+  'x_studio_salida_cliente',
 ]
 
 async function getValidFields(uid: number): Promise<string[]> {

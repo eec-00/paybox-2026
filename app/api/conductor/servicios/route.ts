@@ -58,7 +58,7 @@ const CANDIDATE_FIELDS = [
   'x_studio_ingreso_a_planta',
   'x_studio_inicio_cargadescarga',
   'x_studio_termino_de_descarga',
-  'x_studio_salida_de_cliente',
+  'x_studio_salida_cliente',
 ]
 
 export async function GET(req: NextRequest) {
@@ -150,7 +150,14 @@ export async function GET(req: NextRequest) {
       )],
     }
 
-    return NextResponse.json({ tasks, stats, month: monthParam })
+    const { data: completados } = await supabase
+      .from('conductor_servicios_completados')
+      .select('servicio_id')
+      .eq('conductor_id', user.id)
+
+    const completedServiceIds = completados?.map((c: { servicio_id: number }) => c.servicio_id) ?? []
+
+    return NextResponse.json({ tasks, stats, month: monthParam, completedServiceIds })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[conductor/servicios]', msg)

@@ -11,7 +11,7 @@ import { ImageUploader, OCRData } from '@/components/ImageUploader'
 import { OdooAxisAutocomplete } from '@/components/OdooAxisAutocomplete'
 import { getUserPermissions } from '@/lib/utils/auth'
 import { Shield, CheckCircle2 } from 'lucide-react'
-import type { Categoria, CalendarioPago } from '@/lib/types/database.types'
+import type { Categoria, CalendarioPago, GastoConductor } from '@/lib/types/database.types'
 
 interface PaymentFormProps {
   onSuccess?: () => void
@@ -77,12 +77,17 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
   const [pagosProgramados, setPagosProgramados] = useState<CalendarioPago[]>([])
   const [selectedPagoProgramado, setSelectedPagoProgramado] = useState<string>('none')
 
+  // Gastos Conductores
+  const [gastosConductor, setGastosConductor] = useState<GastoConductor[]>([])
+  const [selectedGastoConductor, setSelectedGastoConductor] = useState<string>('none')
+
   const supabase = createClient()
 
   useEffect(() => {
     checkPermissions()
     loadCategorias()
     loadPagosProgramados()
+    loadGastosConductor()
   }, [])
 
   const loadPagosProgramados = async () => {
@@ -104,6 +109,39 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
       }
     } catch (err) {
       console.error('Error cargando pagos programados:', err)
+    }
+  }
+
+  const loadGastosConductor = async () => {
+    try {
+      const now = new Date()
+      const nextWeek = new Date(now)
+      nextWeek.setDate(nextWeek.getDate() + 7)
+      const nextWeekStr = nextWeek.toISOString()
+
+      const { data, error } = await supabase
+        .from('gastos_conductor')
+        .select('*')
+        .eq('estado', 'pendiente')
+        .lte('created_at', nextWeekStr)
+        .order('created_at', { ascending: true })
+
+      if (!error && data) setGastosConductor(data)
+    } catch (err) {
+      console.error('Error cargando gastos conductor:', err)
+    }
+  }
+
+  const handleGastoConductorChange = (val: string) => {
+    setSelectedGastoConductor(val)
+    if (val !== 'none') {
+      const gasto = gastosConductor.find(g => g.id === val)
+      if (gasto) {
+        setBeneficiario(gasto.conductor_nombre)
+        setMonto(gasto.monto.toString())
+        setMoneda(gasto.moneda as 'soles' | 'dolares')
+        setDescripcion(`${gasto.descripcion} | Servicio: ${gasto.servicio_nombre}`)
+      }
     }
   }
 
@@ -349,6 +387,14 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
         }
       }
 
+      if (selectedGastoConductor && selectedGastoConductor !== 'none') {
+        await fetch('/api/conductor/gastos', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: selectedGastoConductor }),
+        }).catch(err => console.error('No se pudo marcar gasto como pagado:', err))
+      }
+
       // Limpiar formulario
       setFechaYHoraPago('')
       setBeneficiario('')
@@ -364,6 +410,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
       setDatosDinamicos({})
       setImageUrls([])
       setSelectedPagoProgramado('none')
+      setSelectedGastoConductor('none')
 
       if (onSuccess) onSuccess()
     } catch (error: any) {
@@ -454,6 +501,35 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
               </p>
             </div>
           )}
+
+          {/* Vinculación con Gasto de Conductor */}
+          <div className="space-y-2 pb-4 border-b">
+            <Label htmlFor="gastoConductor">Vincular a Pago de Conductor (Opcional)</Label>
+            <Select
+              value={selectedGastoConductor}
+              onValueChange={handleGastoConductorChange}
+              disabled={loading}
+            >
+              <SelectTrigger id="gastoConductor">
+                <SelectValue placeholder="No vincular a gasto de conductor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No vincular a gasto de conductor</SelectItem>
+                {gastosConductor.length === 0 ? (
+                  <SelectItem value="__empty__" disabled>Sin gastos pendientes</SelectItem>
+                ) : (
+                  gastosConductor.map(g => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {new Date(g.created_at).toLocaleDateString('es-PE')} · {g.conductor_nombre} · {g.descripcion} · {g.moneda === 'soles' ? 'S/' : '$'} {g.monto}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Al seleccionar, se autocompletarán los datos del conductor y se marcará el gasto como pagado al guardar.
+            </p>
+          </div>
 
           {/* Datos Fijos */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
