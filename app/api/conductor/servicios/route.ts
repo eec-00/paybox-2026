@@ -50,12 +50,15 @@ const CANDIDATE_FIELDS = [
   'x_studio_almacen_de_retiro',
   'x_studio_almacen_de_destino',
   'x_studio_es_importacion',
+  'x_studio_saliendo_de_la_cochera',
+  'x_studio_en_cola_de_ingreso',
   'x_studio_ingreso_a_almacen_de_retiro_1',
   'x_studio_salida_de_almacen_de_retiro',
   'x_studio_llegada_a_cliente',
   'x_studio_ingreso_a_planta',
   'x_studio_inicio_cargadescarga',
   'x_studio_termino_de_descarga',
+  'x_studio_salida_de_cliente',
 ]
 
 export async function GET(req: NextRequest) {

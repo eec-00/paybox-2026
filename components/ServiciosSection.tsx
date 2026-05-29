@@ -29,12 +29,15 @@ interface OdooTask {
   x_studio_almacen_de_destino: [number, string] | false
   x_studio_es_importacion: boolean
   // TIEMPOS OPERATIVOS
+  x_studio_saliendo_de_la_cochera: number | false
+  x_studio_en_cola_de_ingreso: number | false
   x_studio_ingreso_a_almacen_de_retiro_1: number | false
   x_studio_salida_de_almacen_de_retiro: number | false
   x_studio_llegada_a_cliente: number | false
   x_studio_ingreso_a_planta: number | false
   x_studio_inicio_cargadescarga: number | false
   x_studio_termino_de_descarga: number | false
+  x_studio_salida_de_cliente: number | false
 }
 
 interface OdooStage { id: number; name: string }
@@ -305,18 +308,21 @@ export function ServiciosSection() {
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[140px]">N° Contenedor</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[200px]">Almacén Retiro</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[200px]">Almacén Destino</TableHead>
+                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Sal. Cochera</TableHead>
+                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Cola Ingreso</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Ing. Almacén</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Sal. Almacén</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Llegada Cliente</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Ing. Planta</TableHead>
+                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Ing. Cliente</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Ini. C/D</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Tér. C/D</TableHead>
+                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Sal. Cliente</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginated.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={20} className="text-center py-12 text-muted-foreground text-sm">
+                      <TableCell colSpan={23} className="text-center py-12 text-muted-foreground text-sm">
                         No se encontraron servicios con los filtros aplicados
                       </TableCell>
                     </TableRow>
@@ -367,12 +373,15 @@ export function ServiciosSection() {
                               {m2oName(task.x_studio_almacen_de_destino)}
                             </span>
                           </TableCell>
-                          <TimeCell time={task.x_studio_ingreso_a_almacen_de_retiro_1} loc={locations[task.id]?.[0]} />
-                          <TimeCell time={task.x_studio_salida_de_almacen_de_retiro}   loc={locations[task.id]?.[1]} />
-                          <TimeCell time={task.x_studio_llegada_a_cliente}             loc={locations[task.id]?.[2]} />
-                          <TimeCell time={task.x_studio_ingreso_a_planta}              loc={locations[task.id]?.[3]} />
-                          <TimeCell time={task.x_studio_inicio_cargadescarga}          loc={locations[task.id]?.[4]} />
-                          <TimeCell time={task.x_studio_termino_de_descarga}           loc={locations[task.id]?.[5]} />
+                          <TimeCell time={task.x_studio_saliendo_de_la_cochera}        loc={locations[task.id]?.[0]} />
+                          <TimeCell time={task.x_studio_en_cola_de_ingreso}             loc={locations[task.id]?.[1]} />
+                          <TimeCell time={task.x_studio_ingreso_a_almacen_de_retiro_1} loc={locations[task.id]?.[2]} />
+                          <TimeCell time={task.x_studio_salida_de_almacen_de_retiro}   loc={locations[task.id]?.[3]} />
+                          <TimeCell time={task.x_studio_llegada_a_cliente}             loc={locations[task.id]?.[4]} />
+                          <TimeCell time={task.x_studio_ingreso_a_planta}              loc={locations[task.id]?.[5]} />
+                          <TimeCell time={task.x_studio_inicio_cargadescarga}          loc={locations[task.id]?.[6]} />
+                          <TimeCell time={task.x_studio_termino_de_descarga}           loc={locations[task.id]?.[7]} />
+                          <TimeCell time={task.x_studio_salida_de_cliente}             loc={locations[task.id]?.[8]} />
                         </TableRow>
                       )
                     })

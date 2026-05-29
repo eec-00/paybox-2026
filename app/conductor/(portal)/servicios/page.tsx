@@ -12,12 +12,15 @@ import { createClient } from '@/lib/supabase/client'
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 const STEPS = [
-  { label: 'Llegué Almacén',       field: 'x_studio_ingreso_a_almacen_de_retiro_1' },
+  { label: 'Saliendo de cochera',   field: 'x_studio_saliendo_de_la_cochera' },
+  { label: 'En cola de ingreso',    field: 'x_studio_en_cola_de_ingreso' },
+  { label: 'Llegué almacén',        field: 'x_studio_ingreso_a_almacen_de_retiro_1' },
   { label: 'Salida almacén',        field: 'x_studio_salida_de_almacen_de_retiro' },
   { label: 'Llegada a cliente',     field: 'x_studio_llegada_a_cliente' },
-  { label: 'Ingreso a planta',      field: 'x_studio_ingreso_a_planta' },
+  { label: 'Ingreso a cliente',     field: 'x_studio_ingreso_a_planta' },
   { label: 'Inicio carga/descarga', field: 'x_studio_inicio_cargadescarga' },
   { label: 'Fin carga/descarga',    field: 'x_studio_termino_de_descarga' },
+  { label: 'Salida de cliente',     field: 'x_studio_salida_de_cliente' },
 ]
 
 interface ServicioTask {
@@ -35,12 +38,15 @@ interface ServicioTask {
   x_studio_almacen_de_retiro?: [number, string] | false
   x_studio_almacen_de_destino?: [number, string] | false
   x_studio_es_importacion?: boolean
+  x_studio_saliendo_de_la_cochera?: number | false
+  x_studio_en_cola_de_ingreso?: number | false
   x_studio_ingreso_a_almacen_de_retiro_1?: number | false
   x_studio_salida_de_almacen_de_retiro?: number | false
   x_studio_llegada_a_cliente?: number | false
   x_studio_ingreso_a_planta?: number | false
   x_studio_inicio_cargadescarga?: number | false
   x_studio_termino_de_descarga?: number | false
+  x_studio_salida_de_cliente?: number | false
 }
 
 interface Stats {
@@ -136,12 +142,15 @@ function getAlmacenDestino(task: ServicioTask): string {
 }
 function getTiempos(task: ServicioTask) {
   return [
-    { label: 'Ingreso almacén',       value: formatTime(task.x_studio_ingreso_a_almacen_de_retiro_1) },
+    { label: 'Saliendo de cochera',    value: formatTime(task.x_studio_saliendo_de_la_cochera) },
+    { label: 'En cola de ingreso',     value: formatTime(task.x_studio_en_cola_de_ingreso) },
+    { label: 'Ingreso almacén',        value: formatTime(task.x_studio_ingreso_a_almacen_de_retiro_1) },
     { label: 'Salida almacén',         value: formatTime(task.x_studio_salida_de_almacen_de_retiro) },
     { label: 'Llegada a cliente',      value: formatTime(task.x_studio_llegada_a_cliente) },
-    { label: 'Ingreso a planta',       value: formatTime(task.x_studio_ingreso_a_planta) },
+    { label: 'Ingreso a cliente',      value: formatTime(task.x_studio_ingreso_a_planta) },
     { label: 'Inicio carga/descarga',  value: formatTime(task.x_studio_inicio_cargadescarga) },
     { label: 'Fin carga/descarga',     value: formatTime(task.x_studio_termino_de_descarga) },
+    { label: 'Salida de cliente',      value: formatTime(task.x_studio_salida_de_cliente) },
   ]
 }
 
