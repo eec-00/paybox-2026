@@ -371,21 +371,31 @@ export default function ConductorServiciosPage() {
       if (!res.ok) throw new Error(data.error || 'Error al cargar servicios')
       setTasks(data.tasks || [])
       setStats(data.stats || null)
-      // Initialize completed services from DB
-      if (data.completedServiceIds?.length) {
-        setServiceSteps(prev => {
-          const next = { ...prev }
-          for (const id of data.completedServiceIds as number[]) {
-            if ((prev[id] ?? -1) < STEPS.length) next[id] = STEPS.length
-          }
-          return next
-        })
-      }
+      // Init step state from DB (progreso + completados)
+      setServiceSteps(prev => {
+        const next = { ...prev }
+        for (const [id, step] of Object.entries(data.servicioProgreso ?? {})) {
+          const numId = Number(id)
+          if ((prev[numId] ?? -1) < (step as number)) next[numId] = step as number
+        }
+        for (const id of (data.completedServiceIds ?? []) as number[]) {
+          next[id] = STEPS.length
+        }
+        return next
+      })
     } catch (e: any) {
       setError(e.message)
     } finally {
       setLoading(false)
     }
+  }, [])
+
+  const [conductorUserId, setConductorUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => {
+      if (data.user) setConductorUserId(data.user.id)
+    })
   }, [])
 
   useEffect(() => { fetchServicios(currentMonth) }, [currentMonth, fetchServicios])
@@ -424,6 +434,11 @@ export default function ConductorServiciosPage() {
       setServiceSteps(prev => ({ ...prev, [taskId]: 0 }))
       setActiveServiceId(taskId)
       setPendingConfirm(null)
+      if (conductorUserId) {
+        createClient().from('conductor_servicios_progreso')
+          .upsert({ conductor_id: conductorUserId, servicio_id: taskId, step_actual: 0, updated_at: new Date().toISOString() })
+          .then(() => {})
+      }
       return
     }
 
@@ -462,18 +477,26 @@ export default function ConductorServiciosPage() {
       const nextStep = stepIndex + 1
       setServiceSteps(prev => ({ ...prev, [taskId]: nextStep }))
 
-      // Last step done → persist completion + change stage in Odoo
+      // Persist step to DB (all steps, not just last)
+      if (conductorUserId) {
+        const supabaseClient = createClient()
+        if (nextStep >= STEPS.length) {
+          // Completed → delete from progreso, insert completados
+          supabaseClient.from('conductor_servicios_progreso')
+            .delete().eq('conductor_id', conductorUserId).eq('servicio_id', taskId).then(() => {})
+          const t = tasks.find(x => x.id === taskId)
+          const codigo = t ? (t.name.includes(' - ') ? t.name.split(' - ')[0] : t.name) : String(taskId)
+          supabaseClient.from('conductor_servicios_completados')
+            .upsert({ conductor_id: conductorUserId, servicio_id: taskId, servicio_nombre: codigo }).then(() => {})
+        } else {
+          supabaseClient.from('conductor_servicios_progreso')
+            .upsert({ conductor_id: conductorUserId, servicio_id: taskId, step_actual: nextStep, updated_at: new Date().toISOString() })
+            .then(() => {})
+        }
+      }
+
+      // Last step done → change stage in Odoo
       if (nextStep >= STEPS.length) {
-        createClient().auth.getUser().then(({ data: authData }) => {
-          if (authData.user) {
-            const t = tasks.find(x => x.id === taskId)
-            const codigo = t ? (t.name.includes(' - ') ? t.name.split(' - ')[0] : t.name) : String(taskId)
-            createClient()
-              .from('conductor_servicios_completados')
-              .upsert({ conductor_id: authData.user.id, servicio_id: taskId, servicio_nombre: codigo })
-              .then(() => {})
-          }
-        })
         fetch('/api/servicios', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -150,14 +150,18 @@ export async function GET(req: NextRequest) {
       )],
     }
 
-    const { data: completados } = await supabase
-      .from('conductor_servicios_completados')
-      .select('servicio_id')
-      .eq('conductor_id', user.id)
+    const [{ data: completados }, { data: progreso }] = await Promise.all([
+      supabase.from('conductor_servicios_completados').select('servicio_id').eq('conductor_id', user.id),
+      supabase.from('conductor_servicios_progreso').select('servicio_id, step_actual').eq('conductor_id', user.id),
+    ])
 
     const completedServiceIds = completados?.map((c: { servicio_id: number }) => c.servicio_id) ?? []
+    const servicioProgreso: Record<number, number> = {}
+    for (const p of (progreso ?? []) as { servicio_id: number; step_actual: number }[]) {
+      servicioProgreso[p.servicio_id] = p.step_actual
+    }
 
-    return NextResponse.json({ tasks, stats, month: monthParam, completedServiceIds })
+    return NextResponse.json({ tasks, stats, month: monthParam, completedServiceIds, servicioProgreso })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error('[conductor/servicios]', msg)
