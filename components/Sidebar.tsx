@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import {
   FileText,
   UserCog,
   Link2,
-  LayoutDashboard,
+  Home,
   Megaphone,
   Calendar,
   MapPin,
@@ -19,35 +21,18 @@ import {
   Settings,
   Users,
   Receipt,
+  PlayCircle,
+  BarChart2,
 } from 'lucide-react'
-
-export type Section =
-  | 'dashboard'
-  | 'pagos'
-  | 'calendario'
-  | 'trailers'
-  | 'geoenlaces'
-  | 'geocercas'
-  | 'tutoriales'
-  | 'administracion'
-  | 'administracion-usuarios'
-  | 'administracion-conductores'
-  | 'updates'
-  | 'automatizacion-tractos'
-  | 'automatizacion-carretas'
-  | 'automatizacion-conductores'
-  | 'automatizacion-facturas'
-  | 'servicios-transporte'
-  | 'gastos-conductores'
 
 interface FlatItem {
   type: 'item'
-  id: Section
+  id: string
+  href: string
   label: string
   icon: React.FC<{ className?: string }>
   description: string
   adminOnly: boolean
-  requiresCreate: boolean
 }
 
 interface GroupItem {
@@ -57,15 +42,12 @@ interface GroupItem {
   icon: React.FC<{ className?: string }>
   description: string
   adminOnly: boolean
-  requiresCreate: boolean
   children: FlatItem[]
 }
 
 type MenuItem = FlatItem | GroupItem
 
 interface SidebarProps {
-  activeSection: Section
-  onSectionChange: (section: Section) => void
   isAdmin?: boolean
   canCreate?: boolean
   collapsed?: boolean
@@ -76,26 +58,35 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  activeSection,
-  onSectionChange,
   isAdmin = false,
-  canCreate = true,
   collapsed = false,
   allowedModules = null,
   userName = null,
   userEmail = null,
   onProfileClick,
 }: SidebarProps) {
-  const isAutoSection = activeSection.startsWith('automatizacion')
-  const isServiciosSection = ['trailers', 'geoenlaces', 'geocercas', 'servicios-transporte'].includes(activeSection)
-  const isFinanzasSection = ['pagos', 'calendario', 'gastos-conductores'].includes(activeSection)
-  const isAdminSection = activeSection.startsWith('administracion')
+  const pathname = usePathname()
+
+  const isFinanzas = pathname.startsWith('/finanzas')
+  const isServicios = pathname.startsWith('/servicios')
+  const isAuto = pathname.startsWith('/automatizacion')
+  const isAdmin_ = pathname.startsWith('/administracion')
+
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
-    ...(isAutoSection ? ['automatizacion'] : []),
-    ...(isServiciosSection ? ['servicios'] : []),
-    ...(isFinanzasSection ? ['finanzas'] : []),
-    ...(isAdminSection ? ['administracion'] : []),
+    ...(isFinanzas ? ['finanzas'] : []),
+    ...(isServicios ? ['servicios'] : []),
+    ...(isAuto ? ['automatizacion'] : []),
+    ...(isAdmin_ ? ['administracion'] : []),
   ])
+
+  useEffect(() => {
+    const toExpand: string[] = []
+    if (isFinanzas) toExpand.push('finanzas')
+    if (isServicios) toExpand.push('servicios')
+    if (isAuto) toExpand.push('automatizacion')
+    if (isAdmin_) toExpand.push('administracion')
+    setExpandedGroups((prev) => Array.from(new Set([...prev, ...toExpand])))
+  }, [pathname, isFinanzas, isServicios, isAuto, isAdmin_])
 
   const toggleGroup = (id: string) => {
     setExpandedGroups((prev) =>
@@ -106,48 +97,56 @@ export function Sidebar({
   const menuItems: MenuItem[] = [
     {
       type: 'item',
-      id: 'dashboard',
-      label: 'Dashboard',
-      icon: LayoutDashboard,
-      description: 'Resumen general',
+      id: 'bienvenida',
+      href: '/bienvenida',
+      label: 'Inicio',
+      icon: Home,
+      description: 'Página principal',
       adminOnly: false,
-      requiresCreate: false,
     },
     {
       type: 'group',
       id: 'finanzas',
       label: 'Finanzas',
       icon: Wallet,
-      description: 'Pagos y Calendario',
+      description: 'Pagos y calendario',
       adminOnly: false,
-      requiresCreate: false,
       children: [
         {
           type: 'item',
-          id: 'pagos',
+          id: 'finanzas-resumen',
+          href: '/finanzas/resumen',
+          label: 'Resumen',
+          icon: BarChart2,
+          description: 'Estadísticas generales',
+          adminOnly: false,
+        },
+        {
+          type: 'item',
+          id: 'finanzas-pagos',
+          href: '/finanzas/pagos',
           label: 'Pagos',
           icon: FileText,
           description: 'Ver y registrar pagos',
           adminOnly: false,
-          requiresCreate: false,
         },
         {
           type: 'item',
-          id: 'calendario',
+          id: 'finanzas-calendario',
+          href: '/finanzas/calendario',
           label: 'Calendario',
           icon: Calendar,
           description: 'Pagos recurrentes',
           adminOnly: false,
-          requiresCreate: false,
         },
         {
           type: 'item',
-          id: 'gastos-conductores',
+          id: 'finanzas-gastos',
+          href: '/finanzas/gastos-conductores',
           label: 'Gastos Conductores',
           icon: Receipt,
-          description: 'Gastos registrados por conductores',
+          description: 'Gastos registrados',
           adminOnly: false,
-          requiresCreate: false,
         },
       ],
     },
@@ -156,36 +155,35 @@ export function Sidebar({
       id: 'servicios',
       label: 'Servicios',
       icon: Layers,
-      description: 'Trailers, Flota y Zonas',
+      description: 'Trailers, flota y zonas',
       adminOnly: false,
-      requiresCreate: false,
       children: [
         {
           type: 'item',
-          id: 'servicios-transporte',
+          id: 'servicios-trailers',
+          href: '/servicios/trailers',
           label: 'Trailers',
           icon: Truck,
-          description: 'Gestión de Trailers',
+          description: 'Gestión de trailers',
           adminOnly: false,
-          requiresCreate: false,
         },
         {
           type: 'item',
-          id: 'geoenlaces',
+          id: 'servicios-geoenlaces',
+          href: '/servicios/geoenlaces',
           label: 'Geoenlaces',
           icon: Link2,
           description: 'Flota y geoenlaces GPS',
           adminOnly: false,
-          requiresCreate: false,
         },
         {
           type: 'item',
-          id: 'geocercas',
+          id: 'servicios-geocercas',
+          href: '/servicios/geocercas',
           label: 'Geocercas',
           icon: MapPin,
           description: 'Zonas GPS Navitel',
           adminOnly: false,
-          requiresCreate: false,
         },
       ],
     },
@@ -196,43 +194,42 @@ export function Sidebar({
       icon: Zap,
       description: 'Alertas y vencimientos',
       adminOnly: false,
-      requiresCreate: false,
       children: [
         {
           type: 'item',
-          id: 'automatizacion-conductores',
+          id: 'auto-conductores',
+          href: '/automatizacion/conductores',
           label: 'Conductores',
           icon: UserCog,
           description: 'Documentos conductores',
           adminOnly: false,
-          requiresCreate: false,
         },
         {
           type: 'item',
-          id: 'automatizacion-tractos',
+          id: 'auto-tractos',
+          href: '/automatizacion/tractos',
           label: 'Tractos',
           icon: Truck,
           description: 'Documentos tractos',
           adminOnly: false,
-          requiresCreate: false,
         },
         {
           type: 'item',
-          id: 'automatizacion-carretas',
+          id: 'auto-carretas',
+          href: '/automatizacion/carretas',
           label: 'Carretas',
           icon: Truck,
           description: 'Documentos carretas',
           adminOnly: false,
-          requiresCreate: false,
         },
         {
           type: 'item',
-          id: 'automatizacion-facturas',
+          id: 'auto-facturas',
+          href: '/automatizacion/facturas',
           label: 'Facturas',
           icon: FileText,
           description: 'Facturas de clientes',
           adminOnly: false,
-          requiresCreate: false,
         },
       ],
     },
@@ -243,36 +240,44 @@ export function Sidebar({
       icon: UserCog,
       description: 'Usuarios y conductores',
       adminOnly: true,
-      requiresCreate: false,
       children: [
         {
           type: 'item',
-          id: 'administracion-usuarios' as Section,
+          id: 'admin-usuarios',
+          href: '/administracion/usuarios',
           label: 'Usuarios Core',
           icon: Users,
           description: 'Equipo de la empresa',
           adminOnly: true,
-          requiresCreate: false,
         },
         {
           type: 'item',
-          id: 'administracion-conductores' as Section,
+          id: 'admin-conductores',
+          href: '/administracion/conductores',
           label: 'Conductores',
           icon: Truck,
           description: 'Choferes del portal',
           adminOnly: true,
-          requiresCreate: false,
         },
       ],
     },
     {
       type: 'item',
       id: 'updates',
+      href: '/updates',
       label: 'Actualizaciones',
       icon: Megaphone,
       description: 'Novedades del sistema',
       adminOnly: false,
-      requiresCreate: false,
+    },
+    {
+      type: 'item',
+      id: 'tutoriales',
+      href: '/tutoriales',
+      label: 'Tutoriales',
+      icon: PlayCircle,
+      description: 'Videos guía de uso',
+      adminOnly: false,
     },
   ]
 
@@ -281,32 +286,34 @@ export function Sidebar({
     return allowedModules.includes(id)
   }
 
-  const visibleItems = menuItems.filter((item) => {
-    if (item.adminOnly && !isAdmin) return false
-    if (item.requiresCreate && !canCreate) return false
-    // siempre visibles para todos
-    if (item.id === 'dashboard' || item.id === 'updates') return true
-    if (item.type === 'group') {
-      // el grupo es visible si está permitido directamente o algún hijo está permitido
-      return canSeeModule(item.id) || item.children.some((c) => canSeeModule(c.id))
-    }
-    return canSeeModule(item.id)
-  }).map((item) => {
-    if (item.type === 'group' && allowedModules !== null && !allowedModules.includes(item.id)) {
-      // el grupo no está directamente en la lista → filtrar sus hijos
-      return { ...item, children: item.children.filter((c) => canSeeModule(c.id)) }
-    }
-    return item
-  })
+  const visibleItems = menuItems
+    .filter((item) => {
+      if (item.adminOnly && !isAdmin) return false
+      if (item.id === 'bienvenida' || item.id === 'updates' || item.id === 'tutoriales') return true
+      if (item.type === 'group') {
+        return canSeeModule(item.id) || item.children.some((c) => canSeeModule(c.id))
+      }
+      return canSeeModule(item.id)
+    })
+    .map((item) => {
+      if (
+        item.type === 'group' &&
+        allowedModules !== null &&
+        !allowedModules.includes(item.id)
+      ) {
+        return { ...item, children: item.children.filter((c) => canSeeModule(c.id)) }
+      }
+      return item
+    })
 
   const renderFlatItem = (item: FlatItem, isChild = false) => {
     const Icon = item.icon
-    const isActive = activeSection === item.id
+    const isActive = pathname === item.href
 
     return (
-      <button
+      <Link
         key={item.id}
-        onClick={() => onSectionChange(item.id)}
+        href={item.href}
         title={collapsed ? item.label : undefined}
         className={cn(
           'w-full flex items-start gap-2.5 p-2.5 rounded-lg transition-all group relative',
@@ -343,14 +350,14 @@ export function Sidebar({
             <div className="text-xs text-white/70">{item.description}</div>
           </div>
         )}
-      </button>
+      </Link>
     )
   }
 
   const renderGroupItem = (item: GroupItem) => {
     const Icon = item.icon
     const isExpanded = expandedGroups.includes(item.id)
-    const isGroupActive = item.children.some((c) => c.id === activeSection)
+    const isGroupActive = item.children.some((c) => pathname === c.href)
 
     return (
       <div key={item.id}>
@@ -358,8 +365,8 @@ export function Sidebar({
           onClick={() => {
             if (!collapsed) toggleGroup(item.id)
             else {
-              // In collapsed mode, click opens first child
-              onSectionChange(item.children[0].id)
+              // In collapsed mode click goes to first child
+              window.location.href = item.children[0].href
             }
           }}
           title={collapsed ? item.label : undefined}
@@ -394,7 +401,6 @@ export function Sidebar({
           )}
         </button>
 
-        {/* Children — shown when expanded or when sidebar is collapsed (tooltip-only) */}
         {isExpanded && !collapsed && (
           <div className="mt-0.5 space-y-0.5 border-l border-primary-foreground/20 ml-4">
             {item.children.map((child) => renderFlatItem(child, true))}
@@ -421,14 +427,12 @@ export function Sidebar({
           : 'translate-x-0 md:w-64'
       )}
     >
-      {/* Menu items — scrollable */}
-      <div className={cn('flex-1 overflow-y-auto p-3 space-y-1.5', collapsed && 'px-2.5 py-3')}>
+      <div className={cn('flex-1 overflow-y-auto p-3 space-y-1.5 sidebar-scrollbar', collapsed && 'px-2.5 py-3')}>
         {visibleItems.map((item) =>
           item.type === 'group' ? renderGroupItem(item) : renderFlatItem(item)
         )}
       </div>
 
-      {/* Profile / Settings — pinned bottom */}
       <div className="border-t border-primary-foreground/20 p-2 shrink-0">
         <button
           onClick={onProfileClick}
@@ -439,7 +443,6 @@ export function Sidebar({
             collapsed && 'justify-center'
           )}
         >
-          {/* Avatar */}
           <div className="w-8 h-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center font-bold text-xs shrink-0">
             {initials}
           </div>
