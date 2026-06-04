@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, CheckCircle2, XCircle, Search, ChevronLeft, ChevronRight, Key, Eye, Download, FileText } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Search, ChevronLeft, ChevronRight, Key, Eye, Download, FileText, FileSpreadsheet } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 
@@ -35,6 +35,7 @@ export function SunatSection() {
   const [page, setPage] = useState(0)
   const [detalleGre, setDetalleGre] = useState<GreDetalle | null>(null)
   const [loadingDetalle, setLoadingDetalle] = useState<string | null>(null)
+  const [exportingExcel, setExportingExcel] = useState(false)
 
   const fetchTokenStatus = useCallback(async () => {
     const res = await fetch('/api/sunat/token')
@@ -152,6 +153,60 @@ export function SunatSection() {
     }
   }
 
+  const DETALLE_LABELS: [keyof GreDetalle, string][] = [
+    ['serie', 'GRE'],
+    ['fecEmision', 'Fecha emisión'],
+    ['fecTraslado', 'Fecha traslado'],
+    ['motivo', 'Motivo'],
+    ['tipoServicio', 'Tipo servicio'],
+    ['greRemitente', 'GRE Remitente'],
+    ['greTransporte', 'GRE Transporte'],
+    ['remitente', 'Remitente'],
+    ['destinatario', 'Destinatario'],
+    ['peso', 'Peso'],
+    ['nroContenedor', 'Nro. contenedor'],
+    ['vehiculo', 'Vehículo'],
+    ['carreta', 'Carreta'],
+    ['conductor', 'Conductor'],
+    ['conductorDni', 'DNI conductor'],
+    ['pagador', 'Pagador'],
+  ]
+
+  async function exportarExcel() {
+    if (!rows.length) return
+    setExportingExcel(true)
+    try {
+      const detalles: GreDetalle[] = []
+      for (const row of rows) {
+        const r = row as any
+        try {
+          const res = await fetch(`/api/sunat/gre/descarga?${buildDescargaParams(r, 'xml')}`)
+          const json = await res.json()
+          if (json.ok && json.parsed) detalles.push(json.parsed)
+          else detalles.push({ serie: `${r.numSerie}-${r.numCpe}`, fecEmision: r.fecEmision ?? '', fecTraslado: '', motivo: '', tipoServicio: '', greRemitente: '', greTransporte: '', remitente: '', destinatario: '', peso: '', nroContenedor: '', vehiculo: '', carreta: '', conductor: '', conductorDni: '', pagador: '' })
+        } catch { /* skip broken row */ }
+      }
+      const ExcelJS = (await import('exceljs')).default
+      const wb = new ExcelJS.Workbook()
+      const ws = wb.addWorksheet('GRE')
+      ws.columns = DETALLE_LABELS.map(([key, label]) => ({ header: label, key, width: 22 }))
+      ws.getRow(1).font = { bold: true }
+      for (const d of detalles) ws.addRow(Object.fromEntries(DETALLE_LABELS.map(([k]) => [k, d[k] || ''])))
+      const buf = await wb.xlsx.writeBuffer()
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `GRE-${fechaInicio}-${fechaFin}.xlsx`
+      a.click()
+      URL.revokeObjectURL(a.href)
+      toast.success(`${detalles.length} GRE exportadas`)
+    } catch {
+      toast.error('Error al exportar Excel')
+    } finally {
+      setExportingExcel(false)
+    }
+  }
+
   async function consultar(pageNum = 0) {
     setLoading(true)
     setResultado(null)
@@ -172,25 +227,6 @@ export function SunatSection() {
       setLoading(false)
     }
   }
-
-  const DETALLE_LABELS: [keyof GreDetalle, string][] = [
-    ['serie', 'GRE'],
-    ['fecEmision', 'Fecha emisión'],
-    ['fecTraslado', 'Fecha traslado'],
-    ['motivo', 'Motivo'],
-    ['tipoServicio', 'Tipo servicio'],
-    ['greRemitente', 'GRE Remitente'],
-    ['greTransporte', 'GRE Transporte'],
-    ['remitente', 'Remitente'],
-    ['destinatario', 'Destinatario'],
-    ['peso', 'Peso'],
-    ['nroContenedor', 'Nro. contenedor'],
-    ['vehiculo', 'Vehículo'],
-    ['carreta', 'Carreta'],
-    ['conductor', 'Conductor'],
-    ['conductorDni', 'DNI conductor'],
-    ['pagador', 'Pagador'],
-  ]
 
   return (
     <>
@@ -310,9 +346,16 @@ export function SunatSection() {
                 <span className="text-muted-foreground">
                   {rows.length > 0 ? `${rows.length} filas · total ${totalRegistros} · página ${page + 1}` : 'Sin resultados'}
                 </span>
-                <Badge className={resultado.ok ? 'bg-green-100 text-green-800 border-green-200' : ''} variant={resultado.ok ? 'outline' : 'destructive'}>
-                  HTTP {resultado.status}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {rows.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={exportarExcel} disabled={exportingExcel || !!loadingDetalle}>
+                      {exportingExcel ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Exportando...</> : <><FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />Exportar a Excel</>}
+                    </Button>
+                  )}
+                  <Badge className={resultado.ok ? 'bg-green-100 text-green-800 border-green-200' : ''} variant={resultado.ok ? 'outline' : 'destructive'}>
+                    HTTP {resultado.status}
+                  </Badge>
+                </div>
               </div>
 
               {rows.length > 0 ? (
