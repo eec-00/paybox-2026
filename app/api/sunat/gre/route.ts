@@ -20,11 +20,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Date-range query — max 100 rows per call, paginate via numRegistros
+  // Masiva query by date range
   const fechaInicio = searchParams.get('fechaInicio')
   const fechaFin = searchParams.get('fechaFin')
+  const tipoGre = searchParams.get('tipoGre') ?? 'TRANSPORTISTA'
   const numRegistros = searchParams.get('numRegistros') ?? '0'
-  const numMaximo = '100'
 
   if (!fechaInicio || !fechaFin) {
     return NextResponse.json(
@@ -37,19 +37,18 @@ export async function GET(req: NextRequest) {
     const params = new URLSearchParams({
       fechaInicio,
       fechaFin,
-      numMaximo,
+      tipoGre,
+      numMaximo: '100',
       numRegistros,
     })
 
     const res = await sunatFetch(`/v1/contribuyente/gem/comprobantes?${params}`)
 
     const text = await res.text()
+    console.log('[sunat/gre masiva] status:', res.status, 'body:', text.slice(0, 300))
+
     let data: unknown
-    try {
-      data = JSON.parse(text)
-    } catch {
-      data = { raw: text }
-    }
+    try { data = JSON.parse(text) } catch { data = { raw: text } }
 
     return NextResponse.json({ ok: res.ok, status: res.status, data })
   } catch (error: any) {

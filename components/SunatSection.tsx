@@ -73,11 +73,12 @@ export function SunatSection() {
   }
 
   // --- consulta por rango ---
-  const [fechaInicio, setFechaInicio] = useState(monthAgo())
+  const [fechaInicio, setFechaInicio] = useState(today())
   const [fechaFin, setFechaFin] = useState(today())
+  const [tipoGre, setTipoGre] = useState<'TRANSPORTISTA' | 'REMITENTE' | 'EVENTOS'>('TRANSPORTISTA')
   const [loading, setLoading] = useState(false)
   const [resultado, setResultado] = useState<QueryResult | null>(null)
-  const [page, setPage] = useState(0) // cada page = 100 registros
+  const [page, setPage] = useState(0)
 
   async function consultar(pageNum = 0) {
     setLoading(true)
@@ -87,12 +88,13 @@ export function SunatSection() {
       const params = new URLSearchParams({
         fechaInicio,
         fechaFin,
+        tipoGre,
         numRegistros: String(pageNum * 100),
       })
       const res = await fetch(`/api/sunat/gre?${params}`)
       const json = await res.json()
       setResultado(json)
-      if (json.ok) toast.success('Consulta exitosa')
+      if (json.ok) toast.success(`${rows.length || '?'} GRE encontradas`)
       else toast.error(`SUNAT status ${json.status}`)
     } catch {
       toast.error('Error al consultar SUNAT')
@@ -169,22 +171,24 @@ export function SunatSection() {
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="space-y-1">
+              <Label>Tipo de GRE</Label>
+              <select
+                value={tipoGre}
+                onChange={(e) => setTipoGre(e.target.value as typeof tipoGre)}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="TRANSPORTISTA">GRE - Transportista</option>
+                <option value="REMITENTE">GRE - Remitente</option>
+                <option value="EVENTOS">GRE - Por Eventos</option>
+              </select>
+            </div>
+            <div className="space-y-1">
               <Label>Fecha inicio</Label>
-              <Input
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                className="w-40"
-              />
+              <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} className="w-40" />
             </div>
             <div className="space-y-1">
               <Label>Fecha fin</Label>
-              <Input
-                type="date"
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-                className="w-40"
-              />
+              <Input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} className="w-40" />
             </div>
             <Button onClick={() => consultar(0)} disabled={loading} size="sm">
               {loading
