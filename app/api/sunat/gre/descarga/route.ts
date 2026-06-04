@@ -62,7 +62,7 @@ function parseGreXml(xml: string) {
   // Remitente: inside Delivery > Despatch > DispatchParty
   const delivery = sec(shipment, 'Delivery')
   const despatch = sec(delivery, 'Despatch')
-  const dispatchParty = sec(despatch, 'DispatchParty')
+  const dispatchParty = sec(despatch, 'DespatchParty')
   const remitenteName = v(sec(dispatchParty, 'PartyLegalEntity'), 'RegistrationName')
 
   // Destinatario: DeliveryCustomerParty

@@ -190,8 +190,33 @@ export function SunatSection() {
       const wb = new ExcelJS.Workbook()
       const ws = wb.addWorksheet('GRE')
       ws.columns = DETALLE_LABELS.map(([key, label]) => ({ header: label, key, width: 22 }))
-      ws.getRow(1).font = { bold: true }
-      for (const d of detalles) ws.addRow(Object.fromEntries(DETALLE_LABELS.map(([k]) => [k, d[k] || ''])))
+
+      // Style header row
+      const headerRow = ws.getRow(1)
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
+        cell.alignment = { vertical: 'middle', horizontal: 'center' }
+        cell.border = {
+          bottom: { style: 'medium', color: { argb: 'FF2E86C1' } },
+        }
+      })
+      headerRow.height = 20
+
+      // Data rows with alternating colors
+      detalles.forEach((d, i) => {
+        const row = ws.addRow(Object.fromEntries(DETALLE_LABELS.map(([k]) => [k, d[k] || ''])))
+        const isEven = i % 2 === 0
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'FFF0F4FA' : 'FFFFFFFF' } }
+          cell.font = { size: 10 }
+          cell.alignment = { vertical: 'middle' }
+          cell.border = {
+            bottom: { style: 'thin', color: { argb: 'FFD5E8F3' } },
+          }
+        })
+        row.height = 16
+      })
       const buf = await wb.xlsx.writeBuffer()
       const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const a = document.createElement('a')
