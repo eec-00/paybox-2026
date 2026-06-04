@@ -1,82 +1,48 @@
-const SUNAT_CLIENT_ID = (process.env.SUNAT_CLIENT_ID || '').trim()
-const SUNAT_CLIENT_SECRET = (process.env.SUNAT_CLIENT_SECRET || '').trim()
-const SUNAT_RUC = (process.env.SUNAT_RUC || '').trim()
-const SUNAT_SOL_USER = (process.env.SUNAT_SOL_USER || '').trim()
-const SUNAT_SOL_PASS = (process.env.SUNAT_SOL_PASS || '').trim()
+import { createAdminClient } from '@/lib/supabase/admin'
 
-// clientessol = GRE Desktop | clientesextranet = consulta Web
-const TOKEN_URL = `https://api-seguridad.sunat.gob.pe/v1/clientessol/${SUNAT_CLIENT_ID}/oauth2/token/`
 const GRE_BASE = 'https://api-cpe.sunat.gob.pe'
+const SINGLETON_ID = '00000000-0000-0000-0000-000000000001'
 
-let cachedToken: { value: string; expiresAt: number; isSession?: boolean } | null = null
+let cachedToken: { value: string; expiresAt: number } | null = null
 
 export async function getSunatToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt) {
     return cachedToken.value
   }
 
-  const body = new URLSearchParams({
-    grant_type: 'password',
-    scope: 'https://api-cpe.sunat.gob.pe',
-    client_id: SUNAT_CLIENT_ID,
-    client_secret: SUNAT_CLIENT_SECRET,
-    username: SUNAT_SOL_USER,
-    password: SUNAT_SOL_PASS,
-  })
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('sunat_tokens')
+    .select('access_token, expires_at')
+    .eq('id', SINGLETON_ID)
+    .single()
 
-  const res = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  })
-
-  const rawText = await res.text()
-
-  if (!res.ok) {
-    throw new Error(`SUNAT auth error ${res.status}: ${rawText}`)
+  if (error || !data?.access_token) {
+    throw new Error('Token SUNAT no configurado. Ve a /sunat y pega el Bearer token.')
   }
 
-  // 204 = SUNAT Desktop session flow — cookie IS the auth credential
-  if (res.status === 204) {
-    const setCookie = res.headers.get('set-cookie')
-    if (!setCookie) throw new Error('SUNAT: 204 sin cookie de sesión')
-
-    const cookieValue = setCookie.split(';')[0]
-    console.log('[sunat token] session established via cookie')
-
-    // Cache cookie as "token" — 55 min expiry (SUNAT sessions ~1hr)
-    cachedToken = {
-      value: cookieValue,
-      expiresAt: Date.now() + 55 * 60 * 1000,
-      isSession: true,
-    }
-    return cachedToken.value
+  const expiresAt = new Date(data.expires_at).getTime()
+  if (Date.now() >= expiresAt) {
+    throw new Error('Token SUNAT expirado. Ve a /sunat y pega un nuevo Bearer token.')
   }
 
-  if (!rawText) throw new Error(`SUNAT auth: respuesta vacía (status ${res.status})`)
-
-  const data = JSON.parse(rawText)
-  const expiresIn: number = data.expires_in ?? 3600
-
-  cachedToken = {
-    value: data.access_token,
-    expiresAt: Date.now() + (expiresIn - 60) * 1000,
-  }
-
-  return cachedToken.value
+  cachedToken = { value: data.access_token, expiresAt }
+  return data.access_token
 }
 
 export async function sunatFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
-  const credential = await getSunatToken()
-  const authHeader = cachedToken?.isSession
-    ? { Cookie: credential }
-    : { Authorization: `Bearer ${credential}` }
-
+  const token = await getSunatToken()
   return fetch(`${GRE_BASE}${endpoint}`, {
     ...options,
     headers: {
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      ...authHeader,
+      Accept: 'application/json, text/plain, */*',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Accept-Language': 'es-PE,es;q=0.9',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
+      Origin: 'https://e-factura.sunat.gob.pe',
+      Referer: 'https://e-factura.sunat.gob.pe/',
       ...(options.headers ?? {}),
     },
   })

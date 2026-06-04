@@ -34,15 +34,27 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // codCpe: 31=Transportista, 09=Remitente, 32=Eventos
+    const codCpe = tipoGre === 'TRANSPORTISTA' ? '31' : tipoGre === 'REMITENTE' ? '09' : '32'
+    const page = String(Math.floor(parseInt(numRegistros) / 100) + 1)
+
     const params = new URLSearchParams({
-      fechaInicio,
-      fechaFin,
-      tipoGre,
-      numMaximo: '100',
-      numRegistros,
+      numRucEmisor: process.env.SUNAT_RUC!,
+      numRucReceptor: '',
+      codCpe,
+      numSerie: '',
+      numCpe: '',
+      fecEmisionIni: fechaInicio,
+      fecEmisionFin: fechaFin,
+      codEstado: '',
+      codSubEstado: '',
+      rangoHoras: '',
+      page,
+      per_page: '100',
+      tipBusqueda: '2',
     })
 
-    const res = await sunatFetch(`/v1/contribuyente/gem/comprobantes?${params}`)
+    const res = await sunatFetch(`/v1/contribuyente/gre/comprobantes?${params}`)
 
     const text = await res.text()
     console.log('[sunat/gre masiva] status:', res.status, 'body:', text.slice(0, 300))
