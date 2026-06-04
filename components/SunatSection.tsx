@@ -153,6 +153,7 @@ export function SunatSection() {
     }
   }
 
+  // Modal detail labels (full set)
   const DETALLE_LABELS: [keyof GreDetalle, string][] = [
     ['serie', 'GRE'],
     ['fecEmision', 'Fecha emisión'],
@@ -172,6 +173,27 @@ export function SunatSection() {
     ['pagador', 'Pagador'],
   ]
 
+  // Excel-only columns (reordered, no GRE/Motivo)
+  const EXCEL_COLS: [keyof GreDetalle, string, number][] = [
+    ['fecEmision',    'FECHA EMISIÓN',    14],
+    ['greRemitente',  'GRE REMITENTE',    18],
+    ['greTransporte', 'GRE TRANSPORTE',   18],
+    ['fecTraslado',   'FECHA TRASLADO',   14],
+    ['remitente',     'REMITENTE',        28],
+    ['destinatario',  'DESTINATARIO',     28],
+    ['peso',          'PESO',             12],
+    ['nroContenedor', 'NRO. CONTENEDOR',  18],
+    ['vehiculo',      'VEHÍCULO',         12],
+    ['carreta',       'CARRETA',          12],
+    ['conductor',     'CONDUCTOR',        28],
+    ['pagador',       'PAGADOR GUIA',     18],
+  ]
+
+  function fmtDate(d: string) {
+    const p = d.split('-')
+    return p.length === 3 ? `${p[2]}/${p[1]}` : d
+  }
+
   async function exportarExcel() {
     if (!rows.length) return
     setExportingExcel(true)
@@ -189,31 +211,48 @@ export function SunatSection() {
       const ExcelJS = (await import('exceljs')).default
       const wb = new ExcelJS.Workbook()
       const ws = wb.addWorksheet('GRE')
-      ws.columns = DETALLE_LABELS.map(([key, label]) => ({ header: label, key, width: 22 }))
+      // Calculate column widths from actual data (auto-fit)
+      const colWidths = EXCEL_COLS.map(([key, label]) => {
+        const maxData = detalles.reduce((max, d) => {
+          let val = d[key] || ''
+          if ((key === 'fecEmision' || key === 'fecTraslado') && val) val = fmtDate(val)
+          return Math.max(max, val.length)
+        }, 0)
+        return Math.max(label.length, maxData) + 2
+      })
+      ws.columns = EXCEL_COLS.map(([key, label], i) => ({ header: label, key, width: colWidths[i] }))
+
+      const blackBorder: Partial<import('exceljs').Borders> = {
+        top:    { style: 'thin', color: { argb: 'FF000000' } },
+        left:   { style: 'thin', color: { argb: 'FF000000' } },
+        bottom: { style: 'thin', color: { argb: 'FF000000' } },
+        right:  { style: 'thin', color: { argb: 'FF000000' } },
+      }
 
       // Style header row
       const headerRow = ws.getRow(1)
       headerRow.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
-        cell.alignment = { vertical: 'middle', horizontal: 'center' }
-        cell.border = {
-          bottom: { style: 'medium', color: { argb: 'FF2E86C1' } },
-        }
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: false }
+        cell.border = { ...blackBorder, bottom: { style: 'medium', color: { argb: 'FF000000' } } }
       })
-      headerRow.height = 20
+      headerRow.height = 22
 
-      // Data rows with alternating colors
+      // Data rows with alternating colors + black borders
       detalles.forEach((d, i) => {
-        const row = ws.addRow(Object.fromEntries(DETALLE_LABELS.map(([k]) => [k, d[k] || ''])))
         const isEven = i % 2 === 0
+        const rowData = Object.fromEntries(EXCEL_COLS.map(([k]) => {
+          let val = d[k] || ''
+          if ((k === 'fecEmision' || k === 'fecTraslado') && val) val = fmtDate(val)
+          return [k, val]
+        }))
+        const row = ws.addRow(rowData)
         row.eachCell({ includeEmpty: true }, (cell) => {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'FFF0F4FA' : 'FFFFFFFF' } }
           cell.font = { size: 10 }
           cell.alignment = { vertical: 'middle' }
-          cell.border = {
-            bottom: { style: 'thin', color: { argb: 'FFD5E8F3' } },
-          }
+          cell.border = blackBorder
         })
         row.height = 16
       })

@@ -89,6 +89,13 @@ function parseGreXml(xml: string) {
   const nota = v(body, 'Note')
   const tipoServicio = nota.includes(':') ? nota.split(':').slice(1).join(':').trim() : nota
 
+  // Container: prefer TransportHandlingUnit ID, fallback to "según contenedor: XXXX" in Note
+  let nroContenedor = nroContenedorRaw === '-' ? '' : nroContenedorRaw
+  if (!nroContenedor) {
+    const contMatch = nota.match(/seg[uú]n contenedor[:\s]+([A-Z0-9]+)/i)
+    if (contMatch) nroContenedor = contMatch[1]
+  }
+
   return {
     serie: greTransporte,
     fecEmision,
@@ -100,7 +107,7 @@ function parseGreXml(xml: string) {
     remitente: remitenteName,
     destinatario: destinatarioName,
     peso,
-    nroContenedor: nroContenedorRaw === '-' ? '' : nroContenedorRaw,
+    nroContenedor,
     vehiculo,
     carreta,
     conductor: conductorNombre,
