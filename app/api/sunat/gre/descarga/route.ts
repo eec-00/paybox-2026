@@ -1,93 +1,111 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sunatFetch } from '@/lib/sunat/client'
 
-function xmlVal(xml: string, tag: string): string {
-  const m = xml.match(new RegExp(`<(?:[^:>]+:)?${tag}[^>]*>([^<]*)<`, 'i'))
-  return m?.[1]?.trim() ?? ''
+// Extracts value handling both plain text and CDATA
+function v(scope: string, tag: string): string {
+  const cd = scope.match(new RegExp(`<(?:[^:>]+:)?${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]>`, 'i'))
+  if (cd) return cd[1].trim()
+  const pl = scope.match(new RegExp(`<(?:[^:>]+:)?${tag}[^>]*>([^<]+)<`, 'i'))
+  return pl?.[1]?.trim() ?? ''
 }
 
-function xmlAttr(xml: string, tag: string, attr: string): string {
-  const m = xml.match(new RegExp(`<(?:[^:>]+:)?${tag}[^>]*${attr}="([^"]*)"`, 'i'))
-  return m?.[1]?.trim() ?? ''
+// Extracts a full XML section (first match)
+function sec(scope: string, tag: string): string {
+  const m = scope.match(new RegExp(`<(?:[^:>]+:)?${tag}[\\s\\S]*?</(?:[^:>]+:)?${tag}>`, 'i'))
+  return m?.[0] ?? ''
+}
+
+function formatPlate(raw: string): string {
+  if (!raw || raw === '-') return ''
+  // ATV751 → ATV-751 | B3J123 → B3J-123
+  return raw.replace(/^([A-Z]{1,3})(\d+)([A-Z]*)$/, (_, a, b, c) => c ? `${a}${b}-${c}` : `${a}-${b}`)
 }
 
 function parseGreXml(xml: string) {
-  // Document number
-  const serie = xmlVal(xml, 'ID')
+  // Strip signature block to avoid false ID matches
+  const body = xml.replace(/<(?:[^:>]+:)?UBLExtensions[\s\S]*?<\/(?:[^:>]+:)?UBLExtensions>/i, '')
+
+  // Document ID (EG03-7356)
+  const greTransporte = v(body, 'ID')
+
+  // GRE Remitente from AdditionalDocumentReference
+  const addRef = sec(body, 'AdditionalDocumentReference')
+  const greRemitente = v(addRef, 'ID')
 
   // Dates
-  const fecEmision = xmlVal(xml, 'IssueDate')
-  const fecTraslado = xmlVal(xml, 'ActualDeliveryDate') || xmlVal(xml, 'RequestedDeliveryPeriod')
+  const fecEmision = v(body, 'IssueDate')
 
-  // Motivo traslado
-  const motivoCod = xmlAttr(xml, 'DespatchAdviceTypeCode', 'listID') || xmlVal(xml, 'DespatchAdviceTypeCode')
-  const motivo = xmlVal(xml, 'Note') || motivoCod
+  // Shipment block
+  const shipment = sec(body, 'Shipment')
 
-  // Remitente
-  const remitenteName = (() => {
-    const sup = xml.match(/<cac:DespatchSupplierParty[\s\S]*?<\/cac:DespatchSupplierParty>/i)?.[0] ?? ''
-    return xmlVal(sup, 'RegistrationName') || xmlVal(sup, 'Name')
-  })()
-  const remitenteRuc = (() => {
-    const sup = xml.match(/<cac:DespatchSupplierParty[\s\S]*?<\/cac:DespatchSupplierParty>/i)?.[0] ?? ''
-    return xmlVal(sup, 'ID')
-  })()
+  // Peso
+  const pesoM = shipment.match(/<(?:[^:>]+:)?GrossWeightMeasure[^>]*unitCode="([^"]*)"[^>]*>([^<]*)</)
+  const peso = pesoM ? `${parseFloat(pesoM[2]).toLocaleString('es-PE')} ${pesoM[1]}` : ''
 
-  // Destinatario
-  const destinatarioName = (() => {
-    const del = xml.match(/<cac:DeliveryCustomerParty[\s\S]*?<\/cac:DeliveryCustomerParty>/i)?.[0] ?? ''
-    return xmlVal(del, 'RegistrationName') || xmlVal(del, 'Name')
-  })()
-  const destinatarioRuc = (() => {
-    const del = xml.match(/<cac:DeliveryCustomerParty[\s\S]*?<\/cac:DeliveryCustomerParty>/i)?.[0] ?? ''
-    return xmlVal(del, 'ID')
-  })()
+  // Pagador indicator
+  const pagadorInd = shipment.includes('IndicadorPagadorFlete_Tercero') ? 'Tercero' :
+    shipment.includes('IndicadorPagadorFlete_Remitente') ? 'Remitente' :
+    shipment.includes('IndicadorPagadorFlete_Destinatario') ? 'Destinatario' : ''
 
-  // Shipment
-  const shipment = xml.match(/<cac:Shipment[\s\S]*?<\/cac:Shipment>/i)?.[0] ?? ''
-  const pesoTotal = xmlVal(shipment, 'GrossWeightMeasure')
-  const pesUOM = xmlAttr(shipment, 'GrossWeightMeasure', 'unitCode')
-  const nroContenedor = xmlVal(shipment, 'ID') || ''
-  const tipoServicio = xmlVal(shipment, 'HandlingCode') || xmlVal(xml, 'TransportModeCode') || ''
+  // ShipmentStage
+  const stage = sec(shipment, 'ShipmentStage')
 
-  // Vehículo y carreta
-  const transport = xml.match(/<cac:TransportMeans[\s\S]*?<\/cac:TransportMeans>/i)?.[0] ?? ''
-  const vehiculo = xmlVal(transport, 'RegistrationNationalityID') || xmlVal(transport, 'JourneyID') || xmlVal(shipment, 'ShipmentStage')
-  const carreta = (() => {
-    const trailers = [...xml.matchAll(/<cac:TransportEquipment[\s\S]*?<\/cac:TransportEquipment>/gi)]
-    return trailers.map(m => xmlVal(m[0], 'ID')).filter(Boolean).join(', ')
-  })()
+  // Fecha traslado
+  const transitPeriod = sec(stage, 'TransitPeriod')
+  const fecTraslado = v(transitPeriod, 'StartDate')
 
   // Conductor
-  const driver = xml.match(/<cac:Driver[\s\S]*?<\/cac:Driver>/i)?.[0] ?? ''
-  const conductorNombre = xmlVal(driver, 'FamilyName')
-    ? `${xmlVal(driver, 'FirstName')} ${xmlVal(driver, 'FamilyName')}`.trim()
-    : xmlVal(driver, 'RegistrationName')
-  const conductorDoc = xmlVal(driver, 'ID')
+  const driver = sec(stage, 'DriverPerson')
+  const conductorNombre = v(driver, 'FirstName') || v(driver, 'RegistrationName')
+  const conductorDni = v(driver, 'ID')
 
-  // GRE Remitente / GRE Transporte nums
-  const greRemitente = xmlVal(xml, 'ReferencedConsignmentID') || ''
-  const greTransporte = serie
+  // Remitente: inside Delivery > Despatch > DispatchParty
+  const delivery = sec(shipment, 'Delivery')
+  const despatch = sec(delivery, 'Despatch')
+  const dispatchParty = sec(despatch, 'DispatchParty')
+  const remitenteName = v(sec(dispatchParty, 'PartyLegalEntity'), 'RegistrationName')
 
-  // Pagador
-  const pagador = xmlVal(xml, 'FreightAllowanceCharge') || ''
+  // Destinatario: DeliveryCustomerParty
+  const delivCustomer = sec(body, 'DeliveryCustomerParty')
+  const destinatarioName = v(sec(delivCustomer, 'PartyLegalEntity'), 'RegistrationName')
+
+  // Pagador: OriginatorCustomerParty
+  const originator = sec(body, 'OriginatorCustomerParty')
+  const pagadorName = v(sec(originator, 'PartyLegalEntity'), 'RegistrationName')
+
+  // Vehículo: TransportHandlingUnit > TransportEquipment > ID
+  const thu = sec(shipment, 'TransportHandlingUnit')
+  const nroContenedorRaw = v(thu, 'ID')
+  const equip = sec(thu, 'TransportEquipment')
+  const vehiculoPlate = v(equip, 'ID')
+  const vehiculo = formatPlate(vehiculoPlate)
+
+  // Carreta: look for second TransportEquipment
+  const allEquip = [...thu.matchAll(/<(?:[^:>]+:)?TransportEquipment[\s\S]*?<\/(?:[^:>]+:)?TransportEquipment>/gi)]
+  const carretaPlate = allEquip.length > 1 ? v(allEquip[1][0], 'ID') : ''
+  const carreta = formatPlate(carretaPlate)
+
+  // Tipo servicio from Note
+  const nota = v(body, 'Note')
+  const tipoServicio = nota.includes(':') ? nota.split(':').slice(1).join(':').trim() : nota
 
   return {
-    serie,
+    serie: greTransporte,
     fecEmision,
     fecTraslado,
-    motivo,
+    motivo: v(body, 'DespatchAdviceTypeCode'),
     tipoServicio,
     greRemitente,
     greTransporte,
-    remitente: remitenteName ? `${remitenteName} (${remitenteRuc})` : remitenteRuc,
-    destinatario: destinatarioName ? `${destinatarioName} (${destinatarioRuc})` : destinatarioRuc,
-    peso: pesoTotal ? `${pesoTotal} ${pesUOM}`.trim() : '',
-    nroContenedor,
+    remitente: remitenteName,
+    destinatario: destinatarioName,
+    peso,
+    nroContenedor: nroContenedorRaw === '-' ? '' : nroContenedorRaw,
     vehiculo,
     carreta,
-    conductor: conductorNombre ? `${conductorNombre} - ${conductorDoc}`.trim() : conductorDoc,
-    pagador,
+    conductor: conductorNombre,
+    conductorDni,
+    pagador: pagadorName || pagadorInd,
   }
 }
 
@@ -124,7 +142,7 @@ export async function GET(req: NextRequest) {
       if (b64) {
         const xmlStr = Buffer.from(b64, 'base64').toString('utf-8')
         const gre = parseGreXml(xmlStr)
-        return NextResponse.json({ ok: true, parsed: gre, raw: xmlStr.slice(0, 2000) })
+        return NextResponse.json({ ok: true, parsed: gre, rawXml: xmlStr })
       }
       // If response is already XML
       if (text.startsWith('<?xml') || text.startsWith('<')) {

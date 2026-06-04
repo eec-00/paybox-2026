@@ -17,7 +17,7 @@ interface GreDetalle {
   serie: string; fecEmision: string; fecTraslado: string; motivo: string
   tipoServicio: string; greRemitente: string; greTransporte: string
   remitente: string; destinatario: string; peso: string; nroContenedor: string
-  vehiculo: string; carreta: string; conductor: string; pagador: string
+  vehiculo: string; carreta: string; conductor: string; conductorDni: string; pagador: string
 }
 
 function today() { return new Date().toISOString().slice(0, 10) }
@@ -188,6 +188,7 @@ export function SunatSection() {
     ['vehiculo', 'Vehículo'],
     ['carreta', 'Carreta'],
     ['conductor', 'Conductor'],
+    ['conductorDni', 'DNI conductor'],
     ['pagador', 'Pagador'],
   ]
 
