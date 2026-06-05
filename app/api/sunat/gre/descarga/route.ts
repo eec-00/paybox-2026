@@ -80,9 +80,9 @@ function parseGreXml(xml: string) {
   const vehiculoPlate = v(equip, 'ID')
   const vehiculo = formatPlate(vehiculoPlate)
 
-  // Carreta: look for second TransportEquipment
-  const allEquip = [...thu.matchAll(/<(?:[^:>]+:)?TransportEquipment[\s\S]*?<\/(?:[^:>]+:)?TransportEquipment>/gi)]
-  const carretaPlate = allEquip.length > 1 ? v(allEquip[1][0], 'ID') : ''
+  // Carreta: AttachedTransportEquipment nested inside TransportEquipment
+  const attached = sec(equip, 'AttachedTransportEquipment')
+  const carretaPlate = attached ? v(attached, 'ID') : ''
   const carreta = formatPlate(carretaPlate)
 
   // Tipo servicio from Note
