@@ -92,7 +92,7 @@ function parseGreXml(xml: string) {
   // Container: prefer TransportHandlingUnit ID, fallback to "según contenedor: XXXX" in Note
   let nroContenedor = nroContenedorRaw === '-' ? '' : nroContenedorRaw
   if (!nroContenedor) {
-    const contMatch = nota.match(/seg[uú]n contenedor[:\s]+([A-Z0-9]+)/i)
+    const contMatch = nota.match(/seg[uú]n (?:contenedor|nro\.?\s*de\s*isotanque)[:\s]+([A-Z0-9]+)/i)
     if (contMatch) nroContenedor = contMatch[1]
   }
 
