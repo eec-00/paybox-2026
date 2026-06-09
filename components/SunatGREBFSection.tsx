@@ -50,10 +50,12 @@ export function SunatGREBFSection() {
   const [savingSession, setSavingSession] = useState(false)
 
   const [tipConsulta, setTipConsulta] = useState('02')
-  const [periodo, setPeriodo] = useState(currentPeriodo)
+  const [periodoDesde, setPeriodoDesde] = useState(currentPeriodo)
+  const [periodoHasta, setPeriodoHasta] = useState(currentPeriodo)
   const [ubigeoPartida, setUbigeoPartida] = useState('')
   const [ubigeoLlegada, setUbigeoLlegada] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingMsg, setLoadingMsg] = useState('')
   const [items, setItems] = useState<unknown[] | null>(null)
   const [rawData, setRawData] = useState<unknown>(null)
   const [httpStatus, setHttpStatus] = useState<number | null>(null)
@@ -94,28 +96,35 @@ export function SunatGREBFSection() {
   }
 
   async function buscar() {
-    if (!periodo.match(/^\d{6}$/)) { toast.error('Periodo debe ser AAAAMM — 6 dígitos, ej: 202606'); return }
+    if (!periodoDesde.match(/^\d{6}$/) || !periodoHasta.match(/^\d{6}$/)) {
+      toast.error('Periodo debe ser AAAAMM — 6 dígitos, ej: 202606')
+      return
+    }
+    if (periodoDesde > periodoHasta) { toast.error('Desde debe ser ≤ Hasta'); return }
     setLoading(true)
+    setLoadingMsg('')
     setItems(null)
     setRawData(null)
     try {
-      const params = new URLSearchParams({ tipConsulta, periodo })
+      const params = new URLSearchParams({ tipConsulta, periodoDesde, periodoHasta })
       if (ubigeoPartida) params.set('ubiPartida', ubigeoPartida)
       if (ubigeoLlegada) params.set('ubiLlegada', ubigeoLlegada)
       const res = await fetch(`/api/sunat/grebf?${params}`)
       const json = await res.json()
-      setHttpStatus(json.status)
-      setRawData(json.data)
+      setHttpStatus(json.status ?? 200)
+      setRawData(json)
       if (json.ok) {
         setItems(json.items ?? [])
-        toast.success(`${(json.items ?? []).length} GRE BF encontradas`)
+        const meses = json.meses > 1 ? ` (${json.meses} meses)` : ''
+        toast.success(`${json.total ?? (json.items ?? []).length} GRE BF encontradas${meses}`)
       } else {
-        toast.error(json.error ?? `SUNAT status ${json.status}`)
+        toast.error(json.error ?? `Error SUNAT`)
       }
     } catch {
       toast.error('Error al consultar SUNAT')
     } finally {
       setLoading(false)
+      setLoadingMsg('')
     }
   }
 
@@ -243,13 +252,23 @@ export function SunatGREBFSection() {
               </select>
             </div>
             <div className="space-y-1">
-              <Label>Periodo (AAAAMM)</Label>
+              <Label>Desde (AAAAMM)</Label>
               <Input
-                value={periodo}
-                onChange={(e) => setPeriodo(e.target.value)}
+                value={periodoDesde}
+                onChange={(e) => setPeriodoDesde(e.target.value)}
+                placeholder="202601"
+                maxLength={6}
+                className="w-24 font-mono"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Hasta (AAAAMM)</Label>
+              <Input
+                value={periodoHasta}
+                onChange={(e) => setPeriodoHasta(e.target.value)}
                 placeholder="202606"
                 maxLength={6}
-                className="w-28 font-mono"
+                className="w-24 font-mono"
               />
             </div>
             <div className="space-y-1">
@@ -272,7 +291,7 @@ export function SunatGREBFSection() {
             </div>
             <Button onClick={buscar} disabled={loading || !sessionStatus?.active} size="sm">
               {loading
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Consultando...</>
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{loadingMsg || 'Consultando...'}</>
                 : <><Search className="h-4 w-4 mr-2" />Buscar</>}
             </Button>
           </div>
