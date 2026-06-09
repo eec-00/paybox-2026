@@ -458,7 +458,7 @@ export function SunatSection() {
                             {Object.entries(r)
                               .filter(([k]) => !['docGrePorEvento'].includes(k))
                               .map(([, v], j) => (
-                                <td key={j} className="px-3 py-2 font-mono whitespace-nowrap">{String(v ?? '-')}</td>
+                                <td key={j} className="px-3 py-2 font-mono whitespace-nowrap">{v === false || v == null ? '—' : String(v)}</td>
                               ))}
                           </tr>
                         )})}

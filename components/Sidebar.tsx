@@ -72,12 +72,14 @@ export function Sidebar({
   const isServicios = pathname.startsWith('/servicios')
   const isAuto = pathname.startsWith('/automatizacion')
   const isAdmin_ = pathname.startsWith('/administracion')
+  const isSunat = pathname.startsWith('/sunat')
 
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     ...(isFinanzas ? ['finanzas'] : []),
     ...(isServicios ? ['servicios'] : []),
     ...(isAuto ? ['automatizacion'] : []),
     ...(isAdmin_ ? ['administracion'] : []),
+    ...(isSunat ? ['sunat'] : []),
   ])
 
   useEffect(() => {
@@ -86,8 +88,9 @@ export function Sidebar({
     if (isServicios) toExpand.push('servicios')
     if (isAuto) toExpand.push('automatizacion')
     if (isAdmin_) toExpand.push('administracion')
+    if (isSunat) toExpand.push('sunat')
     setExpandedGroups((prev) => Array.from(new Set([...prev, ...toExpand])))
-  }, [pathname, isFinanzas, isServicios, isAuto, isAdmin_])
+  }, [pathname, isFinanzas, isServicios, isAuto, isAdmin_, isSunat])
 
   const toggleGroup = (id: string) => {
     setExpandedGroups((prev) =>
@@ -263,13 +266,32 @@ export function Sidebar({
       ],
     },
     {
-      type: 'item',
+      type: 'group',
       id: 'sunat',
-      href: '/sunat',
       label: 'SUNAT',
       icon: ShieldCheck,
       description: 'GRE · Comprobantes electrónicos',
       adminOnly: false,
+      children: [
+        {
+          type: 'item',
+          id: 'sunat-grt',
+          href: '/sunat',
+          label: 'GRE Transportistas',
+          icon: ShieldCheck,
+          description: 'Guías de remisión transportistas',
+          adminOnly: false,
+        },
+        {
+          type: 'item',
+          id: 'sunat-grebf',
+          href: '/sunat/grebf',
+          label: 'GRE Bienes Fiscalizables',
+          icon: ShieldCheck,
+          description: 'Guías de remisión BF',
+          adminOnly: false,
+        },
+      ],
     },
     {
       type: 'item',
@@ -309,7 +331,8 @@ export function Sidebar({
       if (
         item.type === 'group' &&
         allowedModules !== null &&
-        !allowedModules.includes(item.id)
+        !allowedModules.includes(item.id) &&
+        item.id !== 'sunat'
       ) {
         return { ...item, children: item.children.filter((c) => canSeeModule(c.id)) }
       }

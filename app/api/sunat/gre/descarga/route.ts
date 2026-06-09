@@ -86,14 +86,22 @@ function parseGreXml(xml: string) {
   const carreta = formatPlate(carretaPlate)
 
   // Tipo servicio from Note
+  // Note formats: "IMPORTACION" | "IMPORTACION según contenedor: MSCU123" | "Label: IMPORTACION"
   const nota = v(body, 'Note')
-  const tipoServicio = nota.includes(':') ? nota.split(':').slice(1).join(':').trim() : nota
+  let tipoServicio = ''
+  if (nota && nota.toLowerCase() !== 'false') {
+    // Strip container/isotank suffix before extracting type
+    const stripped = nota.replace(/\s*seg[uú]n\s+(?:contenedor|nro\.?\s*(?:de\s*isotanque)?)[:\s.]*[A-Z0-9]*/i, '').trim()
+    tipoServicio = stripped.includes(':') ? stripped.split(':').slice(1).join(':').trim() : stripped
+  }
 
-  // Container: prefer TransportHandlingUnit ID, fallback to "según contenedor: XXXX" in Note
+  // Container: prefer TransportHandlingUnit ID, fallback to scanning entire XML
+  // Handles: "según contenedor: XXX" | "según NRO. XXX" | "según NRO.\nXXX" (anywhere in doc)
+  const CONT_RE = /seg[uú]n\s+(?:contenedor|nro\.?\s*(?:de\s*isotanque)?)[:\s.\n\r]*([A-Z]{3,4}\d{6,7})/i
   let nroContenedor = nroContenedorRaw === '-' ? '' : nroContenedorRaw
   if (!nroContenedor) {
-    const contMatch = nota.match(/seg[uú]n (?:contenedor|nro\.?\s*de\s*isotanque)[:\s]+([A-Z0-9]+)/i)
-    if (contMatch) nroContenedor = contMatch[1]
+    const contMatch = body.match(CONT_RE)
+    if (contMatch) nroContenedor = contMatch[1].replace(/\.+$/, '')
   }
 
   return {
