@@ -6,7 +6,7 @@ import {
   Truck, Clock, Building2, RefreshCw, PackageSearch,
   Play, CheckCircle2, SkipForward, ArrowLeft,
   FileText, Download, Loader2, AlertCircle,
-  Receipt, Plus, Trash2, Camera, X,
+  Receipt, Plus, Trash2, Camera, X, MapPin,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -390,6 +390,9 @@ export default function ConductorServiciosPage() {
     }
   }, [])
 
+  const [locationBlockedFor, setLocationBlockedFor] = useState<{ taskId: number } | null>(null)
+  const [locationPermState, setLocationPermState] = useState<'checking' | 'prompt' | 'denied' | null>(null)
+
   const [conductorUserId, setConductorUserId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -425,6 +428,44 @@ export default function ConductorServiciosPage() {
       return next
     })
   }
+
+  const handleStartWithLocationCheck = useCallback(async (taskId: number) => {
+    if (!navigator.geolocation) {
+      setLocationBlockedFor({ taskId })
+      setLocationPermState('denied')
+      return
+    }
+    if ('permissions' in navigator) {
+      const perm = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
+      if (perm.state === 'granted') {
+        setPendingConfirm({ taskId, stepIndex: 0, action: 'start' })
+        return
+      }
+      setLocationBlockedFor({ taskId })
+      setLocationPermState(perm.state === 'denied' ? 'denied' : 'prompt')
+      return
+    }
+    // No Permissions API (Firefox) — show modal, try on click
+    setLocationBlockedFor({ taskId })
+    setLocationPermState('prompt')
+  }, [])
+
+  const handleRequestLocation = useCallback(() => {
+    if (!locationBlockedFor) return
+    setLocationPermState('checking')
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        const taskId = locationBlockedFor.taskId
+        setLocationBlockedFor(null)
+        setLocationPermState(null)
+        setPendingConfirm({ taskId, stepIndex: 0, action: 'start' })
+      },
+      (err) => {
+        setLocationPermState(err.code === err.PERMISSION_DENIED ? 'denied' : 'prompt')
+      },
+      { timeout: 15000, enableHighAccuracy: true }
+    )
+  }, [locationBlockedFor])
 
   const handleConfirm = async () => {
     if (!pendingConfirm || saving) return
@@ -1033,6 +1074,57 @@ export default function ConductorServiciosPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl space-y-4">
+      {/* Location permission modal */}
+      {locationBlockedFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center">
+                <MapPin className="h-8 w-8 text-[#f5a623]" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-[#1a2332]">Ubicación requerida</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Para iniciar el servicio debes permitir el acceso a tu ubicación.
+                </p>
+              </div>
+              {locationPermState === 'denied' ? (
+                <>
+                  <div className="bg-red-50 rounded-xl px-4 py-3 text-xs text-red-600 text-left w-full space-y-1">
+                    <p className="font-semibold">Permiso bloqueado por el navegador</p>
+                    <p>Ve a la configuración de tu navegador → Privacidad / Sitios → Ubicación y permite el acceso a esta página. Luego pulsa Reintentar.</p>
+                  </div>
+                  <button
+                    onClick={handleRequestLocation}
+                    className="w-full py-3 rounded-xl bg-[#f5a623] text-white font-bold text-sm active:scale-95 transition-transform flex items-center justify-center gap-2"
+                  >
+                    <MapPin className="h-4 w-4" />
+                    Reintentar
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleRequestLocation}
+                  disabled={locationPermState === 'checking'}
+                  className="w-full py-3 rounded-xl bg-[#f5a623] text-white font-bold text-sm disabled:opacity-60 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                >
+                  {locationPermState === 'checking'
+                    ? <><Loader2 className="h-4 w-4 animate-spin" />Verificando...</>
+                    : <><MapPin className="h-4 w-4" />Dar acceso a ubicación</>
+                  }
+                </button>
+              )}
+              <button
+                onClick={() => { setLocationBlockedFor(null); setLocationPermState(null) }}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
@@ -1238,7 +1330,7 @@ export default function ConductorServiciosPage() {
                   />
                 ) : (
                   <button
-                    onClick={() => !otherInProgress && setPendingConfirm({ taskId: task.id, stepIndex: 0, action: 'start' })}
+                    onClick={() => !otherInProgress && handleStartWithLocationCheck(task.id)}
                     disabled={otherInProgress}
                     className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-gray-500 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-transform"
                   >
