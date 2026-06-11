@@ -392,6 +392,7 @@ export default function ConductorServiciosPage() {
 
   const [locationBlockedFor, setLocationBlockedFor] = useState<{ taskId: number } | null>(null)
   const [locationPermState, setLocationPermState] = useState<'checking' | 'prompt' | 'denied' | null>(null)
+  const permStatusRef = useRef<PermissionStatus | null>(null)
 
   const [conductorUserId, setConductorUserId] = useState<string | null>(null)
 
@@ -429,6 +430,28 @@ export default function ConductorServiciosPage() {
     })
   }
 
+  const attachPermissionWatcher = useCallback((taskId: number, status: PermissionStatus) => {
+    permStatusRef.current = status
+    status.onchange = () => {
+      if (status.state === 'granted') {
+        permStatusRef.current = null
+        setLocationBlockedFor(null)
+        setLocationPermState(null)
+        setPendingConfirm({ taskId, stepIndex: 0, action: 'start' })
+      } else {
+        setLocationPermState(status.state === 'denied' ? 'denied' : 'prompt')
+      }
+    }
+  }, [])
+
+  // Clean up watcher when modal closes
+  useEffect(() => {
+    if (!locationBlockedFor && permStatusRef.current) {
+      permStatusRef.current.onchange = null
+      permStatusRef.current = null
+    }
+  }, [locationBlockedFor])
+
   const handleStartWithLocationCheck = useCallback(async (taskId: number) => {
     if (!navigator.geolocation) {
       setLocationBlockedFor({ taskId })
@@ -443,19 +466,41 @@ export default function ConductorServiciosPage() {
       }
       setLocationBlockedFor({ taskId })
       setLocationPermState(perm.state === 'denied' ? 'denied' : 'prompt')
+      attachPermissionWatcher(taskId, perm)
       return
     }
     // No Permissions API (Firefox) — show modal, try on click
     setLocationBlockedFor({ taskId })
     setLocationPermState('prompt')
-  }, [])
+  }, [attachPermissionWatcher])
 
-  const handleRequestLocation = useCallback(() => {
+  const handleRequestLocation = useCallback(async () => {
     if (!locationBlockedFor) return
     setLocationPermState('checking')
+    const taskId = locationBlockedFor.taskId
+
+    // Re-check actual permission state first (user may have changed it in browser settings)
+    if ('permissions' in navigator) {
+      try {
+        const perm = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
+        if (perm.state === 'granted') {
+          setLocationBlockedFor(null)
+          setLocationPermState(null)
+          setPendingConfirm({ taskId, stepIndex: 0, action: 'start' })
+          return
+        }
+        if (perm.state === 'denied') {
+          // Re-attach watcher in case previous one was lost
+          attachPermissionWatcher(taskId, perm)
+          setLocationPermState('denied')
+          return
+        }
+        // 'prompt' — fall through to native dialog
+      } catch {}
+    }
+
     navigator.geolocation.getCurrentPosition(
       () => {
-        const taskId = locationBlockedFor.taskId
         setLocationBlockedFor(null)
         setLocationPermState(null)
         setPendingConfirm({ taskId, stepIndex: 0, action: 'start' })
@@ -465,7 +510,7 @@ export default function ConductorServiciosPage() {
       },
       { timeout: 15000, enableHighAccuracy: true }
     )
-  }, [locationBlockedFor])
+  }, [locationBlockedFor, attachPermissionWatcher])
 
   const handleConfirm = async () => {
     if (!pendingConfirm || saving) return
@@ -1090,16 +1135,23 @@ export default function ConductorServiciosPage() {
               </div>
               {locationPermState === 'denied' ? (
                 <>
-                  <div className="bg-red-50 rounded-xl px-4 py-3 text-xs text-red-600 text-left w-full space-y-1">
-                    <p className="font-semibold">Permiso bloqueado por el navegador</p>
-                    <p>Ve a la configuración de tu navegador → Privacidad / Sitios → Ubicación y permite el acceso a esta página. Luego pulsa Reintentar.</p>
+                  <div className="bg-red-50 rounded-xl px-4 py-3 text-xs text-red-600 text-left w-full space-y-1.5">
+                    <p className="font-semibold">Permiso bloqueado</p>
+                    <p>Marcaste "Nunca" o "Bloquear". Para activarlo:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-red-500">
+                      <li>Abre la <strong>configuración de tu navegador</strong></li>
+                      <li>Busca <strong>Privacidad → Ubicación</strong> (o el ícono 🔒 en la barra de dirección)</li>
+                      <li>Permite el acceso a este sitio</li>
+                      <li>Vuelve aquí y pulsa <strong>Verificar permiso</strong></li>
+                    </ol>
+                    <p className="text-red-400 text-[10px]">La página detectará el cambio automáticamente si lo activas sin cerrarla.</p>
                   </div>
                   <button
                     onClick={handleRequestLocation}
                     className="w-full py-3 rounded-xl bg-[#f5a623] text-white font-bold text-sm active:scale-95 transition-transform flex items-center justify-center gap-2"
                   >
                     <MapPin className="h-4 w-4" />
-                    Reintentar
+                    Verificar permiso
                   </button>
                 </>
               ) : (
