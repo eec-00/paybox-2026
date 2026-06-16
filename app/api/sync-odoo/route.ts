@@ -133,6 +133,13 @@ async function odooCall<T = unknown>(
 // ── Name → ID cache ──────────────────────────────────────────────────────────
 const resolveCache = new Map<string, number | string | null>()
 
+function slashVariants(name: string): string[] {
+  const compact = name.replace(/\s*\/\s*/g, '/')
+  const spaced = name.replace(/\s*\/\s*/g, ' / ')
+  const variants = [name, compact, spaced]
+  return [...new Set(variants)]
+}
+
 async function resolveId(
   uid: number,
   model: string,
@@ -142,17 +149,21 @@ async function resolveId(
   const key = `${model}::${name}`
   if (resolveCache.has(key)) return resolveCache.get(key) as number
 
-  const results = await odooCall<{ id: number }[]>(
-    uid,
-    model,
-    'search_read',
-    [[[field, '=', name]]],
-    { fields: ['id', 'name'], limit: 1 }
-  )
+  for (const candidate of slashVariants(name)) {
+    const results = await odooCall<{ id: number }[]>(
+      uid,
+      model,
+      'search_read',
+      [[[field, '=', candidate]]],
+      { fields: ['id', 'name'], limit: 1 }
+    )
+    if (results.length) {
+      resolveCache.set(key, results[0].id)
+      return results[0].id
+    }
+  }
 
-  if (!results.length) throw new Error(`No encontrado en '${model}': "${name}"`)
-  resolveCache.set(key, results[0].id)
-  return results[0].id
+  throw new Error(`No encontrado en '${model}': "${name}"`)
 }
 
 async function resolveIdByCandidateFields(
