@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -52,10 +52,25 @@ export function PaymentsTable({
   const PAGE_SIZE = 20
   const supabase = createClient()
 
+  const userProfileCacheRef = useRef<Map<string, string>>(new Map())
+  const profilesCachedRef = useRef(false)
+
+  // Load user permissions once on mount
   useEffect(() => {
     loadUser()
+  }, [])
+
+  // Reset to page 1 whenever filters or refresh change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [refresh, externalCatSearch, externalDocSearch, externalStartDate, externalEndDate,
+      externalMinAmount, externalMaxAmount, externalCurrency, externalPaymentType])
+
+  // Reload data when page or any filter changes
+  useEffect(() => {
     loadRegistros()
-  }, [refresh, externalCatSearch, externalDocSearch, currentPage, externalStartDate, externalEndDate])
+  }, [currentPage, refresh, externalCatSearch, externalDocSearch, externalStartDate, externalEndDate,
+      externalMinAmount, externalMaxAmount, externalCategories, externalCurrency, externalPaymentType])
 
   const loadUser = async () => {
     try {
@@ -73,10 +88,24 @@ export function PaymentsTable({
   const loadRegistros = async () => {
     setLoading(true)
     try {
-      console.log('🔄 Cargando registros (Página:', currentPage, ')...')
-
       const from = (currentPage - 1) * PAGE_SIZE
       const to = from + PAGE_SIZE - 1
+
+      // Pre-query categorias by name to avoid ilike on related table (no index)
+      let categoryIdFilter: string[] | null = null
+      if (externalCatSearch) {
+        const { data: matchingCats } = await supabase
+          .from('categorias')
+          .select('id')
+          .ilike('categoria_nombre', `%${externalCatSearch}%`)
+
+        categoryIdFilter = matchingCats?.map(c => String(c.id)) ?? []
+        if (categoryIdFilter.length === 0) {
+          setRegistros([])
+          setTotalRecords(0)
+          return
+        }
+      }
 
       let query = supabase
         .from('registros')
@@ -91,71 +120,45 @@ export function PaymentsTable({
           )
         `, { count: 'exact' })
 
-      // Aplicar filtros de búsqueda de categoría (en la relación)
-      if (externalCatSearch) {
-        // Filtramos por el nombre de la categoría en la tabla relacionada
-        query = query.ilike('categoria.categoria_nombre', `%${externalCatSearch}%`)
-      }
+      if (categoryIdFilter) query = query.in('categoria_id', categoryIdFilter)
 
-      // Aplicar filtros de búsqueda por tipo de documento
-      if (externalDocSearch) {
-        query = query.ilike('tipo_documento', `%${externalDocSearch}%`)
-      }
+      if (externalDocSearch) query = query.ilike('tipo_documento', `%${externalDocSearch}%`)
+      if (externalStartDate) query = query.gte('fecha_y_hora_pago', externalStartDate)
+      if (externalEndDate) query = query.lte('fecha_y_hora_pago', `${externalEndDate}T23:59:59`)
+      if (externalMinAmount && !isNaN(Number(externalMinAmount))) query = query.gte('monto', Number(externalMinAmount))
+      if (externalMaxAmount && !isNaN(Number(externalMaxAmount))) query = query.lte('monto', Number(externalMaxAmount))
+      if (externalCategories && externalCategories.length > 0) query = query.in('categoria_id', externalCategories)
+      if (externalCurrency && externalCurrency !== 'all') query = query.eq('moneda', externalCurrency)
+      if (externalPaymentType && externalPaymentType !== 'all') query = query.eq('metodo_pago', externalPaymentType)
 
-      // Aplicar filtros de fecha externos
-      if (externalStartDate) {
-        query = query.gte('fecha_y_hora_pago', externalStartDate)
-      }
-      if (externalEndDate) {
-        // Añadir 23:59:59 a la fecha final para incluir todo el día
-        query = query.lte('fecha_y_hora_pago', `${externalEndDate}T23:59:59`)
-      }
-
-      // Filtros avanzados
-      if (externalMinAmount && !isNaN(Number(externalMinAmount))) {
-        query = query.gte('monto', Number(externalMinAmount))
-      }
-      if (externalMaxAmount && !isNaN(Number(externalMaxAmount))) {
-        query = query.lte('monto', Number(externalMaxAmount))
-      }
-      if (externalCategories && externalCategories.length > 0) {
-        query = query.in('categoria_id', externalCategories)
-      }
-      if (externalCurrency && externalCurrency !== 'all') {
-        query = query.eq('moneda', externalCurrency)
-      }
-      if (externalPaymentType && externalPaymentType !== 'all') {
-        query = query.eq('metodo_pago', externalPaymentType)
-      }
-
-      const { data: registros, error, count } = await query
+      const registrosQuery = query
         .order('fecha_y_hora_pago', { ascending: false })
         .range(from, to)
 
-      if (error) {
-        console.error('❌ Error en query de registros:', error)
-        throw error
+      // Parallelize: main query + user profiles cache (first load only)
+      const profilesQuery = profilesCachedRef.current
+        ? Promise.resolve({ data: null, error: null })
+        : supabase.from('user_profiles').select('id, full_name')
+
+      const [{ data: registros, error, count }, { data: profilesData }] = await Promise.all([
+        registrosQuery,
+        profilesQuery,
+      ])
+
+      if (profilesData) {
+        userProfileCacheRef.current = new Map(profilesData.map(p => [p.id, p.full_name]))
+        profilesCachedRef.current = true
       }
 
+      if (error) throw error
+
       setTotalRecords(count || 0)
-      console.log('✅ Registros cargados:', registros?.length || 0, 'Total:', count)
 
-      // Obtener nombres desde user_profiles usando creado_por
       if (registros && registros.length > 0) {
-        const userIds = [...new Set(registros.map(r => r.creado_por))]
-
-        const { data: profiles, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('id, full_name')
-          .in('id', userIds)
-
-        const profileMap = new Map(profiles?.map(p => [p.id, p.full_name]) || [])
-
         const registrosConNombres = registros.map(r => ({
           ...r,
-          nombre_usuario: profileMap.get(r.creado_por) || 'Usuario desconocido'
+          nombre_usuario: userProfileCacheRef.current.get(r.creado_por) || 'Usuario desconocido',
         }))
-
         setRegistros(registrosConNombres)
       } else {
         setRegistros([])

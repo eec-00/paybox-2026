@@ -10,7 +10,8 @@
       "Bash(timeout:*)",
       "Bash(nul)",
       "Bash(exit 0)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(grep -E \"\\\\.\\(toml|yml|yaml\\)$\")"
     ],
     "deny": [],
     "ask": []
