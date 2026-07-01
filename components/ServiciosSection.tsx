@@ -1,14 +1,12 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { RefreshCw, Search, XCircle, Truck, Pencil, MapPin } from 'lucide-react'
+import { RefreshCw, Search, XCircle, Truck, Pencil, Info } from 'lucide-react'
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
-import { createClient } from '@/lib/supabase/client'
-
-type LocationMap = Record<number, Record<number, { lat: number; lng: number }>>
 
 interface OdooTask {
   id: number
@@ -108,7 +106,6 @@ export function ServiciosSection() {
   const [almacenRetiroFilter, setAlmacenRetiroFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [editingTask, setEditingTask] = useState<OdooTask | null>(null)
-  const [locations, setLocations] = useState<LocationMap>({})
 
   const fetchData = async () => {
     setLoading(true)
@@ -124,24 +121,6 @@ export function ServiciosSection() {
       setTasks(loadedTasks)
       setStages(data.stages ?? [])
       setValidFields(data.validFields ?? [])
-
-      // Fetch locations for all tasks
-      if (loadedTasks.length > 0) {
-        const supabase = createClient()
-        const ids = loadedTasks.map(t => t.id)
-        const { data: locs } = await supabase
-          .from('service_locations')
-          .select('task_id, step_index, lat, lng')
-          .in('task_id', ids)
-        if (locs) {
-          const map: LocationMap = {}
-          for (const l of locs) {
-            if (!map[l.task_id]) map[l.task_id] = {}
-            map[l.task_id][l.step_index] = { lat: l.lat, lng: l.lng }
-          }
-          setLocations(map)
-        }
-      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -398,6 +377,7 @@ export function ServiciosSection() {
                 <TableHeader>
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
                     <TableHead className="w-10" />
+                    <TableHead className="w-10" />
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[100px]">Código</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs w-10 text-center">Etapa</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[180px]">Cliente</TableHead>
@@ -411,21 +391,12 @@ export function ServiciosSection() {
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[140px]">N° Contenedor</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[200px]">Almacén Retiro</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[200px]">Almacén Destino</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Sal. Cochera</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Cola Ingreso</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Ing. Almacén</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Sal. Almacén</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Llegada Cliente</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Ing. Cliente</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Ini. C/D</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Tér. C/D</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px] text-center">Sal. Cliente</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginated.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={23} className="text-center py-12 text-muted-foreground text-sm">
+                      <TableCell colSpan={15} className="text-center py-12 text-muted-foreground text-sm">
                         No se encontraron servicios con los filtros aplicados
                       </TableCell>
                     </TableRow>
@@ -445,6 +416,18 @@ export function ServiciosSection() {
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
+                          </TableCell>
+                          <TableCell className="p-1">
+                            <Link href={`/servicios/trailers/${task.id}`}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                title="Ver detalle"
+                              >
+                                <Info className="h-3.5 w-3.5" />
+                              </Button>
+                            </Link>
                           </TableCell>
                           <TableCell className="font-medium whitespace-nowrap" title={task.name}>
                             {code}
@@ -476,15 +459,6 @@ export function ServiciosSection() {
                               {m2oName(task.x_studio_almacen_de_destino)}
                             </span>
                           </TableCell>
-                          <TimeCell time={task.x_studio_saliendo_de_la_cochera}        loc={locations[task.id]?.[0]} />
-                          <TimeCell time={task.x_studio_en_cola_de_ingreso}             loc={locations[task.id]?.[1]} />
-                          <TimeCell time={task.x_studio_ingreso_a_almacen_de_retiro_1} loc={locations[task.id]?.[2]} />
-                          <TimeCell time={task.x_studio_salida_de_almacen_de_retiro}   loc={locations[task.id]?.[3]} />
-                          <TimeCell time={task.x_studio_llegada_a_cliente}             loc={locations[task.id]?.[4]} />
-                          <TimeCell time={task.x_studio_ingreso_a_planta}              loc={locations[task.id]?.[5]} />
-                          <TimeCell time={task.x_studio_inicio_cargadescarga}          loc={locations[task.id]?.[6]} />
-                          <TimeCell time={task.x_studio_termino_de_descarga}           loc={locations[task.id]?.[7]} />
-                          <TimeCell time={task.x_studio_salida_cliente}             loc={locations[task.id]?.[8]} />
                         </TableRow>
                       )
                     })
@@ -513,25 +487,5 @@ export function ServiciosSection() {
       )}
     </div>
     </>
-  )
-}
-
-function TimeCell({ time, loc }: { time: number | false; loc?: { lat: number; lng: number } }) {
-  const formatted = formatOdooTime(time)
-  return (
-    <TableCell className="text-center whitespace-nowrap">
-      <span className="font-mono">{formatted}</span>
-      {loc && (
-        <a
-          href={`https://maps.google.com/?q=${loc.lat},${loc.lng}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center ml-1 text-blue-500 hover:text-blue-700"
-          title={`${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}`}
-        >
-          <MapPin className="h-3 w-3" />
-        </a>
-      )}
-    </TableCell>
   )
 }

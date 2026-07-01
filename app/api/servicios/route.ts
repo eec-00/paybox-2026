@@ -96,6 +96,7 @@ async function getValidFields(uid: number): Promise<string[]> {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
+    const idParam = searchParams.get('id')
     const stageFilter = searchParams.get('stage') || ''
     const limitParam = parseInt(searchParams.get('limit') || '500')
     const debugFields = searchParams.get('fields') === '1'
@@ -104,6 +105,46 @@ export async function GET(request: Request) {
 
     // Discover which x_studio fields actually exist
     const validFields = await getValidFields(uid)
+
+    // Detalle de un solo servicio (para la vista de detalle)
+    if (idParam) {
+      const taskId = parseInt(idParam)
+      const tasks = await odooCall<any[]>(
+        uid,
+        'project.task',
+        'search_read',
+        [[['id', '=', taskId]]],
+        { fields: validFields, limit: 1 }
+      )
+      if (!tasks.length) {
+        return NextResponse.json({ error: 'Servicio no encontrado' }, { status: 404 })
+      }
+      const task = tasks[0]
+
+      let conductor: Record<string, unknown> | null = null
+      const conductorRef = task.x_studio_conductor
+      if (Array.isArray(conductorRef) && conductorRef[0]) {
+        try {
+          const empCandidateFields = ['id', 'name', 'work_phone', 'mobile_phone', 'job_title', 'work_email']
+          const empMeta = await odooCall<Record<string, unknown>>(
+            uid, 'hr.employee', 'fields_get', [empCandidateFields], { attributes: ['type'] }
+          )
+          const empFields = empCandidateFields.filter((f) => f in empMeta)
+          const emps = await odooCall<any[]>(
+            uid,
+            'hr.employee',
+            'search_read',
+            [[['id', '=', conductorRef[0]]]],
+            { fields: empFields, limit: 1 }
+          )
+          conductor = emps[0] || null
+        } catch {
+          conductor = null
+        }
+      }
+
+      return NextResponse.json({ task, conductor })
+    }
 
     if (debugFields) {
       // Debug mode: return field list with their labels/types
