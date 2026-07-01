@@ -109,7 +109,7 @@ export async function GET(request: Request) {
     // Detalle de un solo servicio (para la vista de detalle)
     if (idParam) {
       const taskId = parseInt(idParam)
-      const tasks = await odooCall<any[]>(
+      const tasks = await odooCall<Record<string, unknown>[]>(
         uid,
         'project.task',
         'search_read',
@@ -130,7 +130,7 @@ export async function GET(request: Request) {
             uid, 'hr.employee', 'fields_get', [empCandidateFields], { attributes: ['type'] }
           )
           const empFields = empCandidateFields.filter((f) => f in empMeta)
-          const emps = await odooCall<any[]>(
+          const emps = await odooCall<Record<string, unknown>[]>(
             uid,
             'hr.employee',
             'search_read',
@@ -143,7 +143,29 @@ export async function GET(request: Request) {
         }
       }
 
-      return NextResponse.json({ task, conductor })
+      let cliente: Record<string, unknown> | null = null
+      const clienteRef = task.partner_id
+      if (Array.isArray(clienteRef) && clienteRef[0]) {
+        try {
+          const partnerCandidateFields = ['id', 'name', 'email', 'phone', 'mobile', 'vat', 'street', 'city', 'website']
+          const partnerMeta = await odooCall<Record<string, unknown>>(
+            uid, 'res.partner', 'fields_get', [partnerCandidateFields], { attributes: ['type'] }
+          )
+          const partnerFields = partnerCandidateFields.filter((f) => f in partnerMeta)
+          const partners = await odooCall<Record<string, unknown>[]>(
+            uid,
+            'res.partner',
+            'search_read',
+            [[['id', '=', clienteRef[0]]]],
+            { fields: partnerFields, limit: 1 }
+          )
+          cliente = partners[0] || null
+        } catch {
+          cliente = null
+        }
+      }
+
+      return NextResponse.json({ task, conductor, cliente })
     }
 
     if (debugFields) {

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   ChevronRight, RefreshCw, Truck, User, Phone, Mail, Briefcase,
   Calendar, Clock, Building2, Package, Hash, FileText, MapPin,
+  IdCard, Globe, MapPinned,
 } from 'lucide-react'
 
 interface OdooTaskDetail {
@@ -43,6 +44,18 @@ interface Conductor {
   mobile_phone?: string | false
   job_title?: string | false
   work_email?: string | false
+}
+
+interface Cliente {
+  id: number
+  name: string
+  email?: string | false
+  phone?: string | false
+  mobile?: string | false
+  vat?: string | false
+  street?: string | false
+  city?: string | false
+  website?: string | false
 }
 
 interface LocationPoint { lat: number; lng: number }
@@ -117,6 +130,7 @@ export default function ServicioDetailPage() {
 
   const [task, setTask] = useState<OdooTaskDetail | null>(null)
   const [conductor, setConductor] = useState<Conductor | null>(null)
+  const [cliente, setCliente] = useState<Cliente | null>(null)
   const [locations, setLocations] = useState<Record<number, LocationPoint>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -130,6 +144,7 @@ export default function ServicioDetailPage() {
       if (!res.ok) throw new Error(data.error || 'Error al cargar el servicio')
       setTask(data.task)
       setConductor(data.conductor)
+      setCliente(data.cliente)
 
       const supabase = createClient()
       const { data: locs } = await supabase
@@ -230,6 +245,24 @@ export default function ServicioDetailPage() {
               <InfoField icon={Package} label="Almacén Destino" value={m2oName(task.x_studio_almacen_de_destino)} />
               <InfoField icon={FileText} label="Importación" value={task.x_studio_es_importacion ? 'Sí' : 'No'} />
             </div>
+          </div>
+
+          {/* Cliente */}
+          <div className="bg-card border rounded-xl shadow-sm p-4">
+            <h3 className="text-sm font-bold mb-3 text-muted-foreground uppercase tracking-wide">Cliente</h3>
+            {!cliente ? (
+              <p className="text-sm text-muted-foreground">Sin información adicional del cliente.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <InfoField icon={User} label="Nombre" value={cliente.name || '—'} />
+                <InfoField icon={Mail} label="Correo" value={cliente.email || '—'} />
+                <InfoField icon={Phone} label="Teléfono" value={cliente.phone || cliente.mobile || '—'} />
+                <InfoField icon={IdCard} label="RUC/VAT" value={cliente.vat || '—'} />
+                <InfoField icon={MapPinned} label="Dirección" value={cliente.street || '—'} />
+                <InfoField icon={Building2} label="Ciudad" value={cliente.city || '—'} />
+                <InfoField icon={Globe} label="Sitio Web" value={cliente.website || '—'} />
+              </div>
+            )}
           </div>
 
           {/* Conductor */}
