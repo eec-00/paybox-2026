@@ -101,6 +101,11 @@ export function ServiciosSection() {
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState('all')
   const [importFilter, setImportFilter] = useState<'all' | 'yes' | 'no'>('all')
+  const [conductorFilter, setConductorFilter] = useState('all')
+  const [clienteFilter, setClienteFilter] = useState('all')
+  const [fechaFilter, setFechaFilter] = useState('')
+  const [almacenDestinoFilter, setAlmacenDestinoFilter] = useState('all')
+  const [almacenRetiroFilter, setAlmacenRetiroFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [editingTask, setEditingTask] = useState<OdooTask | null>(null)
   const [locations, setLocations] = useState<LocationMap>({})
@@ -146,6 +151,26 @@ export function ServiciosSection() {
 
   useEffect(() => { fetchData() }, [])
 
+  const conductorOptions = useMemo(() => {
+    const names = new Set(tasks.map((t) => m2oName(t.x_studio_conductor)).filter((n) => n !== '—'))
+    return Array.from(names).sort()
+  }, [tasks])
+
+  const clienteOptions = useMemo(() => {
+    const names = new Set(tasks.map((t) => m2oName(t.partner_id)).filter((n) => n !== '—'))
+    return Array.from(names).sort()
+  }, [tasks])
+
+  const almacenDestinoOptions = useMemo(() => {
+    const names = new Set(tasks.map((t) => m2oName(t.x_studio_almacen_de_destino)).filter((n) => n !== '—'))
+    return Array.from(names).sort()
+  }, [tasks])
+
+  const almacenRetiroOptions = useMemo(() => {
+    const names = new Set(tasks.map((t) => m2oName(t.x_studio_almacen_de_retiro)).filter((n) => n !== '—'))
+    return Array.from(names).sort()
+  }, [tasks])
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
     return tasks.filter((t) => {
@@ -155,6 +180,11 @@ export function ServiciosSection() {
       }
       if (importFilter === 'yes' && !t.x_studio_es_importacion) return false
       if (importFilter === 'no' && t.x_studio_es_importacion) return false
+      if (conductorFilter !== 'all' && m2oName(t.x_studio_conductor) !== conductorFilter) return false
+      if (clienteFilter !== 'all' && m2oName(t.partner_id) !== clienteFilter) return false
+      if (almacenDestinoFilter !== 'all' && m2oName(t.x_studio_almacen_de_destino) !== almacenDestinoFilter) return false
+      if (almacenRetiroFilter !== 'all' && m2oName(t.x_studio_almacen_de_retiro) !== almacenRetiroFilter) return false
+      if (fechaFilter && t.x_studio_fecha_de_la_programacin !== fechaFilter) return false
       if (!q) return true
       const searchable = [
         t.name,
@@ -167,7 +197,7 @@ export function ServiciosSection() {
       ].join(' ').toLowerCase()
       return searchable.includes(q)
     })
-  }, [tasks, search, stageFilter, importFilter])
+  }, [tasks, search, stageFilter, importFilter, conductorFilter, clienteFilter, almacenDestinoFilter, almacenRetiroFilter, fechaFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -175,9 +205,26 @@ export function ServiciosSection() {
   const handleSearch = (val: string) => { setSearch(val); setPage(1) }
   const handleStage = (val: string) => { setStageFilter(val); setPage(1) }
   const handleImport = (val: string) => { setImportFilter(val as 'all' | 'yes' | 'no'); setPage(1) }
+  const handleConductor = (val: string) => { setConductorFilter(val); setPage(1) }
+  const handleCliente = (val: string) => { setClienteFilter(val); setPage(1) }
+  const handleFecha = (val: string) => { setFechaFilter(val); setPage(1) }
+  const handleAlmacenDestino = (val: string) => { setAlmacenDestinoFilter(val); setPage(1) }
+  const handleAlmacenRetiro = (val: string) => { setAlmacenRetiroFilter(val); setPage(1) }
 
-  const clearFilters = () => { setSearch(''); setStageFilter('all'); setImportFilter('all'); setPage(1) }
-  const hasFilters = search || stageFilter !== 'all' || importFilter !== 'all'
+  const clearFilters = () => {
+    setSearch('')
+    setStageFilter('all')
+    setImportFilter('all')
+    setConductorFilter('all')
+    setClienteFilter('all')
+    setFechaFilter('')
+    setAlmacenDestinoFilter('all')
+    setAlmacenRetiroFilter('all')
+    setPage(1)
+  }
+  const hasFilters = search || stageFilter !== 'all' || importFilter !== 'all' ||
+    conductorFilter !== 'all' || clienteFilter !== 'all' || fechaFilter ||
+    almacenDestinoFilter !== 'all' || almacenRetiroFilter !== 'all'
 
   return (
     <>
@@ -249,6 +296,62 @@ export function ServiciosSection() {
             <SelectItem value="all">Importación: Todos</SelectItem>
             <SelectItem value="yes">Solo Importación</SelectItem>
             <SelectItem value="no">No Importación</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={conductorFilter} onValueChange={handleConductor}>
+          <SelectTrigger className="h-9 text-xs w-40">
+            <SelectValue placeholder="Por Conductor" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los conductores</SelectItem>
+            {conductorOptions.map((n) => (
+              <SelectItem key={n} value={n}>{n}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={clienteFilter} onValueChange={handleCliente}>
+          <SelectTrigger className="h-9 text-xs w-40">
+            <SelectValue placeholder="Por Cliente" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los clientes</SelectItem>
+            {clienteOptions.map((n) => (
+              <SelectItem key={n} value={n}>{n}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <input
+          type="date"
+          value={fechaFilter}
+          onChange={(e) => handleFecha(e.target.value)}
+          className="h-9 text-xs border rounded-lg px-2 bg-background text-muted-foreground focus:text-foreground outline-none"
+          title="Por Fecha"
+        />
+
+        <Select value={almacenRetiroFilter} onValueChange={handleAlmacenRetiro}>
+          <SelectTrigger className="h-9 text-xs w-[180px]">
+            <SelectValue placeholder="Por Almacén de Retiro" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos (Retiro)</SelectItem>
+            {almacenRetiroOptions.map((n) => (
+              <SelectItem key={n} value={n}>{n}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={almacenDestinoFilter} onValueChange={handleAlmacenDestino}>
+          <SelectTrigger className="h-9 text-xs w-[180px]">
+            <SelectValue placeholder="Por Almacén de Destino" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos (Destino)</SelectItem>
+            {almacenDestinoOptions.map((n) => (
+              <SelectItem key={n} value={n}>{n}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
 

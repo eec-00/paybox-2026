@@ -13,7 +13,7 @@ export const CAMPOS_VENCIMIENTO: CampoVencimiento[] = [
   { key: 'x_studio_apm', label: 'APM Certificación' },
   { key: 'x_studio_emo', label: 'EMO Vigencia' },
   { key: 'x_studio_normativa_mtc', label: 'MTC Normativa' },
-  { key: 'x_studio_cultura_ziyu', label: 'Cultura ZIYU' },
+  { key: 'x_studio_cultura_ziyu', label: 'CUL ZIYU' },
   { key: 'x_studio_curso_bsico', label: 'Curso Básico' },
   { key: 'x_studio_altura_curso_1', label: 'Curso Altura' },
   { key: 'x_studio_pbip_1', label: 'PBIP Certificación' },
