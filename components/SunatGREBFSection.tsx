@@ -194,6 +194,17 @@ export function SunatGREBFSection() {
     }
   }
 
+  const EXCLUDED_KEYS = [
+    'num_docide_recep',
+    'cod_cpe',
+    'codUbigeoLlegada',
+    'rutaFiscales',
+    'codUbigeoPartida',
+    'razonSocial',
+    'estado',
+    'tipodoc',
+  ]
+
   async function exportarExcel() {
     if (!items || items.length === 0) return
     setExportingExcel(true)
@@ -208,8 +219,12 @@ export function SunatGREBFSection() {
         while (nextIndex < rows.length) {
           const i = nextIndex++
           const detalle = await fetchDetalle(rows[i])
+          const destinatario = rows[i].numeroNombreDestinatario
           enriched[i] = {
             ...rows[i],
+            numeroNombreDestinatario: typeof destinatario === 'string'
+              ? destinatario.replace(/^\d+\s*/, '').trim()
+              : destinatario,
             placaUnidad: detalle.placas,
             nombreConductor: detalle.conductor,
             ...(detalle.debug ? { _debug_pdf: detalle.debug } : {}),
@@ -222,11 +237,26 @@ export function SunatGREBFSection() {
 
       const keySet = new Set<string>()
       enriched.forEach((row) => Object.keys(row).forEach((k) => keySet.add(k)))
-      const allKeys = Array.from(keySet)
+
+      const PRIORITY_KEYS = ['placaUnidad', 'numeroNombreDestinatario', 'nombreConductor']
+      const allKeys = Array.from(keySet).filter((k) => !EXCLUDED_KEYS.includes(k) && !PRIORITY_KEYS.includes(k))
+      const fecIdx = allKeys.indexOf('fecEmision')
+      if (fecIdx !== -1) {
+        allKeys.splice(fecIdx + 1, 0, ...PRIORITY_KEYS)
+      } else {
+        allKeys.unshift(...PRIORITY_KEYS)
+      }
 
       const workbook = new ExcelJS.Workbook()
       const worksheet = workbook.addWorksheet('GRE BF')
-      worksheet.columns = allKeys.map((key) => ({ header: key, key, width: 20 }))
+      worksheet.columns = allKeys.map((key) => {
+        const maxContentLen = enriched.reduce((max, row) => {
+          const len = String(row[key] ?? '').length
+          return len > max ? len : max
+        }, key.length)
+        const width = Math.min(Math.max(maxContentLen + 2, 12), 60)
+        return { header: key, key, width }
+      })
 
       enriched.forEach((row, i) => {
         const r = worksheet.addRow(row)
