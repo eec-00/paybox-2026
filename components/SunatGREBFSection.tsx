@@ -63,6 +63,8 @@ export function SunatGREBFSection() {
   const [httpStatus, setHttpStatus] = useState<number | null>(null)
   const [loadingPdf, setLoadingPdf] = useState<string | null>(null)
   const [showRaw, setShowRaw] = useState(false)
+  const [exportingExcel, setExportingExcel] = useState(false)
+  const [exportProgress, setExportProgress] = useState('')
 
   const fetchSessionStatus = useCallback(async () => {
     const res = await fetch('/api/sunat/bfsession')
@@ -177,34 +179,75 @@ export function SunatGREBFSection() {
     }
   }
 
+  async function fetchDetalle(row: Record<string, unknown>): Promise<{ placas: string; conductor: string; debug: string }> {
+    try {
+      const params = new URLSearchParams({
+        numeroFile: String(row.num_id_xml),
+        numeroRUC: String(row.num_ruc),
+      })
+      const res = await fetch(`/api/sunat/grebf/detalle?${params}`)
+      const data = await res.json()
+      if (!data.ok) return { placas: '', conductor: '', debug: `ERROR: ${data.error ?? res.status}` }
+      return { placas: data.placas ?? '', conductor: data.conductor ?? '', debug: data.debugText ?? '' }
+    } catch (err: any) {
+      return { placas: '', conductor: '', debug: `ERROR fetch: ${err.message}` }
+    }
+  }
+
   async function exportarExcel() {
     if (!items || items.length === 0) return
-    const keySet = new Set<string>()
-    items.forEach((row) => {
-      Object.keys(row as Record<string, unknown>).forEach((k) => keySet.add(k))
-    })
-    const allKeys = Array.from(keySet)
+    setExportingExcel(true)
+    try {
+      const rows = items as Record<string, unknown>[]
+      const enriched: Record<string, unknown>[] = new Array(rows.length)
 
-    const workbook = new ExcelJS.Workbook()
-    const worksheet = workbook.addWorksheet('GRE BF')
-    worksheet.columns = allKeys.map((key) => ({ header: key, key, width: 20 }))
-
-    items.forEach((row, i) => {
-      const r = worksheet.addRow(row as Record<string, unknown>)
-      if (i % 2 === 1) {
-        r.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }
+      const CONCURRENCY = 3
+      let nextIndex = 0
+      let done = 0
+      async function worker() {
+        while (nextIndex < rows.length) {
+          const i = nextIndex++
+          const detalle = await fetchDetalle(rows[i])
+          enriched[i] = {
+            ...rows[i],
+            placaUnidad: detalle.placas,
+            nombreConductor: detalle.conductor,
+            ...(detalle.debug ? { _debug_pdf: detalle.debug } : {}),
+          }
+          done++
+          setExportProgress(`Extrayendo datos operativos ${done}/${rows.length}...`)
+        }
       }
-    })
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, rows.length) }, worker))
 
-    const headerRow = worksheet.getRow(1)
-    headerRow.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2332' } }
-      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true }
-      cell.alignment = { vertical: 'middle', horizontal: 'center' }
-    })
+      const keySet = new Set<string>()
+      enriched.forEach((row) => Object.keys(row).forEach((k) => keySet.add(k)))
+      const allKeys = Array.from(keySet)
 
-    const buffer = await workbook.xlsx.writeBuffer()
-    saveAs(new Blob([buffer]), `GRE-BF-${tipConsulta}-${periodoDesde}-${periodoHasta}.xlsx`)
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('GRE BF')
+      worksheet.columns = allKeys.map((key) => ({ header: key, key, width: 20 }))
+
+      enriched.forEach((row, i) => {
+        const r = worksheet.addRow(row)
+        if (i % 2 === 1) {
+          r.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }
+        }
+      })
+
+      const headerRow = worksheet.getRow(1)
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2332' } }
+        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true }
+        cell.alignment = { vertical: 'middle', horizontal: 'center' }
+      })
+
+      const buffer = await workbook.xlsx.writeBuffer()
+      saveAs(new Blob([buffer]), `GRE-BF-${tipConsulta}-${periodoDesde}-${periodoHasta}.xlsx`)
+    } finally {
+      setExportingExcel(false)
+      setExportProgress('')
+    }
   }
 
   return (
@@ -342,9 +385,10 @@ export function SunatGREBFSection() {
                   <span className="text-sm text-muted-foreground">{items.length} registros</span>
                 )}
                 {items && items.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={exportarExcel} className="ml-auto">
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Exportar Excel
+                  <Button variant="outline" size="sm" onClick={exportarExcel} disabled={exportingExcel} className="ml-auto">
+                    {exportingExcel
+                      ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{exportProgress || 'Exportando...'}</>
+                      : <><FileSpreadsheet className="h-4 w-4 mr-2" />Exportar Excel (con placa/conductor)</>}
                   </Button>
                 )}
                 <Button variant="ghost" size="sm" onClick={() => setShowRaw((v) => !v)}>
