@@ -1,7 +1,7 @@
 import { PDFParse } from 'pdf-parse'
 
 export interface DetalleGreBF {
-  placas: string
+  placas: string[]
   conductor: string
   debugText?: string
 }
@@ -44,7 +44,7 @@ export function extractDetalle(text: string): DetalleGreBF {
   }
 
   return {
-    placas: placas.join(' / '),
+    placas,
     conductor,
     ...(placas.length === 0 || !conductor ? { debugText: normalized.slice(0, 2000) } : {}),
   }

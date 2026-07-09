@@ -179,7 +179,7 @@ export function SunatGREBFSection() {
     }
   }
 
-  async function fetchDetalle(row: Record<string, unknown>): Promise<{ placas: string; conductor: string; debug: string }> {
+  async function fetchDetalle(row: Record<string, unknown>): Promise<{ placas: string[]; conductor: string; debug: string }> {
     try {
       const params = new URLSearchParams({
         numeroFile: String(row.num_id_xml),
@@ -187,22 +187,43 @@ export function SunatGREBFSection() {
       })
       const res = await fetch(`/api/sunat/grebf/detalle?${params}`)
       const data = await res.json()
-      if (!data.ok) return { placas: '', conductor: '', debug: `ERROR: ${data.error ?? res.status}` }
-      return { placas: data.placas ?? '', conductor: data.conductor ?? '', debug: data.debugText ?? '' }
+      if (!data.ok) return { placas: [], conductor: '', debug: `ERROR: ${data.error ?? res.status}` }
+      return { placas: data.placas ?? [], conductor: data.conductor ?? '', debug: data.debugText ?? '' }
     } catch (err: any) {
-      return { placas: '', conductor: '', debug: `ERROR fetch: ${err.message}` }
+      return { placas: [], conductor: '', debug: `ERROR fetch: ${err.message}` }
     }
   }
 
-  const EXCLUDED_KEYS = [
-    'num_docide_recep',
-    'cod_cpe',
-    'codUbigeoLlegada',
-    'rutaFiscales',
-    'codUbigeoPartida',
-    'razonSocial',
-    'estado',
-    'tipodoc',
+  // Mismas columnas/diseño que el Excel de GRE Transportistas (ver SunatSection.tsx EXCEL_COLS),
+  // adaptado a los campos que sí trae la consulta GRE-BF (sin peso/contenedor/pagador; con direcciones).
+  interface BFExcelRow {
+    fecEmision: string
+    greRemitente: string
+    greTransporte: string
+    fecTraslado: string
+    remitente: string
+    destinatario: string
+    puntoPartida: string
+    puntoLlegada: string
+    vehiculo: string
+    carreta: string
+    conductor: string
+    _debug?: string
+  }
+
+  const BF_EXCEL_COLS: [keyof BFExcelRow, string][] = [
+    ['fecEmision', 'FECHA EMISIÓN'],
+    ['greRemitente', 'GRE REMITENTE'],
+    ['greTransporte', 'GRE TRANSPORTE'],
+    ['fecTraslado', 'FECHA TRASLADO'],
+    ['remitente', 'REMITENTE'],
+    ['destinatario', 'DESTINATARIO'],
+    ['vehiculo', 'VEHÍCULO'],
+    ['carreta', 'CARRETA'],
+    ['conductor', 'CONDUCTOR'],
+    ['puntoPartida', 'PUNTO DE PARTIDA'],
+    ['puntoLlegada', 'PUNTO DE LLEGADA'],
+    ['_debug', '_DEBUG (temporal)'],
   ]
 
   async function exportarExcel() {
@@ -210,7 +231,7 @@ export function SunatGREBFSection() {
     setExportingExcel(true)
     try {
       const rows = items as Record<string, unknown>[]
-      const enriched: Record<string, unknown>[] = new Array(rows.length)
+      const enriched: BFExcelRow[] = new Array(rows.length)
 
       const CONCURRENCY = 3
       let nextIndex = 0
@@ -218,16 +239,21 @@ export function SunatGREBFSection() {
       async function worker() {
         while (nextIndex < rows.length) {
           const i = nextIndex++
-          const detalle = await fetchDetalle(rows[i])
-          const destinatario = rows[i].numeroNombreDestinatario
+          const r = rows[i]
+          const detalle = await fetchDetalle(r)
           enriched[i] = {
-            ...rows[i],
-            numeroNombreDestinatario: typeof destinatario === 'string'
-              ? destinatario.replace(/^\d+\s*/, '').trim()
-              : destinatario,
-            placaUnidad: detalle.placas,
-            nombreConductor: detalle.conductor,
-            ...(detalle.debug ? { _debug_pdf: detalle.debug } : {}),
+            fecEmision: String(r.fecEmision ?? ''),
+            greRemitente: String(r.serieNumeroGreRemitente ?? ''),
+            greTransporte: String(r.serieNumeroGre ?? ''),
+            fecTraslado: String(r.fecIniTraslado ?? ''),
+            remitente: String(r.rucRemitente ?? ''),
+            destinatario: String(r.razonSocialDestino ?? '').trim(),
+            puntoPartida: String(r.direccionPartida ?? ''),
+            puntoLlegada: String(r.direccionLlegada ?? ''),
+            vehiculo: detalle.placas[0] ?? '',
+            carreta: detalle.placas[1] ?? '',
+            conductor: detalle.conductor,
+            _debug: detalle.debug,
           }
           done++
           setExportProgress(`Extrayendo datos operativos ${done}/${rows.length}...`)
@@ -235,41 +261,41 @@ export function SunatGREBFSection() {
       }
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, rows.length) }, worker))
 
-      const keySet = new Set<string>()
-      enriched.forEach((row) => Object.keys(row).forEach((k) => keySet.add(k)))
-
-      const PRIORITY_KEYS = ['placaUnidad', 'numeroNombreDestinatario', 'nombreConductor']
-      const allKeys = Array.from(keySet).filter((k) => !EXCLUDED_KEYS.includes(k) && !PRIORITY_KEYS.includes(k))
-      const fecIdx = allKeys.indexOf('fecEmision')
-      if (fecIdx !== -1) {
-        allKeys.splice(fecIdx + 1, 0, ...PRIORITY_KEYS)
-      } else {
-        allKeys.unshift(...PRIORITY_KEYS)
-      }
-
       const workbook = new ExcelJS.Workbook()
       const worksheet = workbook.addWorksheet('GRE BF')
-      worksheet.columns = allKeys.map((key) => {
-        const maxContentLen = enriched.reduce((max, row) => {
-          const len = String(row[key] ?? '').length
-          return len > max ? len : max
-        }, key.length)
-        const width = Math.min(Math.max(maxContentLen + 2, 12), 60)
-        return { header: key, key, width }
-      })
 
-      enriched.forEach((row, i) => {
-        const r = worksheet.addRow(row)
-        if (i % 2 === 1) {
-          r.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }
-        }
+      const colWidths = BF_EXCEL_COLS.map(([key, label]) => {
+        const maxData = enriched.reduce((max, row) => Math.max(max, String(row[key] ?? '').length), 0)
+        return Math.max(label.length, maxData) + 2
       })
+      worksheet.columns = BF_EXCEL_COLS.map(([key, label], i) => ({ header: label, key, width: colWidths[i] }))
+
+      const blackBorder: Partial<import('exceljs').Borders> = {
+        top: { style: 'thin', color: { argb: 'FF000000' } },
+        left: { style: 'thin', color: { argb: 'FF000000' } },
+        bottom: { style: 'thin', color: { argb: 'FF000000' } },
+        right: { style: 'thin', color: { argb: 'FF000000' } },
+      }
 
       const headerRow = worksheet.getRow(1)
       headerRow.eachCell((cell) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2332' } }
-        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true }
-        cell.alignment = { vertical: 'middle', horizontal: 'center' }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: false }
+        cell.border = { ...blackBorder, bottom: { style: 'medium', color: { argb: 'FF000000' } } }
+      })
+      headerRow.height = 22
+
+      enriched.forEach((row, i) => {
+        const isEven = i % 2 === 0
+        const r = worksheet.addRow(row)
+        r.eachCell({ includeEmpty: true }, (cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'FFF0F4FA' : 'FFFFFFFF' } }
+          cell.font = { size: 10 }
+          cell.alignment = { vertical: 'middle' }
+          cell.border = blackBorder
+        })
+        r.height = 16
       })
 
       const buffer = await workbook.xlsx.writeBuffer()

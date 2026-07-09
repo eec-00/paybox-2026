@@ -48,7 +48,11 @@ export async function updateSession(request: NextRequest) {
       response.cookies.delete('sb-ensmgozpmqcnkhthqgit-auth-token')
       response.cookies.delete('sb-ensmgozpmqcnkhthqgit-auth-token.0')
       response.cookies.delete('sb-ensmgozpmqcnkhthqgit-auth-token.1')
-      
+
+      if (request.nextUrl.pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Sesión expirada' }, { status: 401 })
+      }
+
       // Redirect to login if not already on auth pages
       if (
         !request.nextUrl.pathname.startsWith('/login') &&
@@ -74,6 +78,9 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/auth')
 
   if (!user && !isPublicPath) {
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
     const url = request.nextUrl.clone()
     url.pathname = request.nextUrl.pathname.startsWith('/conductor')
       ? '/conductor/login'
