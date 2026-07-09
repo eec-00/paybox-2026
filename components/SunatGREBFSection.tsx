@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, CheckCircle2, XCircle, Search, Cookie, FileText, Download } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Search, Cookie, FileText, Download, FileSpreadsheet } from 'lucide-react'
 import { toast } from 'sonner'
+import ExcelJS from 'exceljs'
+import { saveAs } from 'file-saver'
 
 interface SessionStatus { active: boolean; minutes_left?: number }
 
@@ -60,6 +62,7 @@ export function SunatGREBFSection() {
   const [rawData, setRawData] = useState<unknown>(null)
   const [httpStatus, setHttpStatus] = useState<number | null>(null)
   const [loadingPdf, setLoadingPdf] = useState<string | null>(null)
+  const [showRaw, setShowRaw] = useState(false)
 
   const fetchSessionStatus = useCallback(async () => {
     const res = await fetch('/api/sunat/bfsession')
@@ -172,6 +175,36 @@ export function SunatGREBFSection() {
     } finally {
       setLoadingPdf(null)
     }
+  }
+
+  async function exportarExcel() {
+    if (!items || items.length === 0) return
+    const keySet = new Set<string>()
+    items.forEach((row) => {
+      Object.keys(row as Record<string, unknown>).forEach((k) => keySet.add(k))
+    })
+    const allKeys = Array.from(keySet)
+
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet('GRE BF')
+    worksheet.columns = allKeys.map((key) => ({ header: key, key, width: 20 }))
+
+    items.forEach((row, i) => {
+      const r = worksheet.addRow(row as Record<string, unknown>)
+      if (i % 2 === 1) {
+        r.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }
+      }
+    })
+
+    const headerRow = worksheet.getRow(1)
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2332' } }
+      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true }
+      cell.alignment = { vertical: 'middle', horizontal: 'center' }
+    })
+
+    const buffer = await workbook.xlsx.writeBuffer()
+    saveAs(new Blob([buffer]), `GRE-BF-${tipConsulta}-${periodoDesde}-${periodoHasta}.xlsx`)
   }
 
   return (
@@ -308,7 +341,22 @@ export function SunatGREBFSection() {
                 {items !== null && (
                   <span className="text-sm text-muted-foreground">{items.length} registros</span>
                 )}
+                {items && items.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={exportarExcel} className="ml-auto">
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Exportar Excel
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => setShowRaw((v) => !v)}>
+                  {showRaw ? 'Ocultar' : 'Ver'} campos crudos
+                </Button>
               </div>
+
+              {showRaw && (
+                <pre className="bg-muted rounded-md p-3 text-xs overflow-auto max-h-96 font-mono">
+                  {JSON.stringify(items && items.length > 0 ? items[0] : rawData, null, 2)}
+                </pre>
+              )}
 
               {items && items.length > 0 ? (
                 <div className="overflow-auto rounded-md border">
