@@ -7,8 +7,9 @@ import { createClient } from '@/lib/supabase/client'
 import {
   ChevronRight, RefreshCw, Truck, User, Phone, Mail, Briefcase,
   Calendar, Clock, Building2, Package, Hash, FileText, MapPin,
-  IdCard, Globe, MapPinned,
+  IdCard, Globe, MapPinned, Camera,
 } from 'lucide-react'
+import { getHitosForTask, tipoServicioLabelFor } from '@/lib/servicios/hitos'
 
 interface OdooTaskDetail {
   id: number
@@ -25,16 +26,22 @@ interface OdooTaskDetail {
   x_studio_nmero_de_contenedor: string | false
   x_studio_almacen_de_retiro: [number, string] | false
   x_studio_almacen_de_destino: [number, string] | false
+  x_studio_almacen_de_devolucion?: [number, string] | false
   x_studio_es_importacion: boolean
-  x_studio_saliendo_de_la_cochera: number | false
-  x_studio_en_cola_de_ingreso: number | false
-  x_studio_ingreso_a_almacen_de_retiro_1: number | false
-  x_studio_salida_de_almacen_de_retiro: number | false
-  x_studio_llegada_a_cliente: number | false
-  x_studio_ingreso_a_planta: number | false
-  x_studio_inicio_cargadescarga: number | false
-  x_studio_termino_de_descarga: number | false
-  x_studio_salida_cliente: number | false
+  x_studio_es_import?: boolean
+  x_studio_es_export?: boolean
+  x_studio_es_despacho?: boolean
+  x_studio_es_itk?: boolean
+  x_studio_es_isotanque_lleno?: boolean
+  x_studio_es_isotanque_vacio?: boolean
+  [key: string]: unknown
+}
+
+interface HitoFoto {
+  hito_key: string
+  hito_label: string
+  foto_url: string
+  created_at: string
 }
 
 interface Conductor {
@@ -59,18 +66,6 @@ interface Cliente {
 }
 
 interface LocationPoint { lat: number; lng: number }
-
-const TIEMPOS_FIELDS: { key: keyof OdooTaskDetail; label: string; step: number }[] = [
-  { key: 'x_studio_saliendo_de_la_cochera', label: 'Saliendo de Cochera', step: 0 },
-  { key: 'x_studio_en_cola_de_ingreso', label: 'Cola de Ingreso', step: 1 },
-  { key: 'x_studio_ingreso_a_almacen_de_retiro_1', label: 'Ingreso a Almacén', step: 2 },
-  { key: 'x_studio_salida_de_almacen_de_retiro', label: 'Salida de Almacén', step: 3 },
-  { key: 'x_studio_llegada_a_cliente', label: 'Llegada a Cliente', step: 4 },
-  { key: 'x_studio_ingreso_a_planta', label: 'Ingreso a Cliente', step: 5 },
-  { key: 'x_studio_inicio_cargadescarga', label: 'Inicio Carga/Descarga', step: 6 },
-  { key: 'x_studio_termino_de_descarga', label: 'Término Carga/Descarga', step: 7 },
-  { key: 'x_studio_salida_cliente', label: 'Salida de Cliente', step: 8 },
-]
 
 function formatOdooTime(value: number | false | undefined): string {
   if (!value && value !== 0) return '—'
@@ -132,6 +127,7 @@ export default function ServicioDetailPage() {
   const [conductor, setConductor] = useState<Conductor | null>(null)
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [locations, setLocations] = useState<Record<number, LocationPoint>>({})
+  const [hitoFotos, setHitoFotos] = useState<HitoFoto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -147,15 +143,19 @@ export default function ServicioDetailPage() {
       setCliente(data.cliente)
 
       const supabase = createClient()
-      const { data: locs } = await supabase
-        .from('service_locations')
-        .select('step_index, lat, lng')
-        .eq('task_id', id)
+      const [{ data: locs }, { data: fotos }] = await Promise.all([
+        supabase.from('service_locations').select('step_index, lat, lng').eq('task_id', id),
+        supabase.from('conductor_servicio_hito_fotos')
+          .select('hito_key, hito_label, foto_url, created_at')
+          .eq('servicio_id', id)
+          .order('created_at', { ascending: true }),
+      ])
       if (locs) {
         const map: Record<number, LocationPoint> = {}
         for (const l of locs) map[l.step_index] = { lat: l.lat, lng: l.lng }
         setLocations(map)
       }
+      setHitoFotos(fotos ?? [])
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -243,7 +243,7 @@ export default function ServicioDetailPage() {
               <InfoField icon={Hash} label="N° Contenedor" value={task.x_studio_nmero_de_contenedor || '—'} />
               <InfoField icon={Package} label="Almacén Retiro" value={m2oName(task.x_studio_almacen_de_retiro)} />
               <InfoField icon={Package} label="Almacén Destino" value={m2oName(task.x_studio_almacen_de_destino)} />
-              <InfoField icon={FileText} label="Importación" value={task.x_studio_es_importacion ? 'Sí' : 'No'} />
+              <InfoField icon={FileText} label="Tipo de Servicio" value={tipoServicioLabelFor(task)} />
             </div>
           </div>
 
@@ -282,15 +282,17 @@ export default function ServicioDetailPage() {
 
           {/* Tiempos operativos */}
           <div className="bg-card border rounded-xl shadow-sm p-4">
-            <h3 className="text-sm font-bold mb-3 text-muted-foreground uppercase tracking-wide">Tiempos Operativos</h3>
+            <h3 className="text-sm font-bold mb-3 text-muted-foreground uppercase tracking-wide">
+              Tiempos Operativos · {tipoServicioLabelFor(task)}
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {TIEMPOS_FIELDS.map(({ key, label, step }) => {
-                const time = formatOdooTime(task[key] as number | false)
+              {getHitosForTask(task).map((hito, step) => {
+                const time = formatOdooTime(task[hito.field] as number | false)
                 const loc = locations[step]
                 return (
-                  <div key={key} className="border rounded-lg overflow-hidden">
+                  <div key={hito.key} className="border rounded-lg overflow-hidden">
                     <div className="flex items-center justify-between px-3 py-2 bg-muted/40">
-                      <span className="text-xs font-medium">{label}</span>
+                      <span className="text-xs font-medium">{hito.label}</span>
                       <span className="text-xs font-mono font-bold">{time}</span>
                     </div>
                     {loc ? (
@@ -317,6 +319,32 @@ export default function ServicioDetailPage() {
               })}
             </div>
           </div>
+
+          {/* Fotos de hitos */}
+          {hitoFotos.length > 0 && (
+            <div className="bg-card border rounded-xl shadow-sm p-4">
+              <h3 className="text-sm font-bold mb-3 text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <Camera className="h-3.5 w-3.5" />
+                Evidencia Fotográfica ({hitoFotos.length})
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {hitoFotos.map((f, i) => (
+                  <a
+                    key={`${f.hito_key}-${i}`}
+                    href={f.foto_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="border rounded-lg overflow-hidden hover:opacity-90 transition-opacity"
+                  >
+                    <img src={f.foto_url} alt={f.hito_label} className="w-full h-28 object-cover" />
+                    <p className="text-[11px] font-medium px-2 py-1.5 bg-muted/40 truncate" title={f.hito_label}>
+                      {f.hito_label}
+                    </p>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -3,6 +3,7 @@ import { PDFParse } from 'pdf-parse'
 export interface DetalleGreBF {
   placas: string[]
   conductor: string
+  remitente: string
   debugText?: string
 }
 
@@ -10,6 +11,8 @@ const PLACA_RE = /\b(?=[A-Z0-9]{6}\b)(?=[A-Z0-9]*[A-Z])(?=[A-Z0-9]*\d)[A-Z0-9]{6
 // Fila del conductor viene como "DNI 07997733 ATUNCAR ORTIZ REYNALDO Q07997733" (doc, nombre, N° licencia) antes del tab/salto de línea.
 const CONDUCTOR_ROW_RE = /(?:DNI|CE|RUC|PASAPORTE)\s+[A-Z0-9]{6,12}\s+([^\t\n]+)/
 const LICENCIA_TOKEN_RE = /^[A-Z]{0,2}\d{5,10}$/
+// En "DATOS DEL REMITENTE" el valor sale ANTES de su propia etiqueta: "E & M S.R.L.	APELLIDOS, NOMBRES, DENOMINACIÓN O RAZÓN SOCIAL:"
+const REMITENTE_NAME_RE = /([^\t\n]+?)\s*APELLIDOS,?\s*NOMBRES,?\s*DENOMINACIÓN\s*O\s*RAZÓN\s*SOCIAL:/
 
 function between(text: string, startMarker: string, endMarkers: string[]): string | null {
   const startIdx = text.indexOf(startMarker)
@@ -43,10 +46,14 @@ export function extractDetalle(text: string): DetalleGreBF {
     conductor = tokens.join(' ')
   }
 
+  const remitenteMatch = normalized.match(REMITENTE_NAME_RE)
+  const remitente = remitenteMatch?.[1]?.trim().replace(/\s+/g, ' ') ?? ''
+
   return {
     placas,
     conductor,
-    ...(placas.length === 0 || !conductor ? { debugText: normalized.slice(0, 2000) } : {}),
+    remitente,
+    ...(placas.length === 0 || !conductor || !remitente ? { debugText: normalized.slice(0, 2000) } : {}),
   }
 }
 

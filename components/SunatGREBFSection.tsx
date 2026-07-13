@@ -179,7 +179,7 @@ export function SunatGREBFSection() {
     }
   }
 
-  async function fetchDetalle(row: Record<string, unknown>): Promise<{ placas: string[]; conductor: string; debug: string }> {
+  async function fetchDetalle(row: Record<string, unknown>): Promise<{ placas: string[]; conductor: string; remitente: string; debug: string }> {
     try {
       const params = new URLSearchParams({
         numeroFile: String(row.num_id_xml),
@@ -187,10 +187,10 @@ export function SunatGREBFSection() {
       })
       const res = await fetch(`/api/sunat/grebf/detalle?${params}`)
       const data = await res.json()
-      if (!data.ok) return { placas: [], conductor: '', debug: `ERROR: ${data.error ?? res.status}` }
-      return { placas: data.placas ?? [], conductor: data.conductor ?? '', debug: data.debugText ?? '' }
+      if (!data.ok) return { placas: [], conductor: '', remitente: '', debug: `ERROR: ${data.error ?? res.status}` }
+      return { placas: data.placas ?? [], conductor: data.conductor ?? '', remitente: data.remitente ?? '', debug: data.debugText ?? '' }
     } catch (err: any) {
-      return { placas: [], conductor: '', debug: `ERROR fetch: ${err.message}` }
+      return { placas: [], conductor: '', remitente: '', debug: `ERROR fetch: ${err.message}` }
     }
   }
 
@@ -216,7 +216,7 @@ export function SunatGREBFSection() {
     ['greRemitente', 'GRE REMITENTE'],
     ['greTransporte', 'GRE TRANSPORTE'],
     ['fecTraslado', 'FECHA TRASLADO'],
-    ['remitente', 'REMITENTE'],
+    ['remitente', 'NOMBRE DEL CLIENTE'],
     ['destinatario', 'DESTINATARIO'],
     ['vehiculo', 'VEHÍCULO'],
     ['carreta', 'CARRETA'],
@@ -246,7 +246,7 @@ export function SunatGREBFSection() {
             greRemitente: String(r.serieNumeroGreRemitente ?? ''),
             greTransporte: String(r.serieNumeroGre ?? ''),
             fecTraslado: String(r.fecIniTraslado ?? ''),
-            remitente: String(r.rucRemitente ?? ''),
+            remitente: detalle.remitente,
             destinatario: String(r.razonSocialDestino ?? '').trim(),
             puntoPartida: String(r.direccionPartida ?? ''),
             puntoLlegada: String(r.direccionLlegada ?? ''),

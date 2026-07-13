@@ -12,6 +12,7 @@ import {
   Loader2, Save, Truck, Clock, User, Package,
   Calendar, Hash, Building2, MapPin, Info,
 } from 'lucide-react'
+import { getHitosForTask, tipoServicioLabelFor, type HitoDef, type TaskTypeFlags } from '@/lib/servicios/hitos'
 
 interface Stage { id: number; name: string }
 interface Conductor { id: number; name: string }
@@ -165,13 +166,11 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
     almRetiro:    pick(validFields, 'x_studio_almacen_de_retiro', 'x_studio_almacn_de_retiro'),
     almDestino:   pick(validFields, 'x_studio_almacen_de_destino', 'x_studio_almacn_de_destino'),
     esImport:     pick(validFields, 'x_studio_es_importacion', 'x_studio_es_importacin'),
-    ingAlmacen:   pick(validFields, 'x_studio_ingreso_a_almacen_de_retiro_1', 'x_studio_ingreso_a_almacen_de_retiro'),
-    salAlmacen:   pick(validFields, 'x_studio_salida_de_almacen_de_retiro'),
-    llegCliente:  pick(validFields, 'x_studio_llegada_a_cliente'),
-    ingPlanta:    pick(validFields, 'x_studio_ingreso_a_planta'),
-    inicioCD:     pick(validFields, 'x_studio_inicio_cargadescarga', 'x_studio_inicio_carga_descarga'),
-    terminoCD:    pick(validFields, 'x_studio_termino_de_descarga', 'x_studio_termino_de_carga_descarga'),
   }
+
+  // Hitos del tipo de servicio detectado (ver lib/servicios/hitos.ts), solo los que existen en Odoo
+  const hitos: HitoDef[] = getHitosForTask(task as TaskTypeFlags)
+    .filter(h => validFields.includes(h.field))
 
   // Whether placa fields are many2one (value is [id, name]) or char
   const placaCamionIsM2o = Array.isArray(task[F.placaCamion])
@@ -188,12 +187,11 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
   const [agencia,      setAgencia]      = useState((task[F.agencia] as string) || '')
   const [nContenedor,  setNContenedor]  = useState((task[F.nContenedor] as string) || '')
   const [esImport,     setEsImport]     = useState(Boolean(task[F.esImport]))
-  const [ingAlmacen,   setIngAlmacen]   = useState(floatToTime(task[F.ingAlmacen]))
-  const [salAlmacen,   setSalAlmacen]   = useState(floatToTime(task[F.salAlmacen]))
-  const [llegCliente,  setLlegCliente]  = useState(floatToTime(task[F.llegCliente]))
-  const [ingPlanta,    setIngPlanta]    = useState(floatToTime(task[F.ingPlanta]))
-  const [inicioCD,     setInicioCD]     = useState(floatToTime(task[F.inicioCD]))
-  const [terminoCD,    setTerminoCD]    = useState(floatToTime(task[F.terminoCD]))
+  const [tiempos, setTiempos] = useState<Record<string, string>>(() =>
+    Object.fromEntries(hitos.map(h => [h.field, floatToTime(task[h.field])]))
+  )
+  const setTiempoField = (field: string, value: string) =>
+    setTiempos(prev => ({ ...prev, [field]: value }))
 
   useEffect(() => {
     const post = (action: string) =>
@@ -239,12 +237,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
         agencia:      (task[F.agencia] as string) || '',
         nContenedor:  (task[F.nContenedor] as string) || '',
         esImport:     Boolean(task[F.esImport]),
-        ingAlmacen:   floatToTime(task[F.ingAlmacen]),
-        salAlmacen:   floatToTime(task[F.salAlmacen]),
-        llegCliente:  floatToTime(task[F.llegCliente]),
-        ingPlanta:    floatToTime(task[F.ingPlanta]),
-        inicioCD:     floatToTime(task[F.inicioCD]),
-        terminoCD:    floatToTime(task[F.terminoCD]),
+        tiempos: Object.fromEntries(hitos.map(h => [h.field, floatToTime(task[h.field])])) as Record<string, string>,
       }
 
       const fields: Record<string, unknown> = {}
@@ -258,12 +251,10 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
       if (agencia !== orig.agencia) fields[F.agencia] = agencia || false
       if (nContenedor !== orig.nContenedor) fields[F.nContenedor] = nContenedor || false
       if (esImport !== orig.esImport) fields[F.esImport] = esImport
-      if (ingAlmacen !== orig.ingAlmacen) fields[F.ingAlmacen] = timeToFloat(ingAlmacen)
-      if (salAlmacen !== orig.salAlmacen) fields[F.salAlmacen] = timeToFloat(salAlmacen)
-      if (llegCliente !== orig.llegCliente) fields[F.llegCliente] = timeToFloat(llegCliente)
-      if (ingPlanta !== orig.ingPlanta) fields[F.ingPlanta] = timeToFloat(ingPlanta)
-      if (inicioCD !== orig.inicioCD) fields[F.inicioCD] = timeToFloat(inicioCD)
-      if (terminoCD !== orig.terminoCD) fields[F.terminoCD] = timeToFloat(terminoCD)
+      for (const h of hitos) {
+        const val = tiempos[h.field] ?? ''
+        if (val !== (orig.tiempos[h.field] ?? '')) fields[h.field] = timeToFloat(val)
+      }
 
       if (Object.keys(fields).length === 0) { onClose(); return }
 
@@ -415,19 +406,22 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
 
           {/* ④ TIEMPOS OPERATIVOS — fondo diferenciado */}
           <div className="bg-background rounded-xl border border-blue-100 dark:border-blue-900/40 p-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">④ Tiempos Operativos</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+              ④ Tiempos Operativos · {tipoServicioLabelFor(task as TaskTypeFlags)}
+            </p>
             <div className="grid grid-cols-6 gap-3">
-              {([
-                ['Ingreso\nAlmacén', ingAlmacen, setIngAlmacen],
-                ['Salida\nAlmacén', salAlmacen, setSalAlmacen],
-                ['Llegada\nCliente', llegCliente, setLlegCliente],
-                ['Ingreso\nPlanta', ingPlanta, setIngPlanta],
-                ['Inicio\nC/D', inicioCD, setInicioCD],
-                ['Término\nC/D', terminoCD, setTerminoCD],
-              ] as [string, string, (v: string) => void][]).map(([label, val, set]) => (
-                <div key={label} className="space-y-1 text-center">
-                  <FieldLabel>{label.replace('\n', ' ')}</FieldLabel>
-                  <Input type="time" value={val} onChange={e => set(e.target.value)} className="h-9 text-sm font-mono text-center" />
+              {hitos.map(h => (
+                <div key={h.field} className="space-y-1 text-center">
+                  <FieldLabel>{h.label}</FieldLabel>
+                  <Input
+                    type="time"
+                    value={tiempos[h.field] ?? ''}
+                    onChange={e => setTiempoField(h.field, e.target.value)}
+                    className="h-9 text-sm font-mono text-center"
+                  />
+                  {h.foto !== 'no' && (
+                    <p className="text-[9px] text-amber-600 font-medium uppercase tracking-wide">Foto: {h.foto}</p>
+                  )}
                 </div>
               ))}
             </div>

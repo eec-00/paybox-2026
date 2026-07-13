@@ -9,20 +9,9 @@ import {
   Receipt, Plus, Trash2, Camera, X, MapPin,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { getHitosForTask, detectTipoServicio, tipoServicioLabelFor, type HitoDef } from '@/lib/servicios/hitos'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-
-const STEPS = [
-  { label: 'Saliendo de cochera',   field: 'x_studio_saliendo_de_la_cochera' },
-  { label: 'En cola de ingreso',    field: 'x_studio_en_cola_de_ingreso' },
-  { label: 'Llegué almacén',        field: 'x_studio_ingreso_a_almacen_de_retiro_1' },
-  { label: 'Salida almacén',        field: 'x_studio_salida_de_almacen_de_retiro' },
-  { label: 'Llegada a cliente',     field: 'x_studio_llegada_a_cliente' },
-  { label: 'Ingreso a cliente',     field: 'x_studio_ingreso_a_planta' },
-  { label: 'Inicio carga/descarga', field: 'x_studio_inicio_cargadescarga' },
-  { label: 'Fin carga/descarga',    field: 'x_studio_termino_de_descarga' },
-  { label: 'Salida de cliente',     field: 'x_studio_salida_cliente' },
-]
 
 interface GastoItem {
   id: string
@@ -72,6 +61,19 @@ async function uploadGastoFoto(file: File): Promise<string> {
   return data.publicUrl
 }
 
+async function uploadHitoFoto(taskId: number, hitoKey: string, file: File): Promise<string> {
+  const supabase = createClient()
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+  const path = `hitos-servicio/${taskId}/${hitoKey}-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const { error } = await supabase.storage.from('comprobantes').upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  })
+  if (error) throw error
+  const { data } = supabase.storage.from('comprobantes').getPublicUrl(path)
+  return data.publicUrl
+}
+
 interface ServicioTask {
   id: number
   name: string
@@ -86,16 +88,16 @@ interface ServicioTask {
   x_studio_agencia?: [number, string] | false
   x_studio_almacen_de_retiro?: [number, string] | false
   x_studio_almacen_de_destino?: [number, string] | false
+  x_studio_almacen_de_devolucion?: [number, string] | false
   x_studio_es_importacion?: boolean
-  x_studio_saliendo_de_la_cochera?: number | false
-  x_studio_en_cola_de_ingreso?: number | false
-  x_studio_ingreso_a_almacen_de_retiro_1?: number | false
-  x_studio_salida_de_almacen_de_retiro?: number | false
-  x_studio_llegada_a_cliente?: number | false
-  x_studio_ingreso_a_planta?: number | false
-  x_studio_inicio_cargadescarga?: number | false
-  x_studio_termino_de_descarga?: number | false
-  x_studio_salida_cliente?: number | false
+  x_studio_es_import?: boolean
+  x_studio_es_export?: boolean
+  x_studio_es_despacho?: boolean
+  x_studio_es_itk?: boolean
+  x_studio_es_isotanque_lleno?: boolean
+  x_studio_es_isotanque_vacio?: boolean
+  // Campos de hitos por tipo de servicio (ver lib/servicios/hitos.ts) — dinámicos
+  [key: string]: unknown
 }
 
 interface Stats {
@@ -189,18 +191,14 @@ function getAlmacenRetiro(task: ServicioTask): string {
 function getAlmacenDestino(task: ServicioTask): string {
   return extractName(task.x_studio_almacen_de_destino)
 }
+function getSteps(task: ServicioTask): HitoDef[] {
+  return getHitosForTask(task)
+}
 function getTiempos(task: ServicioTask) {
-  return [
-    { label: 'Saliendo de cochera',    value: formatTime(task.x_studio_saliendo_de_la_cochera) },
-    { label: 'En cola de ingreso',     value: formatTime(task.x_studio_en_cola_de_ingreso) },
-    { label: 'Ingreso almacén',        value: formatTime(task.x_studio_ingreso_a_almacen_de_retiro_1) },
-    { label: 'Salida almacén',         value: formatTime(task.x_studio_salida_de_almacen_de_retiro) },
-    { label: 'Llegada a cliente',      value: formatTime(task.x_studio_llegada_a_cliente) },
-    { label: 'Ingreso a cliente',      value: formatTime(task.x_studio_ingreso_a_planta) },
-    { label: 'Inicio carga/descarga',  value: formatTime(task.x_studio_inicio_cargadescarga) },
-    { label: 'Fin carga/descarga',     value: formatTime(task.x_studio_termino_de_descarga) },
-    { label: 'Salida de cliente',      value: formatTime(task.x_studio_salida_cliente) },
-  ]
+  return getSteps(task).map(h => ({
+    label: h.label,
+    value: formatTime(task[h.field] as string | number | false | undefined),
+  }))
 }
 
 // ─── Guias Section ───────────────────────────────────────────────────────────
@@ -369,7 +367,8 @@ export default function ConductorServiciosPage() {
       const res = await fetch(`/api/conductor/servicios?month=${month}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error al cargar servicios')
-      setTasks(data.tasks || [])
+      const loadedTasks: ServicioTask[] = data.tasks || []
+      setTasks(loadedTasks)
       setStats(data.stats || null)
       // Init step state from DB (progreso + completados)
       setServiceSteps(prev => {
@@ -379,7 +378,8 @@ export default function ConductorServiciosPage() {
           if ((prev[numId] ?? -1) < (step as number)) next[numId] = step as number
         }
         for (const id of (data.completedServiceIds ?? []) as number[]) {
-          next[id] = STEPS.length
+          const t = loadedTasks.find(x => x.id === id)
+          next[id] = t ? getSteps(t).length : 99
         }
         return next
       })
@@ -406,11 +406,13 @@ export default function ConductorServiciosPage() {
 
   useEffect(() => {
     if (activeServiceId === null) return
+    const t = tasks.find(x => x.id === activeServiceId)
+    if (!t) return
     const step = serviceSteps[activeServiceId] ?? -1
-    if (step >= STEPS.length && servicioGastosMap[activeServiceId] === undefined) {
+    if (step >= getSteps(t).length && servicioGastosMap[activeServiceId] === undefined) {
       fetchGastosForService(activeServiceId)
     }
-  }, [activeServiceId, serviceSteps])
+  }, [activeServiceId, serviceSteps, tasks])
 
   const prevMonth = () => {
     const d = parseMonth(currentMonth)
@@ -512,6 +514,97 @@ export default function ConductorServiciosPage() {
     )
   }, [locationBlockedFor, attachPermissionWatcher])
 
+  // Advance step + persist progreso/completados + finalize Odoo stage if last step
+  const advanceStep = (task: ServicioTask, stepIndex: number) => {
+    const taskId = task.id
+    const nextStep = stepIndex + 1
+    const stepsLen = getSteps(task).length
+    setServiceSteps(prev => ({ ...prev, [taskId]: nextStep }))
+
+    if (conductorUserId) {
+      const supabaseClient = createClient()
+      if (nextStep >= stepsLen) {
+        supabaseClient.from('conductor_servicios_progreso')
+          .delete().eq('conductor_id', conductorUserId).eq('servicio_id', taskId).then(() => {})
+        const codigo = task.name.includes(' - ') ? task.name.split(' - ')[0] : task.name
+        supabaseClient.from('conductor_servicios_completados')
+          .upsert({ conductor_id: conductorUserId, servicio_id: taskId, servicio_nombre: codigo }).then(() => {})
+      } else {
+        supabaseClient.from('conductor_servicios_progreso')
+          .upsert({ conductor_id: conductorUserId, servicio_id: taskId, step_actual: nextStep, updated_at: new Date().toISOString() })
+          .then(() => {})
+      }
+    }
+
+    if (nextStep >= stepsLen) {
+      fetch('/api/servicios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: taskId, action: 'finalize' }),
+      }).then(r => r.json()).then(data => {
+        if (data.stageId) {
+          setTasks(prev => prev.map(t =>
+            t.id === taskId ? { ...t, stage_id: [data.stageId, data.stageName] as [number, string] } : t
+          ))
+        }
+      }).catch(() => {})
+    }
+  }
+
+  // Write hito time + GPS to Odoo/Supabase, attach photos if any, then advance
+  const performMarkStep = async (task: ServicioTask, stepIndex: number, hito: HitoDef, fotoUrls: string[]) => {
+    const taskId = task.id
+    setSaving(true)
+    try {
+      const value = nowAsOdooFloat()
+
+      const [res, location] = await Promise.all([
+        fetch('/api/servicios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: taskId, fields: { [hito.field]: value } }),
+        }),
+        getLocation(),
+      ])
+
+      if (res.ok) {
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, [hito.field]: value } : t))
+      }
+
+      if (location) {
+        createClient().from('service_locations').insert({
+          task_id: taskId,
+          step_index: stepIndex,
+          step_label: hito.label,
+          lat: location.lat,
+          lng: location.lng,
+          accuracy: location.accuracy,
+        }).then(() => {})
+      }
+
+      if (fotoUrls.length > 0 && conductorUserId) {
+        createClient().from('conductor_servicio_hito_fotos').insert(
+          fotoUrls.map(url => ({
+            conductor_id: conductorUserId,
+            servicio_id: taskId,
+            tipo_servicio: detectTipoServicio(task),
+            hito_key: hito.key,
+            hito_label: hito.label,
+            foto_url: url,
+            lat: location?.lat ?? null,
+            lng: location?.lng ?? null,
+          }))
+        ).then(() => {})
+      }
+
+      advanceStep(task, stepIndex)
+    } catch {
+      advanceStep(task, stepIndex)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleConfirm = async () => {
     if (!pendingConfirm || saving) return
     const { taskId, stepIndex, action } = pendingConfirm
@@ -528,78 +621,72 @@ export default function ConductorServiciosPage() {
       return
     }
 
-    setSaving(true)
+    const task = tasks.find(t => t.id === taskId)
+    const hito = task ? getSteps(task)[stepIndex] : undefined
+    setPendingConfirm(null)
+    if (!task || !hito) return
+
+    if (action === 'mark') {
+      await performMarkStep(task, stepIndex, hito, [])
+    } else if (action === 'skip') {
+      advanceStep(task, stepIndex)
+    }
+  }
+
+  // ── Photo capture for critical hitos ─────────────────────────────────────
+  const [photoStepFor, setPhotoStepFor] = useState<{ taskId: number; stepIndex: number } | null>(null)
+  const [photoFiles, setPhotoFiles] = useState<File[]>([])
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
+  const [photoSubmitting, setPhotoSubmitting] = useState(false)
+
+  const handleOpenPhotoStep = (taskId: number, stepIndex: number) => {
+    setPhotoFiles([])
+    setPhotoPreviews([])
+    setPhotoStepFor({ taskId, stepIndex })
+  }
+  const handleCancelPhotoStep = () => {
+    setPhotoStepFor(null)
+    setPhotoFiles([])
+    setPhotoPreviews([])
+  }
+  const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    const remaining = 3 - photoFiles.length
+    const toAdd = files.slice(0, remaining)
+    const previews = toAdd.map(f => URL.createObjectURL(f))
+    setPhotoFiles(prev => [...prev, ...toAdd])
+    setPhotoPreviews(prev => [...prev, ...previews])
+    e.target.value = ''
+  }
+  const handleRemovePhotoFile = (idx: number) => {
+    setPhotoFiles(prev => prev.filter((_, i) => i !== idx))
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== idx))
+  }
+  const handleConfirmPhotoStep = async (skipPhoto: boolean) => {
+    if (!photoStepFor || photoSubmitting) return
+    const { taskId, stepIndex } = photoStepFor
+    const task = tasks.find(t => t.id === taskId)
+    const hito = task ? getSteps(task)[stepIndex] : undefined
+    if (!task || !hito) return
+    if (hito.foto === 'si' && !skipPhoto && photoFiles.length === 0) return
+
+    setPhotoSubmitting(true)
     try {
-      if (action === 'mark') {
-        const step = STEPS[stepIndex]
-        const value = nowAsOdooFloat()
-
-        // Capture location + save time in parallel
-        const [res, location] = await Promise.all([
-          fetch('/api/servicios', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: taskId, fields: { [step.field]: value } }),
-          }),
-          getLocation(),
-        ])
-
-        if (res.ok) {
-          setTasks(prev => prev.map(t => t.id === taskId ? { ...t, [step.field]: value } : t))
-        }
-
-        if (location) {
-          const supabase = createClient()
-          supabase.from('service_locations').insert({
-            task_id: taskId,
-            step_index: stepIndex,
-            step_label: step.label,
-            lat: location.lat,
-            lng: location.lng,
-            accuracy: location.accuracy,
-          }).then(() => {})
+      const urls: string[] = []
+      if (!skipPhoto) {
+        for (const file of photoFiles) {
+          urls.push(await uploadHitoFoto(taskId, hito.key, file))
         }
       }
-      const nextStep = stepIndex + 1
-      setServiceSteps(prev => ({ ...prev, [taskId]: nextStep }))
-
-      // Persist step to DB (all steps, not just last)
-      if (conductorUserId) {
-        const supabaseClient = createClient()
-        if (nextStep >= STEPS.length) {
-          // Completed → delete from progreso, insert completados
-          supabaseClient.from('conductor_servicios_progreso')
-            .delete().eq('conductor_id', conductorUserId).eq('servicio_id', taskId).then(() => {})
-          const t = tasks.find(x => x.id === taskId)
-          const codigo = t ? (t.name.includes(' - ') ? t.name.split(' - ')[0] : t.name) : String(taskId)
-          supabaseClient.from('conductor_servicios_completados')
-            .upsert({ conductor_id: conductorUserId, servicio_id: taskId, servicio_nombre: codigo }).then(() => {})
-        } else {
-          supabaseClient.from('conductor_servicios_progreso')
-            .upsert({ conductor_id: conductorUserId, servicio_id: taskId, step_actual: nextStep, updated_at: new Date().toISOString() })
-            .then(() => {})
-        }
-      }
-
-      // Last step done → change stage in Odoo
-      if (nextStep >= STEPS.length) {
-        fetch('/api/servicios', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: taskId, action: 'finalize' }),
-        }).then(r => r.json()).then(data => {
-          if (data.stageId) {
-            setTasks(prev => prev.map(t =>
-              t.id === taskId ? { ...t, stage_id: [data.stageId, data.stageName] as [number, string] } : t
-            ))
-          }
-        }).catch(() => {})
-      }
+      await performMarkStep(task, stepIndex, hito, urls)
     } catch {
-      setServiceSteps(prev => ({ ...prev, [taskId]: stepIndex + 1 }))
+      alert('Error al subir la foto. Inténtalo de nuevo.')
     } finally {
-      setSaving(false)
-      setPendingConfirm(null)
+      setPhotoSubmitting(false)
+      setPhotoStepFor(null)
+      setPhotoFiles([])
+      setPhotoPreviews([])
     }
   }
 
@@ -716,10 +803,12 @@ export default function ConductorServiciosPage() {
     }
   }
 
-  // id of the task currently in-progress (step 0-5), if any
-  const inProgressId = Object.entries(serviceSteps).find(
-    ([, step]) => step >= 0 && step < STEPS.length
-  )?.[0]
+  // id of the task currently in-progress, if any
+  const inProgressId = Object.entries(serviceSteps).find(([id, step]) => {
+    if (step < 0) return false
+    const t = tasks.find(x => x.id === Number(id))
+    return t ? step < getSteps(t).length : false
+  })?.[0]
   const inProgressTaskId = inProgressId ? Number(inProgressId) : null
 
   // ── Gastos registration view ─────────────────────────────────────────────
@@ -942,8 +1031,11 @@ export default function ConductorServiciosPage() {
       return null
     }
 
+    const steps = getSteps(task)
     const currentStep = serviceSteps[task.id] ?? 0
+    const currentHito = steps[currentStep]
     const isConfirming = pendingConfirm?.taskId === task.id
+    const isPhotoStep = photoStepFor?.taskId === task.id
     const stage = Array.isArray(task.stage_id) ? task.stage_id[1] : 'Sin etapa'
     const client = Array.isArray(task.partner_id) ? task.partner_id[1] : '—'
     const stageStyle = getStageStyle(stage)
@@ -978,6 +1070,11 @@ export default function ConductorServiciosPage() {
         <div className="flex-1 overflow-y-auto px-4 space-y-3 pb-4">
           {/* Service name + meta */}
           <div className="bg-white rounded-2xl px-4 py-3 border border-gray-100 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] px-2 py-0.5 rounded-md font-bold tracking-wide bg-slate-100 text-slate-600 border border-slate-200">
+                {tipoServicioLabelFor(task)}
+              </span>
+            </div>
             <p className="text-xs text-gray-400">{task.name}</p>
             <div className="flex gap-4 flex-wrap">
               {fecha !== '—' && (
@@ -1053,13 +1150,24 @@ export default function ConductorServiciosPage() {
 
         {/* Sticky workflow controls */}
         <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-4 space-y-2">
-          {currentStep < STEPS.length ? (
-            isConfirming ? (
+          {currentStep < steps.length ? (
+            isPhotoStep ? (
+              <PhotoStepPanel
+                hito={currentHito}
+                previews={photoPreviews}
+                submitting={photoSubmitting}
+                onFileChange={handlePhotoFileChange}
+                onRemoveFile={handleRemovePhotoFile}
+                onCancel={handleCancelPhotoStep}
+                onConfirm={() => handleConfirmPhotoStep(false)}
+                onSkipPhoto={() => handleConfirmPhotoStep(true)}
+              />
+            ) : isConfirming ? (
               <ConfirmRow
                 label={
                   pendingConfirm?.action === 'skip'
-                    ? `¿Saltar "${STEPS[currentStep].label}"?`
-                    : `¿Confirmar: ${STEPS[currentStep].label}?`
+                    ? `¿Saltar "${currentHito.label}"?`
+                    : `¿Confirmar: ${currentHito.label}?`
                 }
                 onConfirm={handleConfirm}
                 onCancel={() => setPendingConfirm(null)}
@@ -1068,11 +1176,17 @@ export default function ConductorServiciosPage() {
             ) : (
               <div className="flex gap-2">
                 <button
-                  onClick={() => setPendingConfirm({ taskId: task.id, stepIndex: currentStep, action: 'mark' })}
+                  onClick={() => {
+                    if (currentHito.foto === 'no') {
+                      setPendingConfirm({ taskId: task.id, stepIndex: currentStep, action: 'mark' })
+                    } else {
+                      handleOpenPhotoStep(task.id, currentStep)
+                    }
+                  }}
                   className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#f5a623] text-white text-sm font-bold active:scale-95 transition-transform"
                 >
-                  <CheckCircle2 className="h-4 w-4" />
-                  {STEPS[currentStep].label}
+                  {currentHito.foto === 'no' ? <CheckCircle2 className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+                  {currentHito.label}
                 </button>
                 <button
                   onClick={() => setPendingConfirm({ taskId: task.id, stepIndex: currentStep, action: 'skip' })}
@@ -1305,14 +1419,14 @@ export default function ConductorServiciosPage() {
         const agencia = extractName(task.x_studio_agencia)
         const almacenRetiro = getAlmacenRetiro(task)
         const almacenDestino = getAlmacenDestino(task)
-        const esImportacion = task.x_studio_es_importacion ?? null
         const fecha = formatDate(task.x_studio_fecha_de_la_programacin)
         const horaCita = task.x_studio_hora_de_cita ? formatTime(task.x_studio_hora_de_cita) : null
         const stageStyle = getStageStyle(stage)
 
+        const taskStepsLen = getSteps(task).length
         const taskStep = serviceSteps[task.id] ?? -1
-        const isInProgress = taskStep >= 0 && taskStep < STEPS.length
-        const isDone = taskStep >= STEPS.length
+        const isInProgress = taskStep >= 0 && taskStep < taskStepsLen
+        const isDone = taskStep >= taskStepsLen
         const otherInProgress = inProgressTaskId !== null && inProgressTaskId !== task.id
 
         // Confirm pending for this card's "Iniciar" button in list view
@@ -1341,15 +1455,9 @@ export default function ConductorServiciosPage() {
                       )}
                     </div>
                   )}
-                  {esImportacion !== null && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold tracking-wide ${
-                      esImportacion
-                        ? 'bg-purple-50 text-purple-600 border border-purple-200'
-                        : 'bg-orange-50 text-orange-600 border border-orange-200'
-                    }`}>
-                      {esImportacion ? 'IMP' : 'EXP'}
-                    </span>
-                  )}
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold tracking-wide bg-slate-100 text-slate-600 border border-slate-200">
+                    {tipoServicioLabelFor(task)}
+                  </span>
                 </div>
                 <p className="font-bold text-[#1a2332] text-sm leading-tight truncate">{client}</p>
                 <p className="text-xs text-gray-400 mt-1 truncate">{task.name}</p>
@@ -1487,6 +1595,79 @@ function ConfirmRow({ label, onConfirm, onCancel, saving }: {
           Cancelar
         </button>
       </div>
+    </div>
+  )
+}
+
+function PhotoStepPanel({ hito, previews, submitting, onFileChange, onRemoveFile, onCancel, onConfirm, onSkipPhoto }: {
+  hito: HitoDef
+  previews: string[]
+  submitting: boolean
+  onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onRemoveFile: (idx: number) => void
+  onCancel: () => void
+  onConfirm: () => void
+  onSkipPhoto: () => void
+}) {
+  const isRequired = hito.foto === 'si'
+  const canSkip = hito.foto === 'opcional' || hito.foto === 'condicional'
+  const canConfirm = !isRequired || previews.length > 0
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-xs font-bold text-[#1a2332]">
+          {isRequired ? 'Foto obligatoria: ' : 'Foto: '}{hito.label}
+        </p>
+        {hito.criterio && <p className="text-[11px] text-gray-400 mt-0.5">{hito.criterio}</p>}
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
+        {previews.map((src, i) => (
+          <div key={i} className="relative w-16 h-16">
+            <img src={src} alt={`foto ${i + 1}`} className="w-full h-full object-cover rounded-lg border border-gray-100" />
+            <button
+              onClick={() => onRemoveFile(i)}
+              className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 bg-red-500 rounded-full flex items-center justify-center"
+            >
+              <X className="h-2.5 w-2.5 text-white" />
+            </button>
+          </div>
+        ))}
+        {previews.length < 3 && (
+          <label className="w-16 h-16 rounded-lg border-2 border-dashed border-[#f5a623]/40 flex flex-col items-center justify-center gap-0.5 cursor-pointer hover:border-[#f5a623] transition-colors">
+            <Camera className="h-4 w-4 text-[#f5a623]/60" />
+            <span className="text-[9px] text-[#f5a623]/60 font-medium">Foto</span>
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={onFileChange} />
+          </label>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={onConfirm}
+          disabled={submitting || !canConfirm}
+          className="flex-1 py-2.5 rounded-xl bg-[#f5a623] text-white text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform"
+        >
+          {submitting ? 'Subiendo...' : 'Confirmar hito'}
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={submitting}
+          className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-500 text-sm font-medium disabled:opacity-50 active:scale-95 transition-transform"
+        >
+          Cancelar
+        </button>
+      </div>
+      {canSkip && (
+        <button
+          onClick={onSkipPhoto}
+          disabled={submitting}
+          className="w-full text-center text-[11px] text-gray-400 hover:text-gray-600 disabled:opacity-50"
+        >
+          Continuar sin foto
+        </button>
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS } from '@/lib/servicios/hitos'
 
 const ODOO_URL = (process.env.ODOO_URL || process.env.URL_ODOO || '').trim().replace(/\/$/, '')
 const ODOO_DB = (process.env.ODOO_DB || process.env.DB || '').trim()
@@ -49,16 +50,10 @@ const CANDIDATE_FIELDS = [
   'x_studio_nmero_de_contenedor',
   'x_studio_almacen_de_retiro',
   'x_studio_almacen_de_destino',
+  'x_studio_almacen_de_devolucion',
   'x_studio_es_importacion',
-  'x_studio_saliendo_de_la_cochera',
-  'x_studio_en_cola_de_ingreso',
-  'x_studio_ingreso_a_almacen_de_retiro_1',
-  'x_studio_salida_de_almacen_de_retiro',
-  'x_studio_llegada_a_cliente',
-  'x_studio_ingreso_a_planta',
-  'x_studio_inicio_cargadescarga',
-  'x_studio_termino_de_descarga',
-  'x_studio_salida_cliente',
+  ...TIPO_SERVICIO_BOOL_FIELDS,
+  ...ALL_HITO_FIELDS,
 ]
 
 export async function GET(req: NextRequest) {

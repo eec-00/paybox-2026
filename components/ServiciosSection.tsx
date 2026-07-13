@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { RefreshCw, Search, XCircle, Truck, Pencil, Info } from 'lucide-react'
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
+import { tipoServicioLabelFor, TIPOS_SERVICIO } from '@/lib/servicios/hitos'
 
 interface OdooTask {
   id: number
@@ -26,16 +27,14 @@ interface OdooTask {
   x_studio_almacen_de_retiro: [number, string] | false
   x_studio_almacen_de_destino: [number, string] | false
   x_studio_es_importacion: boolean
-  // TIEMPOS OPERATIVOS
-  x_studio_saliendo_de_la_cochera: number | false
-  x_studio_en_cola_de_ingreso: number | false
-  x_studio_ingreso_a_almacen_de_retiro_1: number | false
-  x_studio_salida_de_almacen_de_retiro: number | false
-  x_studio_llegada_a_cliente: number | false
-  x_studio_ingreso_a_planta: number | false
-  x_studio_inicio_cargadescarga: number | false
-  x_studio_termino_de_descarga: number | false
-  x_studio_salida_cliente: number | false
+  x_studio_es_import?: boolean
+  x_studio_es_export?: boolean
+  x_studio_es_despacho?: boolean
+  x_studio_es_itk?: boolean
+  x_studio_es_isotanque_lleno?: boolean
+  x_studio_es_isotanque_vacio?: boolean
+  x_studio_almacen_de_devolucion?: [number, string] | false
+  [key: string]: unknown
 }
 
 interface OdooStage { id: number; name: string }
@@ -98,7 +97,7 @@ export function ServiciosSection() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState('all')
-  const [importFilter, setImportFilter] = useState<'all' | 'yes' | 'no'>('all')
+  const [tipoFilter, setTipoFilter] = useState('all')
   const [conductorFilter, setConductorFilter] = useState('all')
   const [clienteFilter, setClienteFilter] = useState('all')
   const [fechaFilter, setFechaFilter] = useState('')
@@ -157,8 +156,7 @@ export function ServiciosSection() {
         const stageName = t.stage_id ? t.stage_id[1] : ''
         if (stageName !== stageFilter) return false
       }
-      if (importFilter === 'yes' && !t.x_studio_es_importacion) return false
-      if (importFilter === 'no' && t.x_studio_es_importacion) return false
+      if (tipoFilter !== 'all' && tipoServicioLabelFor(t) !== tipoFilter) return false
       if (conductorFilter !== 'all' && m2oName(t.x_studio_conductor) !== conductorFilter) return false
       if (clienteFilter !== 'all' && m2oName(t.partner_id) !== clienteFilter) return false
       if (almacenDestinoFilter !== 'all' && m2oName(t.x_studio_almacen_de_destino) !== almacenDestinoFilter) return false
@@ -176,14 +174,14 @@ export function ServiciosSection() {
       ].join(' ').toLowerCase()
       return searchable.includes(q)
     })
-  }, [tasks, search, stageFilter, importFilter, conductorFilter, clienteFilter, almacenDestinoFilter, almacenRetiroFilter, fechaFilter])
+  }, [tasks, search, stageFilter, tipoFilter, conductorFilter, clienteFilter, almacenDestinoFilter, almacenRetiroFilter, fechaFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const handleSearch = (val: string) => { setSearch(val); setPage(1) }
   const handleStage = (val: string) => { setStageFilter(val); setPage(1) }
-  const handleImport = (val: string) => { setImportFilter(val as 'all' | 'yes' | 'no'); setPage(1) }
+  const handleTipo = (val: string) => { setTipoFilter(val); setPage(1) }
   const handleConductor = (val: string) => { setConductorFilter(val); setPage(1) }
   const handleCliente = (val: string) => { setClienteFilter(val); setPage(1) }
   const handleFecha = (val: string) => { setFechaFilter(val); setPage(1) }
@@ -193,7 +191,7 @@ export function ServiciosSection() {
   const clearFilters = () => {
     setSearch('')
     setStageFilter('all')
-    setImportFilter('all')
+    setTipoFilter('all')
     setConductorFilter('all')
     setClienteFilter('all')
     setFechaFilter('')
@@ -201,7 +199,7 @@ export function ServiciosSection() {
     setAlmacenRetiroFilter('all')
     setPage(1)
   }
-  const hasFilters = search || stageFilter !== 'all' || importFilter !== 'all' ||
+  const hasFilters = search || stageFilter !== 'all' || tipoFilter !== 'all' ||
     conductorFilter !== 'all' || clienteFilter !== 'all' || fechaFilter ||
     almacenDestinoFilter !== 'all' || almacenRetiroFilter !== 'all'
 
@@ -267,14 +265,15 @@ export function ServiciosSection() {
           </SelectContent>
         </Select>
 
-        <Select value={importFilter} onValueChange={handleImport}>
-          <SelectTrigger className="h-9 text-xs w-[140px]">
-            <SelectValue placeholder="Importación" />
+        <Select value={tipoFilter} onValueChange={handleTipo}>
+          <SelectTrigger className="h-9 text-xs w-[190px]">
+            <SelectValue placeholder="Tipo de Servicio" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Importación: Todos</SelectItem>
-            <SelectItem value="yes">Solo Importación</SelectItem>
-            <SelectItem value="no">No Importación</SelectItem>
+            <SelectItem value="all">Tipo de Servicio: Todos</SelectItem>
+            {Object.values(TIPOS_SERVICIO).map((t) => (
+              <SelectItem key={t.key} value={t.label}>{t.label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
@@ -380,6 +379,7 @@ export function ServiciosSection() {
                     <TableHead className="w-10" />
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[100px]">Código</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs w-10 text-center">Etapa</TableHead>
+                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[150px]">Tipo de Servicio</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[180px]">Cliente</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[110px]">F. Programación</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px]">Hora Cita</TableHead>
@@ -396,7 +396,7 @@ export function ServiciosSection() {
                 <TableBody>
                   {paginated.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={15} className="text-center py-12 text-muted-foreground text-sm">
+                      <TableCell colSpan={16} className="text-center py-12 text-muted-foreground text-sm">
                         No se encontraron servicios con los filtros aplicados
                       </TableCell>
                     </TableRow>
@@ -440,6 +440,7 @@ export function ServiciosSection() {
                               />
                             ) : '—'}
                           </TableCell>
+                          <TableCell className="whitespace-nowrap">{tipoServicioLabelFor(task)}</TableCell>
                           <TableCell className="whitespace-nowrap">{m2oName(task.partner_id)}</TableCell>
                           <TableCell className="whitespace-nowrap">{formatDate(task.x_studio_fecha_de_la_programacin)}</TableCell>
                           <TableCell className="text-center whitespace-nowrap">{formatOdooTime(task.x_studio_hora_de_cita)}</TableCell>
