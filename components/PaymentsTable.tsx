@@ -132,7 +132,7 @@ export function PaymentsTable({
       if (externalPaymentType && externalPaymentType !== 'all') query = query.eq('metodo_pago', externalPaymentType)
 
       const registrosQuery = query
-        .order('fecha_y_hora_pago', { ascending: false })
+        .order('created_at', { ascending: false })
         .range(from, to)
 
       // Parallelize: main query + user profiles cache (first load only)
@@ -252,7 +252,8 @@ export function PaymentsTable({
             <TableHeader>
               <TableRow>
                 <TableHead className="hidden sm:table-cell">Subido por</TableHead>
-                <TableHead className="whitespace-nowrap">Fecha</TableHead>
+                <TableHead className="hidden md:table-cell whitespace-nowrap">Fecha de Subida</TableHead>
+                <TableHead className="whitespace-nowrap">Fecha de Pago</TableHead>
                 <TableHead>Beneficiario</TableHead>
                 <TableHead className="hidden md:table-cell">Tipo Doc.</TableHead>
                 <TableHead className="whitespace-nowrap">Monto</TableHead>
@@ -263,7 +264,7 @@ export function PaymentsTable({
             <TableBody>
               {registros.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     No hay registros aún. Crea tu primer registro arriba.
                   </TableCell>
                 </TableRow>
@@ -272,6 +273,9 @@ export function PaymentsTable({
                   <TableRow key={registro.id}>
                     <TableCell className="hidden sm:table-cell">
                       <span className="font-medium text-sm">{registro.nombre_usuario || 'Usuario desconocido'}</span>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-xs sm:text-sm whitespace-nowrap text-muted-foreground">
+                      {registro.created_at ? formatDateTime(registro.created_at) : '-'}
                     </TableCell>
                     <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">
                       <span className="hidden sm:inline">{formatDateTime(registro.fecha_y_hora_pago)}</span>
@@ -339,6 +343,10 @@ export function PaymentsTable({
                                       <div className="space-y-1">
                                         <span className="text-xs text-muted-foreground uppercase tracking-wide">Fecha y Hora de Pago</span>
                                         <p className="font-semibold text-base">{formatDateTime(selectedRegistro.fecha_y_hora_pago)}</p>
+                                      </div>
+                                      <div className="space-y-1">
+                                        <span className="text-xs text-muted-foreground uppercase tracking-wide">Fecha de Subida a la Plataforma</span>
+                                        <p className="font-semibold text-base">{selectedRegistro.created_at ? formatDateTime(selectedRegistro.created_at) : '-'}</p>
                                       </div>
                                       <div className="space-y-1">
                                         <span className="text-xs text-muted-foreground uppercase tracking-wide">Beneficiario</span>
