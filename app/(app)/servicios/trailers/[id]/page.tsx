@@ -336,7 +336,7 @@ export default function ServicioDetailPage() {
                     rel="noopener noreferrer"
                     className="border rounded-lg overflow-hidden hover:opacity-90 transition-opacity"
                   >
-                    <img src={f.foto_url} alt={f.hito_label} className="w-full h-28 object-cover" />
+                    <img src={f.foto_url} alt={f.hito_label} className="w-full h-64 object-contain bg-muted/30" />
                     <p className="text-[11px] font-medium px-2 py-1.5 bg-muted/40 truncate" title={f.hito_label}>
                       {f.hito_label}
                     </p>

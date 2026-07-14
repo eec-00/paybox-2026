@@ -209,6 +209,7 @@ export function SunatGREBFSection() {
     carreta: string
     conductor: string
     _debug?: string
+    _debugRow?: string
   }
 
   const BF_EXCEL_COLS: [keyof BFExcelRow, string][] = [
@@ -224,6 +225,7 @@ export function SunatGREBFSection() {
     ['puntoPartida', 'PUNTO DE PARTIDA'],
     ['puntoLlegada', 'PUNTO DE LLEGADA'],
     ['_debug', '_DEBUG (temporal)'],
+    ['_debugRow', '_DEBUG_ROW (temporal)'],
   ]
 
   async function exportarExcel() {
@@ -254,6 +256,7 @@ export function SunatGREBFSection() {
             carreta: detalle.placas[1] ?? '',
             conductor: detalle.conductor,
             _debug: detalle.debug,
+            _debugRow: JSON.stringify(r),
           }
           done++
           setExportProgress(`Extrayendo datos operativos ${done}/${rows.length}...`)

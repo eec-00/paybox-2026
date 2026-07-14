@@ -53,7 +53,7 @@ export function extractDetalle(text: string): DetalleGreBF {
     placas,
     conductor,
     remitente,
-    ...(placas.length === 0 || !conductor || !remitente ? { debugText: normalized.slice(0, 2000) } : {}),
+    debugText: normalized.slice(0, 3000),
   }
 }
 
