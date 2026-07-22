@@ -25,6 +25,13 @@ import { Calendar as CalendarIcon, List, Plus, Trash2, CheckCircle2, AlertCircle
 import { CalendarioPago, GastoConductor } from '@/lib/types/database.types'
 import { getUserPermissions } from '@/lib/utils/auth'
 
+const getLocalDateStr = (date: Date = new Date()) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+}
+
 export function CalendarSection() {
     const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
     const [listTab, setListTab] = useState<'fijos' | 'conductores'>('fijos')
@@ -52,7 +59,7 @@ export function CalendarSection() {
 
     // Form State
     const [formData, setFormData] = useState({
-        fecha: new Date().toISOString().split('T')[0],
+        fecha: getLocalDateStr(),
         nombre_pago: '',
         monto: '',
         moneda: 'soles',
@@ -157,7 +164,7 @@ export function CalendarSection() {
 
             // Reset form
             setFormData({
-                fecha: new Date().toISOString().split('T')[0],
+                fecha: getLocalDateStr(),
                 nombre_pago: '',
                 monto: '',
                 moneda: 'soles',
@@ -259,7 +266,7 @@ export function CalendarSection() {
         for (let day = 1; day <= daysInMonth; day++) {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
             const dayPagos = pagos.filter(p => p.fecha === dateStr)
-            const isToday = new Date().toISOString().split('T')[0] === dateStr
+            const isToday = getLocalDateStr() === dateStr
 
             days.push(
                 <div key={day} className={`h-16 sm:h-32 border border-muted/50 rounded-sm p-0.5 sm:p-1 overflow-hidden flex flex-col ${isToday ? 'bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
