@@ -24,6 +24,7 @@ import {
   PlayCircle,
   BarChart2,
   ShieldCheck,
+  Landmark,
 } from 'lucide-react'
 
 interface FlatItem {
@@ -295,6 +296,15 @@ export function Sidebar({
     },
     {
       type: 'item',
+      id: 'detracciones',
+      href: '/detracciones',
+      label: 'Detracciones',
+      icon: Landmark,
+      description: 'Conciliación con Banco de la Nación',
+      adminOnly: false,
+    },
+    {
+      type: 'item',
       id: 'updates',
       href: '/updates',
       label: 'Actualizaciones',
@@ -321,7 +331,7 @@ export function Sidebar({
   const visibleItems = menuItems
     .filter((item) => {
       if (item.adminOnly && !isAdmin) return false
-      if (item.id === 'bienvenida' || item.id === 'updates' || item.id === 'tutoriales' || item.id === 'sunat') return true
+      if (item.id === 'bienvenida' || item.id === 'updates' || item.id === 'tutoriales' || item.id === 'sunat' || item.id === 'detracciones') return true
       if (item.type === 'group') {
         return canSeeModule(item.id) || item.children.some((c) => canSeeModule(c.id))
       }
