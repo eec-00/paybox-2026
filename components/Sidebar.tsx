@@ -25,6 +25,9 @@ import {
   BarChart2,
   ShieldCheck,
   Landmark,
+  CalendarClock,
+  Briefcase,
+  Fingerprint,
 } from 'lucide-react'
 
 interface FlatItem {
@@ -74,6 +77,7 @@ export function Sidebar({
   const isAuto = pathname.startsWith('/automatizacion')
   const isAdmin_ = pathname.startsWith('/administracion')
   const isSunat = pathname.startsWith('/sunat')
+  const isRrhh = pathname.startsWith('/rrhh')
 
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     ...(isFinanzas ? ['finanzas'] : []),
@@ -81,6 +85,7 @@ export function Sidebar({
     ...(isAuto ? ['automatizacion'] : []),
     ...(isAdmin_ ? ['administracion'] : []),
     ...(isSunat ? ['sunat'] : []),
+    ...(isRrhh ? ['rrhh'] : []),
   ])
 
   useEffect(() => {
@@ -90,8 +95,9 @@ export function Sidebar({
     if (isAuto) toExpand.push('automatizacion')
     if (isAdmin_) toExpand.push('administracion')
     if (isSunat) toExpand.push('sunat')
+    if (isRrhh) toExpand.push('rrhh')
     setExpandedGroups((prev) => Array.from(new Set([...prev, ...toExpand])))
-  }, [pathname, isFinanzas, isServicios, isAuto, isAdmin_, isSunat])
+  }, [pathname, isFinanzas, isServicios, isAuto, isAdmin_, isSunat, isRrhh])
 
   const toggleGroup = (id: string) => {
     setExpandedGroups((prev) =>
@@ -234,6 +240,34 @@ export function Sidebar({
           label: 'Facturas',
           icon: FileText,
           description: 'Facturas de clientes',
+          adminOnly: false,
+        },
+      ],
+    },
+    {
+      type: 'group',
+      id: 'rrhh',
+      label: 'Recursos Humanos',
+      icon: Briefcase,
+      description: 'Vacaciones y asistencia',
+      adminOnly: false,
+      children: [
+        {
+          type: 'item',
+          id: 'rrhh-vacaciones',
+          href: '/rrhh/vacaciones',
+          label: 'Vacaciones',
+          icon: CalendarClock,
+          description: 'Control de vacaciones del personal',
+          adminOnly: false,
+        },
+        {
+          type: 'item',
+          id: 'rrhh-asistencia',
+          href: '/rrhh/asistencia',
+          label: 'Asistencia',
+          icon: Fingerprint,
+          description: 'Marcas de ubicación de conductores',
           adminOnly: false,
         },
       ],

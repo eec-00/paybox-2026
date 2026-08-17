@@ -12,6 +12,7 @@ const MODULES: ModuleDef[] = [
   { id: 'pagos',          label: 'Módulo de Finanzas',        desc: 'Pagos y Calendario' },
   { id: 'servicios',      label: 'Módulo de Servicios',      desc: 'Trailers, Flota y Zonas GPS' },
   { id: 'automatizacion', label: 'Módulo de Automatización', desc: 'Conductores, Tractos y Carretas' },
+  { id: 'rrhh',           label: 'Recursos Humanos',         desc: 'Vacaciones y Asistencia' },
 ]
 
 interface Props {

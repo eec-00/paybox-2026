@@ -14,6 +14,7 @@ import {
   X,
   Clock,
   ChevronRight,
+  MapPin,
 } from 'lucide-react'
 
 interface NavItem {
@@ -32,6 +33,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: Truck,
   },
   {
+    href: '/conductor/asistencia',
+    label: 'Asistencia',
+    description: 'Marca tu ingreso con ubicación',
+    icon: MapPin,
+  },
+  {
     href: '/conductor/documentos',
     label: 'Mis Documentos',
     description: 'Fechas de vencimiento',
@@ -42,7 +49,6 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Vacaciones',
     description: 'Días disponibles',
     icon: Calendar,
-    soon: true,
   },
 ]
 

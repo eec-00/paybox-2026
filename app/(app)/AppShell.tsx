@@ -60,6 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         if (mp.pagos?.enabled)          sections.push('finanzas')
         if (mp.servicios?.enabled)      sections.push('servicios')
         if (mp.automatizacion?.enabled) sections.push('automatizacion')
+        if (mp.rrhh?.enabled)           sections.push('rrhh')
         setAllowedModules(sections)
       }
 

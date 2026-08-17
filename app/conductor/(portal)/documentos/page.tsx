@@ -41,6 +41,22 @@ function getStatusConfig(dias: number | null): StatusConfig {
   return { color: 'text-emerald-600', bar: 'bg-emerald-500', barBg: 'bg-emerald-50', text: `${dias}d`, textColor: 'text-emerald-600', icon: 'ok' }
 }
 
+// Prioridad de orden: vencidos primero, luego el que vence antes, sin fecha al final.
+function urgencyRank(dias: number | null): number {
+  if (dias === null) return Infinity
+  return dias
+}
+
+// Agrupa documentos por severidad para que la jerarquía visual sea explícita
+// (secciones separadas) en vez de una grilla plana donde todo pesa igual.
+function groupDocumentos(documentos: Documento[]) {
+  const sorted = [...documentos].sort((a, b) => urgencyRank(a.dias) - urgencyRank(b.dias))
+  const criticos = sorted.filter(d => d.dias !== null && d.dias <= 7)
+  const proximos = sorted.filter(d => d.dias !== null && d.dias > 7 && d.dias <= 30)
+  const resto = sorted.filter(d => d.dias === null || d.dias > 30)
+  return { criticos, proximos, resto }
+}
+
 function formatFecha(fecha: string | null): string {
   if (!fecha) return ''
   const d = new Date(fecha)
@@ -143,9 +159,9 @@ export default function ConductorDocumentosPage() {
 
       {/* Loading skeletons */}
       {loading && !error && (
-        <div className="grid grid-cols-2 gap-3">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl h-24 animate-pulse border border-gray-100 shadow-sm" />
+        <div className="space-y-2">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl h-16 animate-pulse border border-gray-100 shadow-sm" />
           ))}
         </div>
       )}
@@ -160,47 +176,68 @@ export default function ConductorDocumentosPage() {
         </div>
       )}
 
-      {/* Document cards */}
-      {!loading && documentos.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          {documentos.map(doc => {
-            const status = getStatusConfig(doc.dias)
-            return (
-              <div key={doc.key} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                {/* Top color bar */}
-                <div className={`h-1 w-full ${status.bar}`} />
-                <div className="p-3.5">
-                  {/* Header row */}
-                  <div className="flex items-start justify-between gap-1.5 mb-3">
-                    <p className="text-xs font-semibold text-[#1a2332] leading-tight">{doc.label}</p>
-                    {status.icon === 'danger' && (
-                      <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
-                    )}
-                    {status.icon === 'warning' && (
-                      <Clock className="h-3.5 w-3.5 text-orange-500 shrink-0 mt-0.5" />
-                    )}
-                    {status.icon === 'ok' && (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                    )}
-                  </div>
-
-                  {/* Days badge */}
-                  <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${status.barBg} ${status.textColor}`}>
-                    {status.text}
-                  </div>
-
-                  {/* Date */}
-                  {doc.fecha && (
-                    <p className="text-[11px] text-gray-400 mt-2 leading-tight">{formatFecha(doc.fecha)}</p>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      {/* Document list, agrupado por urgencia para que lo crítico resalte y lo vigente no compita por atención */}
+      {!loading && documentos.length > 0 && (() => {
+        const { criticos, proximos, resto } = groupDocumentos(documentos)
+        return (
+          <div className="space-y-5">
+            {criticos.length > 0 && (
+              <DocSection title="Atención inmediata" tone="text-red-600" documentos={criticos} />
+            )}
+            {proximos.length > 0 && (
+              <DocSection title="Próximos a vencer" tone="text-orange-600" documentos={proximos} />
+            )}
+            {resto.length > 0 && (
+              <DocSection title="Vigentes" tone="text-gray-400" documentos={resto} />
+            )}
+          </div>
+        )
+      })()}
 
       <div className="h-4" />
+    </div>
+  )
+}
+
+function DocSection({
+  title, tone, documentos,
+}: {
+  title: string
+  tone: string
+  documentos: Documento[]
+}) {
+  return (
+    <div className="space-y-2">
+      <p className={`text-[11px] font-bold uppercase tracking-wide ${tone}`}>{title}</p>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 divide-y divide-gray-50 overflow-hidden">
+        {documentos.map(doc => {
+          const status = getStatusConfig(doc.dias)
+          return (
+            <div key={doc.key} className="flex items-center gap-3 px-4 py-3.5">
+              {/* Left status accent + icon */}
+              <div className={`w-9 h-9 rounded-xl ${status.barBg} flex items-center justify-center shrink-0`}>
+                {status.icon === 'danger' && <AlertTriangle className={`h-4 w-4 ${status.textColor}`} />}
+                {status.icon === 'warning' && <Clock className={`h-4 w-4 ${status.textColor}`} />}
+                {status.icon === 'ok' && <CheckCircle2 className={`h-4 w-4 ${status.textColor}`} />}
+                {status.icon === null && <FileText className="h-4 w-4 text-gray-300" />}
+              </div>
+
+              {/* Label + date */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-[#1a2332] leading-tight truncate">{doc.label}</p>
+                {doc.fecha && (
+                  <p className="text-[11px] text-gray-400 mt-0.5 leading-tight">{formatFecha(doc.fecha)}</p>
+                )}
+              </div>
+
+              {/* Days badge */}
+              <div className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-bold ${status.barBg} ${status.textColor}`}>
+                {status.text}
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

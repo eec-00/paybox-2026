@@ -201,6 +201,7 @@ export const TIPO_SERVICIO_BOOL_FIELDS = [
   'x_studio_es_itk',
   'x_studio_es_isotanque_lleno',
   'x_studio_es_isotanque_vacio',
+  'x_studio_es_tarea_de_devolucion_de_vacio',
 ] as const
 
 export interface TaskTypeFlags {
@@ -210,17 +211,21 @@ export interface TaskTypeFlags {
   x_studio_es_itk?: boolean
   x_studio_es_isotanque_lleno?: boolean
   x_studio_es_isotanque_vacio?: boolean
+  x_studio_es_tarea_de_devolucion_de_vacio?: boolean
   x_studio_almacen_de_devolucion?: unknown
 }
 
 /**
  * Detecta el tipo de servicio a partir de los booleanos x_studio_es_* de Odoo.
- * No existe (aún) un boolean propio para "Solo devolución contenedor vacío":
- * se infiere cuando hay almacén de devolución y ningún otro tipo está marcado.
- * TODO: reemplazar por un boolean dedicado (ej. x_studio_es_devolucion_vacio)
- * cuando se cree en Odoo Studio — ver nota en FEATURES.MD.
+ * `x_studio_es_tarea_de_devolucion_de_vacio` es el campo real en Odoo (checkbox
+ * "Es tarea de devolución de vacío") que marca las subtareas de devolución que se
+ * crean cuando el servicio principal termina antes y la devolución del contenedor
+ * queda vinculada como un servicio operativo separado (ver FEATURES.MD §6). Se
+ * revisa primero porque es la señal explícita; el almacén de devolución queda
+ * como fallback para registros antiguos que no tienen el booleano marcado.
  */
 export function detectTipoServicio(task: TaskTypeFlags): TipoServicioKey {
+  if (task.x_studio_es_tarea_de_devolucion_de_vacio) return 'devolucion_vacio'
   if (task.x_studio_es_import) return 'importacion'
   if (task.x_studio_es_export) return 'exportacion'
   if (task.x_studio_es_despacho) return 'despacho'

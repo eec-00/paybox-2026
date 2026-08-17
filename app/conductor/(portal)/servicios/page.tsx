@@ -96,6 +96,10 @@ interface ServicioTask {
   x_studio_es_itk?: boolean
   x_studio_es_isotanque_lleno?: boolean
   x_studio_es_isotanque_vacio?: boolean
+  x_studio_es_tarea_de_devolucion_de_vacio?: boolean
+  // Presente cuando la tarea es una subtarea (ej. "Devolución de vacío"
+  // vinculada a un servicio principal que terminó antes de lo previsto)
+  parent_id?: [number, string] | false
   // Campos de hitos por tipo de servicio (ver lib/servicios/hitos.ts) — dinámicos
   [key: string]: unknown
 }
@@ -193,6 +197,9 @@ function getAlmacenDestino(task: ServicioTask): string {
 }
 function getSteps(task: ServicioTask): HitoDef[] {
   return getHitosForTask(task)
+}
+function getParentLabel(task: ServicioTask): string | null {
+  return Array.isArray(task.parent_id) ? task.parent_id[1] : null
 }
 function getTiempos(task: ServicioTask) {
   return getSteps(task).map(h => ({
@@ -1070,12 +1077,20 @@ export default function ConductorServiciosPage() {
         <div className="flex-1 overflow-y-auto px-4 space-y-3 pb-4">
           {/* Service name + meta */}
           <div className="bg-white rounded-2xl px-4 py-3 border border-gray-100 space-y-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] px-2 py-0.5 rounded-md font-bold tracking-wide bg-slate-100 text-slate-600 border border-slate-200">
                 {tipoServicioLabelFor(task)}
               </span>
+              {getParentLabel(task) && (
+                <span className="text-[10px] px-2 py-0.5 rounded-md font-bold tracking-wide bg-amber-50 text-amber-700 border border-amber-200">
+                  Subtarea vinculada
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-400">{task.name}</p>
+            {getParentLabel(task) && (
+              <p className="text-[11px] text-amber-600">Vinculada a: {getParentLabel(task)}</p>
+            )}
             <div className="flex gap-4 flex-wrap">
               {fecha !== '—' && (
                 <div>
@@ -1422,6 +1437,7 @@ export default function ConductorServiciosPage() {
         const fecha = formatDate(task.x_studio_fecha_de_la_programacin)
         const horaCita = task.x_studio_hora_de_cita ? formatTime(task.x_studio_hora_de_cita) : null
         const stageStyle = getStageStyle(stage)
+        const parentLabel = getParentLabel(task)
 
         const taskStepsLen = getSteps(task).length
         const taskStep = serviceSteps[task.id] ?? -1
@@ -1458,9 +1474,18 @@ export default function ConductorServiciosPage() {
                   <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold tracking-wide bg-slate-100 text-slate-600 border border-slate-200">
                     {tipoServicioLabelFor(task)}
                   </span>
+                  {parentLabel && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold tracking-wide bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                      <PackageSearch className="h-2.5 w-2.5" />
+                      Subtarea vinculada
+                    </span>
+                  )}
                 </div>
                 <p className="font-bold text-[#1a2332] text-sm leading-tight truncate">{client}</p>
                 <p className="text-xs text-gray-400 mt-1 truncate">{task.name}</p>
+                {parentLabel && (
+                  <p className="text-[11px] text-amber-600 mt-0.5 truncate">Vinculada a: {parentLabel}</p>
+                )}
               </div>
               <div className="flex flex-col items-end gap-2 shrink-0">
                 <span className={`text-[11px] px-2.5 py-1 rounded-full font-semibold whitespace-nowrap ${stageStyle.badge}`}>{stage}</span>

@@ -11,12 +11,15 @@ export interface ModulePermissions {
   pagos: ModuleAccess
   servicios: ModuleAccess
   automatizacion: ModuleAccess
+  /** Recursos Humanos: Vacaciones + Asistencia */
+  rrhh: ModuleAccess
 }
 
 export const DEFAULT_MODULE_PERMISSIONS: ModulePermissions = {
   pagos:          { enabled: false, can_create: false, can_edit: false, can_delete: false },
   servicios:      { enabled: false, can_create: false, can_edit: false, can_delete: false },
   automatizacion: { enabled: false, can_create: false, can_edit: false, can_delete: false },
+  rrhh:           { enabled: false, can_create: false, can_edit: false, can_delete: false },
 }
 
 export interface UserProfile {

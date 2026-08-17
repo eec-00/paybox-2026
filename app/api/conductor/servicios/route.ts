@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS } from '@/lib/servicios/hitos'
 
+// Datos operativos en vivo (hitos, GPS, servicios recién creados como subtareas
+// de devolución) — nunca debe servirse cacheado, ni la ruta ni los fetch a Odoo.
+export const dynamic = 'force-dynamic'
+
 const ODOO_URL = (process.env.ODOO_URL || process.env.URL_ODOO || '').trim().replace(/\/$/, '')
 const ODOO_DB = (process.env.ODOO_DB || process.env.DB || '').trim()
 const ODOO_EMAIL = (process.env.ODOO_EMAIL || process.env.EMAIL || '').trim()
@@ -11,6 +15,7 @@ async function odooAuth(): Promise<number> {
   const res = await fetch(`${ODOO_URL}/jsonrpc`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
     body: JSON.stringify({
       jsonrpc: '2.0', method: 'call', id: 1,
       params: { service: 'common', method: 'authenticate', args: [ODOO_DB, ODOO_EMAIL, ODOO_API_KEY, {}] },
@@ -28,6 +33,7 @@ async function odooCall<T = unknown>(
   const res = await fetch(`${ODOO_URL}/jsonrpc`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
     body: JSON.stringify({
       jsonrpc: '2.0', method: 'call', id: Date.now(),
       params: { service: 'object', method: 'execute_kw', args: [ODOO_DB, uid, ODOO_API_KEY, model, method, args, kwargs] },
@@ -38,7 +44,7 @@ async function odooCall<T = unknown>(
   return data.result as T
 }
 
-const BASE_FIELDS = ['name', 'stage_id', 'partner_id', 'date_deadline']
+const BASE_FIELDS = ['name', 'stage_id', 'partner_id', 'date_deadline', 'parent_id', 'create_date']
 const CANDIDATE_FIELDS = [
   'x_studio_fecha_de_la_programacin',
   'x_studio_hora_de_cita',
@@ -121,7 +127,17 @@ export async function GET(req: NextRequest) {
         ? 'x_studio_fecha_de_la_programacin'
         : 'date_deadline'
       if (dateField) {
-        domain.push([dateField, '>=', startDate], [dateField, '<=', endDate])
+        // Las subtareas (p.ej. "Devolución de vacío" creadas cuando un servicio
+        // termina antes y la devolución queda como tarea vinculada, ver
+        // FEATURES.MD §6) no suelen tener x_studio_fecha_de_la_programacin
+        // seteado, así que nunca calzarían con el rango de fecha normal y
+        // desaparecerían de todos los meses. Para esas (parent_id seteado) se
+        // usa su fecha de creación como fallback.
+        domain.push('|',
+          '&', [dateField, '>=', startDate], [dateField, '<=', endDate],
+          '&', ['parent_id', '!=', false],
+          '&', ['create_date', '>=', `${startDate} 00:00:00`], ['create_date', '<=', `${endDate} 23:59:59`],
+        )
       }
     }
 
@@ -129,6 +145,17 @@ export async function GET(req: NextRequest) {
       uid, 'project.task', 'search_read', [domain],
       { fields, order: 'name desc', limit: 500 }
     )
+
+    // Las subtareas vinculadas (ej. "Devolución de vacío") tienen un nombre que
+    // no sigue el patrón "S0XXXX - ..." del servicio principal, así que con el
+    // orden alfabético descendente por defecto terminan hasta el final de la
+    // lista — justo lo contrario de lo deseable, ya que existen porque algo
+    // quedó pendiente/atrasado y el conductor debe notarlas primero.
+    ;(tasks as any[]).sort((a, b) => {
+      const aSub = a.parent_id ? 0 : 1
+      const bSub = b.parent_id ? 0 : 1
+      return aSub - bSub
+    })
 
     // Compute stats
     const stats = {
