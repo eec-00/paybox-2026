@@ -9,7 +9,10 @@ import {
   Receipt, Plus, Trash2, Camera, X, MapPin,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { getHitosForTask, detectTipoServicio, tipoServicioLabelFor, type HitoDef } from '@/lib/servicios/hitos'
+import {
+  getHitosForTask, detectTipoServicio, tipoServicioLabelFor, type HitoDef,
+  MODALIDAD_DEVOLUCION_FIELD, MODALIDAD_MISMO_CONDUCTOR, MODALIDAD_OTRO_CONDUCTOR,
+} from '@/lib/servicios/hitos'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -97,6 +100,7 @@ interface ServicioTask {
   x_studio_es_isotanque_lleno?: boolean
   x_studio_es_isotanque_vacio?: boolean
   x_studio_es_tarea_de_devolucion_de_vacio?: boolean
+  x_studio_modalidad_de_devolucion?: string | false
   // Presente cuando la tarea es una subtarea (ej. "Devolución de vacío"
   // vinculada a un servicio principal que terminó antes de lo previsto)
   parent_id?: [number, string] | false
@@ -604,12 +608,63 @@ export default function ConductorServiciosPage() {
         ).then(() => {})
       }
 
-      advanceStep(task, stepIndex)
+      advanceStepOrAskModalidad(task, stepIndex, hito)
     } catch {
-      advanceStep(task, stepIndex)
+      advanceStepOrAskModalidad(task, stepIndex, hito)
     } finally {
       setSaving(false)
     }
+  }
+
+  // ── Modalidad de devolución (importación/exportación) ────────────────────
+  // Al terminar "Salida de cliente" en importación/exportación, si el
+  // conductor todavía no eligió modalidad de devolución, se le pregunta antes
+  // de seguir: "Mismo conductor" mantiene el flujo actual (manejar hasta el
+  // almacén/depósito de devolución); "Otro conductor" cambia la cola de
+  // hitos a solo dejar el contenedor en la cochera de la empresa — Odoo crea
+  // automáticamente la subtarea de devolución para el otro conductor al
+  // guardar este campo (ver automatización "Crear subtarea de devolución de
+  // vacío"), no hace falta que la app la cree.
+  const [modalidadStepFor, setModalidadStepFor] = useState<{ taskId: number; stepIndex: number } | null>(null)
+  const [modalidadSaving, setModalidadSaving] = useState(false)
+
+  const advanceStepOrAskModalidad = (task: ServicioTask, stepIndex: number, hito: HitoDef) => {
+    const tipo = detectTipoServicio(task)
+    const necesitaModalidad =
+      hito.key === 'salida_cliente' &&
+      (tipo === 'importacion' || tipo === 'exportacion') &&
+      !task.x_studio_modalidad_de_devolucion
+    if (necesitaModalidad) {
+      setModalidadStepFor({ taskId: task.id, stepIndex })
+      return
+    }
+    advanceStep(task, stepIndex)
+  }
+
+  const handleElegirModalidad = async (modalidad: typeof MODALIDAD_MISMO_CONDUCTOR | typeof MODALIDAD_OTRO_CONDUCTOR) => {
+    if (!modalidadStepFor || modalidadSaving) return
+    const { taskId, stepIndex } = modalidadStepFor
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) { setModalidadStepFor(null); return }
+
+    setModalidadSaving(true)
+    try {
+      await fetch('/api/servicios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: taskId, fields: { [MODALIDAD_DEVOLUCION_FIELD]: modalidad } }),
+      })
+    } catch {
+      // si falla la escritura seguimos igual: mejor no trabar al conductor,
+      // la modalidad se puede corregir después desde Odoo.
+    } finally {
+      setModalidadSaving(false)
+    }
+
+    const updatedTask: ServicioTask = { ...task, x_studio_modalidad_de_devolucion: modalidad }
+    setTasks(prev => prev.map(t => (t.id === taskId ? updatedTask : t)))
+    setModalidadStepFor(null)
+    advanceStep(updatedTask, stepIndex)
   }
 
   const handleConfirm = async () => {
@@ -636,7 +691,7 @@ export default function ConductorServiciosPage() {
     if (action === 'mark') {
       await performMarkStep(task, stepIndex, hito, [])
     } else if (action === 'skip') {
-      advanceStep(task, stepIndex)
+      advanceStepOrAskModalidad(task, stepIndex, hito)
     }
   }
 
@@ -1043,6 +1098,7 @@ export default function ConductorServiciosPage() {
     const currentHito = steps[currentStep]
     const isConfirming = pendingConfirm?.taskId === task.id
     const isPhotoStep = photoStepFor?.taskId === task.id
+    const isModalidadStep = modalidadStepFor?.taskId === task.id
     const stage = Array.isArray(task.stage_id) ? task.stage_id[1] : 'Sin etapa'
     const client = Array.isArray(task.partner_id) ? task.partner_id[1] : '—'
     const stageStyle = getStageStyle(stage)
@@ -1166,7 +1222,12 @@ export default function ConductorServiciosPage() {
         {/* Sticky workflow controls */}
         <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-4 space-y-2">
           {currentStep < steps.length ? (
-            isPhotoStep ? (
+            isModalidadStep ? (
+              <ModalidadDevolucionPanel
+                saving={modalidadSaving}
+                onElegir={handleElegirModalidad}
+              />
+            ) : isPhotoStep ? (
               <PhotoStepPanel
                 hito={currentHito}
                 previews={photoPreviews}
@@ -1591,6 +1652,43 @@ function InfoCell({ label, value, mono }: { label: string; value: string; mono?:
     <div className="bg-white rounded-xl px-3 py-2.5 border border-gray-100">
       <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide mb-1">{label}</p>
       <p className={`text-xs font-semibold text-[#1a2332] truncate ${mono ? 'font-mono' : ''}`}>{value}</p>
+    </div>
+  )
+}
+
+function ModalidadDevolucionPanel({ saving, onElegir }: {
+  saving: boolean
+  onElegir: (modalidad: typeof MODALIDAD_MISMO_CONDUCTOR | typeof MODALIDAD_OTRO_CONDUCTOR) => void
+}) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-xs font-bold text-[#1a2332]">¿Quién hace la devolución del contenedor vacío?</p>
+        <p className="text-[11px] text-gray-400 mt-0.5">
+          Si es otro conductor, tú solo dejas el contenedor en la cochera; Odoo crea la subtarea de devolución automáticamente.
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => onElegir(MODALIDAD_MISMO_CONDUCTOR)}
+          disabled={saving}
+          className="flex-1 py-3 rounded-xl border-2 border-[#f5a623] text-[#f5a623] text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform"
+        >
+          Yo mismo
+        </button>
+        <button
+          onClick={() => onElegir(MODALIDAD_OTRO_CONDUCTOR)}
+          disabled={saving}
+          className="flex-1 py-3 rounded-xl bg-[#1a2332] text-white text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform"
+        >
+          Otro conductor
+        </button>
+      </div>
+      {saving && (
+        <p className="text-center text-[11px] text-gray-400 flex items-center justify-center gap-1.5">
+          <Loader2 className="h-3 w-3 animate-spin" /> Guardando...
+        </p>
+      )}
     </div>
   )
 }

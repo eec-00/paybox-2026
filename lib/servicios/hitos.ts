@@ -49,6 +49,34 @@ const INICIO_RUTA: HitoDef = {
   foto: 'no',
 }
 
+// Cola de "Otro conductor" para la devolución del contenedor vacío (ver
+// x_studio_modalidad_de_devolucion): en vez de manejar hasta el
+// almacén/depósito de devolución, el conductor original deja el contenedor
+// en la cochera de la empresa para que otro conductor complete la
+// devolución (se le asigna vía una subtarea que Odoo crea automáticamente
+// — ver automatización "Crear subtarea de devolución de vacío").
+const LLEGADA_COCHERA: HitoDef = {
+  key: 'llegada_cochera',
+  label: 'Llegada a cochera',
+  field: 'x_studio_llegada_a_cochera',
+  foto: 'no',
+}
+const CONTENEDOR_DEJADO_COCHERA: HitoDef = {
+  key: 'contenedor_dejado_cochera',
+  label: 'Contenedor dejado en cochera',
+  field: 'x_studio_contenedor_dejado_en_cochera',
+  foto: 'si',
+  criterio: 'Foto del contenedor dejado en la cochera, para el conductor que continuará la devolución.',
+}
+
+/** Campo Odoo (selection: "Mismo conductor" | "Otro conductor") que decide si
+ * la devolución del contenedor vacío la hace el mismo conductor o se deja en
+ * cochera para que otro la complete. Se pregunta al conductor justo al
+ * terminar "Salida de cliente" en importación/exportación. */
+export const MODALIDAD_DEVOLUCION_FIELD = 'x_studio_modalidad_de_devolucion'
+export const MODALIDAD_MISMO_CONDUCTOR = 'Mismo conductor'
+export const MODALIDAD_OTRO_CONDUCTOR = 'Otro conductor'
+
 export const TIPOS_SERVICIO: Record<TipoServicioKey, TipoServicioDef> = {
   importacion: {
     key: 'importacion',
@@ -213,6 +241,7 @@ export interface TaskTypeFlags {
   x_studio_es_isotanque_vacio?: boolean
   x_studio_es_tarea_de_devolucion_de_vacio?: boolean
   x_studio_almacen_de_devolucion?: unknown
+  x_studio_modalidad_de_devolucion?: string | false
 }
 
 /**
@@ -236,8 +265,26 @@ export function detectTipoServicio(task: TaskTypeFlags): TipoServicioKey {
   return 'generico'
 }
 
+/**
+ * Devuelve los hitos a mostrar para una tarea. En importación/exportación, si
+ * el conductor ya eligió "Otro conductor" como modalidad de devolución (se le
+ * pregunta justo al terminar "Salida de cliente"), la cola de hitos después
+ * de ese punto cambia: en vez de manejar hasta el almacén/depósito de
+ * devolución, solo debe dejar el contenedor en la cochera de la empresa.
+ */
 export function getHitosForTask(task: TaskTypeFlags): HitoDef[] {
-  return TIPOS_SERVICIO[detectTipoServicio(task)].hitos
+  const tipo = detectTipoServicio(task)
+  const base = TIPOS_SERVICIO[tipo].hitos
+  if (
+    (tipo === 'importacion' || tipo === 'exportacion') &&
+    task.x_studio_modalidad_de_devolucion === MODALIDAD_OTRO_CONDUCTOR
+  ) {
+    const idxSalidaCliente = base.findIndex(h => h.key === 'salida_cliente')
+    if (idxSalidaCliente !== -1) {
+      return [...base.slice(0, idxSalidaCliente + 1), LLEGADA_COCHERA, CONTENEDOR_DEJADO_COCHERA, SERVICIO_FINALIZADO]
+    }
+  }
+  return base
 }
 
 export function tipoServicioLabelFor(task: TaskTypeFlags): string {
@@ -246,5 +293,9 @@ export function tipoServicioLabelFor(task: TaskTypeFlags): string {
 
 /** Lista única de todos los campos x_studio_* de hitos (para pedir a Odoo vía fields_get/search_read) */
 export const ALL_HITO_FIELDS: string[] = Array.from(
-  new Set(Object.values(TIPOS_SERVICIO).flatMap(t => t.hitos.map(h => h.field)))
+  new Set([
+    ...Object.values(TIPOS_SERVICIO).flatMap(t => t.hitos.map(h => h.field)),
+    LLEGADA_COCHERA.field,
+    CONTENEDOR_DEJADO_COCHERA.field,
+  ])
 )

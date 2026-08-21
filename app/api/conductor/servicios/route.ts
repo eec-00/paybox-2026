@@ -58,6 +58,7 @@ const CANDIDATE_FIELDS = [
   'x_studio_almacen_de_destino',
   'x_studio_almacen_de_devolucion',
   'x_studio_es_importacion',
+  'x_studio_modalidad_de_devolucion',
   ...TIPO_SERVICIO_BOOL_FIELDS,
   ...ALL_HITO_FIELDS,
 ]
