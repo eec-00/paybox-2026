@@ -529,7 +529,8 @@ export default function ConductorServiciosPage() {
   const advanceStep = (task: ServicioTask, stepIndex: number) => {
     const taskId = task.id
     const nextStep = stepIndex + 1
-    const stepsLen = getSteps(task).length
+    const stepsArr = getSteps(task)
+    const stepsLen = stepsArr.length
     setServiceSteps(prev => ({ ...prev, [taskId]: nextStep }))
 
     if (conductorUserId) {
@@ -547,7 +548,13 @@ export default function ConductorServiciosPage() {
       }
     }
 
-    if (nextStep >= stepsLen) {
+    // Solo cerrar la etapa en Odoo si el flujo realmente termina en
+    // "Servicio finalizado". Cuando la devolución quedó en manos de otro
+    // conductor (cola de cochera), este conductor ya completó lo suyo pero
+    // el servicio como tal sigue abierto hasta que el otro conductor cierre
+    // su propia subtarea — no hay que mover la etapa de Odoo acá.
+    const ultimoHito = stepsArr[stepsLen - 1]
+    if (nextStep >= stepsLen && ultimoHito?.key === 'servicio_finalizado') {
       fetch('/api/servicios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -618,24 +625,33 @@ export default function ConductorServiciosPage() {
 
   // ── Modalidad de devolución (importación/exportación) ────────────────────
   // Al terminar "Salida de cliente" en importación/exportación se pregunta
-  // siempre: "Mismo conductor" mantiene el flujo actual (manejar hasta el
+  // "Mismo conductor" mantiene el flujo actual (manejar hasta el
   // almacén/depósito de devolución); "Otro conductor" cambia la cola de
   // hitos a solo dejar el contenedor en la cochera de la empresa — Odoo crea
   // automáticamente la subtarea de devolución para el otro conductor al
   // guardar este campo (ver automatización "Crear subtarea de devolución de
   // vacío"), no hace falta que la app la cree.
   //
-  // OJO: no se puede usar "¿el campo ya tiene valor?" para saber si ya se
-  // preguntó — Odoo trae x_studio_modalidad_de_devolucion con el valor por
+  // OJO: no se puede usar "¿el campo ya tiene valor?" para decidir si hay que
+  // preguntar — Odoo trae x_studio_modalidad_de_devolucion con el valor por
   // defecto "Mismo conductor" desde que se crea la tarea (ir.default), así
-  // que el campo nunca está vacío y esa condición nunca dispararía la
-  // pregunta. Por eso se pregunta siempre al pasar por "Salida de cliente".
+  // que el campo nunca está vacío. Pero "Otro conductor" NUNCA es un valor
+  // por defecto: solo llega ahí si alguien lo eligió a propósito (el
+  // despachador desde Odoo, o el conductor desde la app). Por eso, si ya
+  // viene en "Otro conductor" al llegar a "Salida de cliente", ya está
+  // decidido — no se vuelve a preguntar y se pasa directo a la cola de
+  // cochera. Solo se pregunta cuando el valor todavía es (o sigue siendo)
+  // "Mismo conductor", porque ahí no hay forma de distinguir un default sin
+  // tocar de una decisión real.
   const [modalidadStepFor, setModalidadStepFor] = useState<{ taskId: number; stepIndex: number } | null>(null)
   const [modalidadSaving, setModalidadSaving] = useState(false)
 
   const advanceStepOrAskModalidad = (task: ServicioTask, stepIndex: number, hito: HitoDef) => {
     const tipo = detectTipoServicio(task)
-    const necesitaModalidad = hito.key === 'salida_cliente' && (tipo === 'importacion' || tipo === 'exportacion')
+    const necesitaModalidad =
+      hito.key === 'salida_cliente' &&
+      (tipo === 'importacion' || tipo === 'exportacion') &&
+      task.x_studio_modalidad_de_devolucion !== MODALIDAD_OTRO_CONDUCTOR
     if (necesitaModalidad) {
       setModalidadStepFor({ taskId: task.id, stepIndex })
       return
@@ -1098,6 +1114,10 @@ export default function ConductorServiciosPage() {
     const steps = getSteps(task)
     const currentStep = serviceSteps[task.id] ?? 0
     const currentHito = steps[currentStep]
+    // La cola de "otro conductor" termina dejando el contenedor en cochera,
+    // no en "Servicio finalizado" — ver getHitosForTask. El servicio como tal
+    // sigue abierto hasta que el otro conductor cierre su subtarea.
+    const terminaEnCochera = steps.length > 0 && steps[steps.length - 1]?.key === 'contenedor_dejado_cochera'
     const isConfirming = pendingConfirm?.taskId === task.id
     const isPhotoStep = photoStepFor?.taskId === task.id
     const isModalidadStep = modalidadStepFor?.taskId === task.id
@@ -1279,8 +1299,15 @@ export default function ConductorServiciosPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-center gap-2 py-1 text-emerald-600">
                 <CheckCircle2 className="h-4 w-4" />
-                <span className="text-sm font-bold">Servicio completado</span>
+                <span className="text-sm font-bold">
+                  {terminaEnCochera ? 'Contenedor dejado en cochera' : 'Servicio completado'}
+                </span>
               </div>
+              {terminaEnCochera && (
+                <p className="text-xs text-center text-gray-400 -mt-1">
+                  Tu parte terminó. La devolución la completa otro conductor.
+                </p>
+              )}
               {(() => {
                 const existing = servicioGastosMap[task.id] || []
                 const loadingEx = loadingGastosMap[task.id]

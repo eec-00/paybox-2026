@@ -271,6 +271,11 @@ export function detectTipoServicio(task: TaskTypeFlags): TipoServicioKey {
  * pregunta justo al terminar "Salida de cliente"), la cola de hitos después
  * de ese punto cambia: en vez de manejar hasta el almacén/depósito de
  * devolución, solo debe dejar el contenedor en la cochera de la empresa.
+ *
+ * Ojo: esa cola NO incluye "Servicio finalizado" — el servicio en sí no
+ * termina ahí, sigue con el otro conductor (vía la subtarea que Odoo crea
+ * automáticamente). "Servicio finalizado" es del conductor que SÍ cierra el
+ * servicio: el que hace la subtarea de devolución.
  */
 export function getHitosForTask(task: TaskTypeFlags): HitoDef[] {
   const tipo = detectTipoServicio(task)
@@ -281,7 +286,7 @@ export function getHitosForTask(task: TaskTypeFlags): HitoDef[] {
   ) {
     const idxSalidaCliente = base.findIndex(h => h.key === 'salida_cliente')
     if (idxSalidaCliente !== -1) {
-      return [...base.slice(0, idxSalidaCliente + 1), LLEGADA_COCHERA, CONTENEDOR_DEJADO_COCHERA, SERVICIO_FINALIZADO]
+      return [...base.slice(0, idxSalidaCliente + 1), LLEGADA_COCHERA, CONTENEDOR_DEJADO_COCHERA]
     }
   }
   return base
