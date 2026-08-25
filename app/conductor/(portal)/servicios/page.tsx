@@ -101,6 +101,8 @@ interface ServicioTask {
   x_studio_es_isotanque_vacio?: boolean
   x_studio_es_tarea_de_devolucion_de_vacio?: boolean
   x_studio_modalidad_de_devolucion?: string | false
+  x_studio_es_tarea_de_retiro_de_vacio?: boolean
+  x_studio_modalidad_de_retiro?: string | false
   // Presente cuando la tarea es una subtarea (ej. "Devolución de vacío"
   // vinculada a un servicio principal que terminó antes de lo previsto)
   parent_id?: [number, string] | false
@@ -623,14 +625,20 @@ export default function ConductorServiciosPage() {
     }
   }
 
-  // ── Modalidad de devolución (importación/exportación) ────────────────────
-  // Al terminar "Salida de cliente" en importación/exportación se pregunta
-  // "Mismo conductor" mantiene el flujo actual (manejar hasta el
-  // almacén/depósito de devolución); "Otro conductor" cambia la cola de
-  // hitos a solo dejar el contenedor en la cochera de la empresa — Odoo crea
-  // automáticamente la subtarea de devolución para el otro conductor al
-  // guardar este campo (ver automatización "Crear subtarea de devolución de
-  // vacío"), no hace falta que la app la cree.
+  // ── Modalidad de devolución (SOLO importación) ────────────────────────────
+  // Al terminar "Salida de cliente" en importación se pregunta: "Mismo
+  // conductor" mantiene el flujo actual (manejar hasta el almacén/depósito
+  // de devolución); "Otro conductor" cambia la cola de hitos a solo dejar el
+  // contenedor en la cochera de la empresa — Odoo crea automáticamente la
+  // subtarea de devolución para el otro conductor al guardar este campo (ver
+  // automatización "Crear subtarea de devolución de vacío"), no hace falta
+  // que la app la cree.
+  //
+  // Exportación NO usa esta pregunta — tiene su propio mecanismo espejo,
+  // "modalidad de retiro" (ver MODALIDAD_RETIRO_FIELD en hitos.ts), que
+  // afecta la CABECERA del flujo (antes de cargar) en vez de la cola, y que
+  // por eso no se pregunta a mitad de ruta: se decide de antemano en Odoo y
+  // la app solo la valida al armar los hitos (getHitosForTask).
   //
   // OJO: no se puede usar "¿el campo ya tiene valor?" para decidir si hay que
   // preguntar — Odoo trae x_studio_modalidad_de_devolucion con el valor por
@@ -650,7 +658,7 @@ export default function ConductorServiciosPage() {
     const tipo = detectTipoServicio(task)
     const necesitaModalidad =
       hito.key === 'salida_cliente' &&
-      (tipo === 'importacion' || tipo === 'exportacion') &&
+      tipo === 'importacion' &&
       task.x_studio_modalidad_de_devolucion !== MODALIDAD_OTRO_CONDUCTOR
     if (necesitaModalidad) {
       setModalidadStepFor({ taskId: task.id, stepIndex })

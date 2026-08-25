@@ -25,6 +25,7 @@ export type TipoServicioKey =
   | 'isotanque_lleno'
   | 'isotanque_vacio'
   | 'devolucion_vacio'
+  | 'retiro_vacio'
   | 'generico'
 
 export interface TipoServicioDef {
@@ -71,11 +72,25 @@ const CONTENEDOR_DEJADO_COCHERA: HitoDef = {
 
 /** Campo Odoo (selection: "Mismo conductor" | "Otro conductor") que decide si
  * la devolución del contenedor vacío la hace el mismo conductor o se deja en
- * cochera para que otro la complete. Se pregunta al conductor justo al
- * terminar "Salida de cliente" en importación/exportación. */
+ * cochera para que otro la complete. Solo aplica a IMPORTACIÓN. Se pregunta
+ * al conductor justo al terminar "Salida de cliente". */
 export const MODALIDAD_DEVOLUCION_FIELD = 'x_studio_modalidad_de_devolucion'
 export const MODALIDAD_MISMO_CONDUCTOR = 'Mismo conductor'
 export const MODALIDAD_OTRO_CONDUCTOR = 'Otro conductor'
+
+/**
+ * Campo Odoo (mismo selection "Mismo conductor" | "Otro conductor", campo
+ * técnico distinto) que decide si el RETIRO del contenedor vacío antes de
+ * cargar lo hace el mismo conductor o lo hace otro conductor y lo deja en
+ * cochera para que el conductor original solo lo recoja ahí. Solo aplica a
+ * EXPORTACIÓN, y a diferencia de la devolución, esto NO se pregunta durante
+ * el flujo — se decide de antemano en Odoo (el despachador lo asigna al
+ * crear el servicio, antes de que el conductor empiece su ruta, porque el
+ * retiro es lo primero que pasaría, no hay un punto natural de la ruta en el
+ * que preguntar). La app solo lee/valida este valor para armar la cola de
+ * hitos correcta desde el inicio.
+ */
+export const MODALIDAD_RETIRO_FIELD = 'x_studio_modalidad_de_retiro'
 
 export const TIPOS_SERVICIO: Record<TipoServicioKey, TipoServicioDef> = {
   importacion: {
@@ -87,10 +102,10 @@ export const TIPOS_SERVICIO: Record<TipoServicioKey, TipoServicioDef> = {
       { key: 'ingreso_almacen_retiro', label: 'Ingreso almacén de retiro', field: 'x_studio_ingreso_a_almacen_de_retiro_1', foto: 'no' },
       { key: 'salida_almacen_retiro', label: 'Salida almacén de retiro', field: 'x_studio_salida_de_almacen_de_retiro', foto: 'si', criterio: 'Foto del contenedor retirado, número visible, estado exterior y precinto si aplica.' },
       { key: 'llegada_cliente', label: 'Llegada a cliente', field: 'x_studio_llegada_a_cliente', foto: 'no' },
-      { key: 'ingreso_cliente', label: 'Ingreso a cliente', field: 'x_studio_ingreso_a_planta', foto: 'no' },
+      { key: 'ingreso_cliente', label: 'Ingreso a cliente', field: 'x_studio_ingreso_a_cliente', foto: 'no' },
       { key: 'inicio_descarga', label: 'Inicio descarga', field: 'x_studio_inicio_descarga', foto: 'si', criterio: 'Foto antes de abrir, precinto visible si aplica.' },
       { key: 'fin_descarga', label: 'Fin descarga', field: 'x_studio_fin_descarga', foto: 'si', criterio: 'Foto del contenedor descargado, mercadería entregada o evidencia de conformidad.' },
-      { key: 'salida_cliente', label: 'Salida de cliente', field: 'x_studio_salida_cliente', foto: 'no' },
+      { key: 'salida_cliente', label: 'Salida de cliente', field: 'x_studio_salida_de_cliente', foto: 'no' },
       { key: 'llegada_devolucion', label: 'Llegada a almacén/depósito de devolución', field: 'x_studio_llegada_a_almacendeposito_de_devolucion', foto: 'no' },
       { key: 'ingreso_devolucion', label: 'Ingreso a almacén/depósito de devolución', field: 'x_studio_ingreso_a_almacendeposito_de_devolucion', foto: 'no' },
       { key: 'contenedor_devuelto', label: 'Contenedor vacío devuelto', field: 'x_studio_contenedor_vacio_devuelto', foto: 'si', criterio: 'Foto del EIR, constancia o evidencia de devolución.' },
@@ -107,10 +122,10 @@ export const TIPOS_SERVICIO: Record<TipoServicioKey, TipoServicioDef> = {
       { key: 'ingreso_almacen_retiro', label: 'Ingreso almacén de retiro', field: 'x_studio_ingreso_a_almacen_de_retiro_1', foto: 'no' },
       { key: 'salida_almacen_retiro', label: 'Salida almacén de retiro', field: 'x_studio_salida_de_almacen_de_retiro', foto: 'si', criterio: 'Foto del contenedor retirado, número visible, estado exterior y precinto si aplica.' },
       { key: 'llegada_cliente', label: 'Llegada a cliente', field: 'x_studio_llegada_a_cliente', foto: 'no' },
-      { key: 'ingreso_cliente', label: 'Ingreso a cliente', field: 'x_studio_ingreso_a_planta', foto: 'no' },
+      { key: 'ingreso_cliente', label: 'Ingreso a cliente', field: 'x_studio_ingreso_a_cliente', foto: 'no' },
       { key: 'inicio_carga', label: 'Inicio carga', field: 'x_studio_inicio_carga', foto: 'si', criterio: 'Foto del contenedor vacío antes de cargar o mercadería al inicio de carga.' },
       { key: 'fin_carga', label: 'Fin carga', field: 'x_studio_fin_carga', foto: 'si', criterio: 'Foto de carga finalizada, contenedor cerrado, mercadería asegurada y precinto si aplica.' },
-      { key: 'salida_cliente', label: 'Salida de cliente', field: 'x_studio_salida_cliente', foto: 'no' },
+      { key: 'salida_cliente', label: 'Salida de cliente', field: 'x_studio_salida_de_cliente', foto: 'no' },
       { key: 'llegada_terminal_destino', label: 'Llegada a terminal/almacén destino', field: 'x_studio_llegada_a_terminalalmacen_destino', foto: 'no' },
       { key: 'ingreso_terminal_destino', label: 'Ingreso terminal/almacén destino', field: 'x_studio_ingreso_terminalalmacen_destino', foto: 'no' },
       { key: 'entrega_contenedor_lleno', label: 'Entrega contenedor lleno', field: 'x_studio_entrega_contenedor_lleno', foto: 'si', criterio: 'Foto de ticket, EIR, constancia o documento de recepción.' },
@@ -201,6 +216,24 @@ export const TIPOS_SERVICIO: Record<TipoServicioKey, TipoServicioDef> = {
     ],
   },
 
+  // Subtarea de retiro de vacío en exportación (modalidad_de_retiro = "Otro
+  // conductor"): el otro conductor retira el contenedor vacío del almacén y
+  // lo deja en la cochera de la empresa; el conductor original lo recoge de
+  // ahí y sigue con el servicio (por eso NO termina en "Servicio
+  // finalizado" — el servicio como tal sigue con el otro conductor).
+  retiro_vacio: {
+    key: 'retiro_vacio',
+    label: 'Retiro de vacío (exportación)',
+    hitos: [
+      INICIO_RUTA,
+      { key: 'llegada_cola_retiro', label: 'Llegada/cola en almacén de retiro', field: 'x_studio_en_cola_de_ingreso', foto: 'no' },
+      { key: 'ingreso_almacen_retiro', label: 'Ingreso almacén de retiro', field: 'x_studio_ingreso_a_almacen_de_retiro_1', foto: 'no' },
+      { key: 'salida_almacen_retiro', label: 'Salida almacén de retiro', field: 'x_studio_salida_de_almacen_de_retiro', foto: 'si', criterio: 'Foto del contenedor retirado, número visible, estado exterior y precinto si aplica.' },
+      LLEGADA_COCHERA,
+      CONTENEDOR_DEJADO_COCHERA,
+    ],
+  },
+
   // Fallback para tareas sin ningún boolean de tipo marcado (registros antiguos).
   // Usa los campos genéricos que ya se venían escribiendo antes de este catálogo.
   generico: {
@@ -212,10 +245,10 @@ export const TIPOS_SERVICIO: Record<TipoServicioKey, TipoServicioDef> = {
       { key: 'llegue_almacen', label: 'Llegué almacén', field: 'x_studio_ingreso_a_almacen_de_retiro_1', foto: 'no' },
       { key: 'salida_almacen', label: 'Salida almacén', field: 'x_studio_salida_de_almacen_de_retiro', foto: 'opcional' },
       { key: 'llegada_cliente', label: 'Llegada a cliente', field: 'x_studio_llegada_a_cliente', foto: 'no' },
-      { key: 'ingreso_cliente', label: 'Ingreso a cliente', field: 'x_studio_ingreso_a_planta', foto: 'no' },
+      { key: 'ingreso_cliente', label: 'Ingreso a cliente', field: 'x_studio_ingreso_a_cliente', foto: 'no' },
       { key: 'inicio_cd', label: 'Inicio carga/descarga', field: 'x_studio_inicio_cargadescarga', foto: 'opcional' },
       { key: 'fin_cd', label: 'Fin carga/descarga', field: 'x_studio_termino_de_descarga', foto: 'opcional' },
-      { key: 'salida_cliente', label: 'Salida de cliente', field: 'x_studio_salida_cliente', foto: 'no' },
+      { key: 'salida_cliente', label: 'Salida de cliente', field: 'x_studio_salida_de_cliente', foto: 'no' },
       SERVICIO_FINALIZADO,
     ],
   },
@@ -230,6 +263,7 @@ export const TIPO_SERVICIO_BOOL_FIELDS = [
   'x_studio_es_isotanque_lleno',
   'x_studio_es_isotanque_vacio',
   'x_studio_es_tarea_de_devolucion_de_vacio',
+  'x_studio_es_tarea_de_retiro_de_vacio',
 ] as const
 
 export interface TaskTypeFlags {
@@ -240,21 +274,25 @@ export interface TaskTypeFlags {
   x_studio_es_isotanque_lleno?: boolean
   x_studio_es_isotanque_vacio?: boolean
   x_studio_es_tarea_de_devolucion_de_vacio?: boolean
+  x_studio_es_tarea_de_retiro_de_vacio?: boolean
   x_studio_almacen_de_devolucion?: unknown
   x_studio_modalidad_de_devolucion?: string | false
+  x_studio_modalidad_de_retiro?: string | false
 }
 
 /**
  * Detecta el tipo de servicio a partir de los booleanos x_studio_es_* de Odoo.
- * `x_studio_es_tarea_de_devolucion_de_vacio` es el campo real en Odoo (checkbox
- * "Es tarea de devolución de vacío") que marca las subtareas de devolución que se
- * crean cuando el servicio principal termina antes y la devolución del contenedor
- * queda vinculada como un servicio operativo separado (ver FEATURES.MD §6). Se
- * revisa primero porque es la señal explícita; el almacén de devolución queda
- * como fallback para registros antiguos que no tienen el booleano marcado.
+ * `x_studio_es_tarea_de_devolucion_de_vacio` / `x_studio_es_tarea_de_retiro_de_vacio`
+ * son los campos reales en Odoo (checkboxes) que marcan las subtareas de
+ * devolución/retiro que se crean cuando el servicio principal queda con la
+ * devolución (importación) o el retiro (exportación) a cargo de otro
+ * conductor (ver FEATURES.MD §6). Se revisan primero porque son la señal
+ * explícita; el almacén de devolución queda como fallback para registros
+ * antiguos que no tienen el booleano marcado.
  */
 export function detectTipoServicio(task: TaskTypeFlags): TipoServicioKey {
   if (task.x_studio_es_tarea_de_devolucion_de_vacio) return 'devolucion_vacio'
+  if (task.x_studio_es_tarea_de_retiro_de_vacio) return 'retiro_vacio'
   if (task.x_studio_es_import) return 'importacion'
   if (task.x_studio_es_export) return 'exportacion'
   if (task.x_studio_es_despacho) return 'despacho'
@@ -266,29 +304,39 @@ export function detectTipoServicio(task: TaskTypeFlags): TipoServicioKey {
 }
 
 /**
- * Devuelve los hitos a mostrar para una tarea. En importación/exportación, si
- * el conductor ya eligió "Otro conductor" como modalidad de devolución (se le
- * pregunta justo al terminar "Salida de cliente"), la cola de hitos después
- * de ese punto cambia: en vez de manejar hasta el almacén/depósito de
- * devolución, solo debe dejar el contenedor en la cochera de la empresa.
+ * Devuelve los hitos a mostrar para una tarea.
  *
- * Ojo: esa cola NO incluye "Servicio finalizado" — el servicio en sí no
- * termina ahí, sigue con el otro conductor (vía la subtarea que Odoo crea
- * automáticamente). "Servicio finalizado" es del conductor que SÍ cierra el
- * servicio: el que hace la subtarea de devolución.
+ * Importación + modalidad_de_devolucion = "Otro conductor" (se pregunta al
+ * conductor justo al terminar "Salida de cliente"): la cola después de ese
+ * punto cambia — en vez de manejar hasta el almacén/depósito de devolución,
+ * solo deja el contenedor en la cochera de la empresa. No incluye "Servicio
+ * finalizado": el servicio sigue con el otro conductor (vía la subtarea que
+ * Odoo crea automáticamente).
+ *
+ * Exportación + modalidad_de_retiro = "Otro conductor" (esto NO se pregunta
+ * en la app — se decide de antemano en Odoo, ver MODALIDAD_RETIRO_FIELD): la
+ * cabecera cambia — el conductor original ya no pasa por almacén de retiro,
+ * el contenedor vacío ya lo dejó el otro conductor en cochera, así que
+ * arranca directo en "Llegada a cliente".
  */
 export function getHitosForTask(task: TaskTypeFlags): HitoDef[] {
   const tipo = detectTipoServicio(task)
-  const base = TIPOS_SERVICIO[tipo].hitos
-  if (
-    (tipo === 'importacion' || tipo === 'exportacion') &&
-    task.x_studio_modalidad_de_devolucion === MODALIDAD_OTRO_CONDUCTOR
-  ) {
+  let base = TIPOS_SERVICIO[tipo].hitos
+
+  if (tipo === 'importacion' && task.x_studio_modalidad_de_devolucion === MODALIDAD_OTRO_CONDUCTOR) {
     const idxSalidaCliente = base.findIndex(h => h.key === 'salida_cliente')
     if (idxSalidaCliente !== -1) {
-      return [...base.slice(0, idxSalidaCliente + 1), LLEGADA_COCHERA, CONTENEDOR_DEJADO_COCHERA]
+      base = [...base.slice(0, idxSalidaCliente + 1), LLEGADA_COCHERA, CONTENEDOR_DEJADO_COCHERA]
     }
   }
+
+  if (tipo === 'exportacion' && task.x_studio_modalidad_de_retiro === MODALIDAD_OTRO_CONDUCTOR) {
+    const idxLlegadaCliente = base.findIndex(h => h.key === 'llegada_cliente')
+    if (idxLlegadaCliente !== -1) {
+      base = [base[0], ...base.slice(idxLlegadaCliente)]
+    }
+  }
+
   return base
 }
 

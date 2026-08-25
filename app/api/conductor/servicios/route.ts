@@ -59,6 +59,7 @@ const CANDIDATE_FIELDS = [
   'x_studio_almacen_de_devolucion',
   'x_studio_es_importacion',
   'x_studio_modalidad_de_devolucion',
+  'x_studio_modalidad_de_retiro',
   ...TIPO_SERVICIO_BOOL_FIELDS,
   ...ALL_HITO_FIELDS,
 ]
@@ -142,21 +143,56 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const tasks = await odooCall<unknown[]>(
+    const tasks = await odooCall<any[]>(
       uid, 'project.task', 'search_read', [domain],
       { fields, order: 'name desc', limit: 500 }
     )
 
-    // Las subtareas vinculadas (ej. "Devolución de vacío") tienen un nombre que
-    // no sigue el patrón "S0XXXX - ..." del servicio principal, así que con el
-    // orden alfabético descendente por defecto terminan hasta el final de la
-    // lista — justo lo contrario de lo deseable, ya que existen porque algo
-    // quedó pendiente/atrasado y el conductor debe notarlas primero.
-    ;(tasks as any[]).sort((a, b) => {
-      const aSub = a.parent_id ? 0 : 1
-      const bSub = b.parent_id ? 0 : 1
-      return aSub - bSub
-    })
+    // Las subtareas (ej. "Devolución de vacío") se crean duplicando una
+    // plantilla en blanco (ver automatización de Odoo), no copiando los datos
+    // del servicio padre — así que contenedor, booking, agencia y almacén de
+    // devolución les quedan vacíos aunque el conductor los necesita para
+    // saber de qué servicio se trata. Si vienen vacíos, se completan con los
+    // del servicio padre (nunca se pisa lo que la subtarea sí trae propio,
+    // como su placa/conductor, que legítimamente son distintos).
+    const PARENT_FALLBACK_FIELDS = [
+      'x_studio_nmero_de_contenedor', 'x_studio_referenciabooking',
+      'x_studio_agencia', 'x_studio_almacen_de_devolucion',
+    ].filter(f => validExtraFields.includes(f))
+
+    if (PARENT_FALLBACK_FIELDS.length > 0) {
+      const parentIds = Array.from(new Set(
+        tasks
+          .filter(t => Array.isArray(t.parent_id) && PARENT_FALLBACK_FIELDS.some(f => !t[f]))
+          .map(t => t.parent_id[0] as number)
+      ))
+      if (parentIds.length > 0) {
+        const parents = await odooCall<any[]>(
+          uid, 'project.task', 'read', [parentIds], { fields: PARENT_FALLBACK_FIELDS }
+        )
+        const parentById = new Map(parents.map(p => [p.id, p]))
+        for (const t of tasks) {
+          if (!Array.isArray(t.parent_id)) continue
+          const parent = parentById.get(t.parent_id[0])
+          if (!parent) continue
+          for (const f of PARENT_FALLBACK_FIELDS) {
+            if (!t[f] && parent[f]) t[f] = parent[f]
+          }
+        }
+      }
+    }
+
+    // Orden por número de servicio (ej. "S02155"), no alfabético por nombre
+    // completo: una subtarea (ej. "Devolución de vacío") no tiene ese prefijo
+    // en su propio nombre, así que se ordena usando el número del servicio
+    // padre — debe caer junto a su servicio, no al final de la lista.
+    const servicioKeyFor = (t: any): string => {
+      const nameSource = Array.isArray(t.parent_id) ? t.parent_id[1] : t.name
+      return typeof nameSource === 'string' && nameSource.includes(' - ')
+        ? nameSource.split(' - ')[0]
+        : (nameSource || '')
+    }
+    tasks.sort((a, b) => servicioKeyFor(b).localeCompare(servicioKeyFor(a), undefined, { numeric: true }))
 
     // Compute stats
     const stats = {

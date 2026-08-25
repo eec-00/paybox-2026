@@ -154,11 +154,23 @@ export async function GET(
           })
         }
 
-        // Other binary fields — only if they have data
+        // Other binary fields — only if they have data.
+        // Odoo Studio tiene varios campos "related field" duplicados que
+        // apuntan al mismo archivo bajo distintos nombres técnicos (ej.
+        // x_studio_memo_de_devolucion, _1, _2, x_studio_related_field_2bk_...,
+        // todos etiquetados "MEMO de Devolución") — sobre todo en la sección
+        // de devolución de vacío de importación. Sin deduplicar, el mismo PDF
+        // aparece 3-4 veces en la lista. Se deduplica por contenido: si dos
+        // campos tienen exactamente el mismo base64, es el mismo archivo.
+        const seenContent = new Set<string>()
+        const contentKey = (b64: string) => `${b64.length}:${b64.slice(0, 48)}:${b64.slice(-48)}`
         for (const field of binaryFields) {
           if (processedGuia.has(field)) continue
           const b64 = task[field]
           if (typeof b64 === 'string' && b64.length > 0) {
+            const key = contentKey(b64)
+            if (seenContent.has(key)) continue
+            seenContent.add(key)
             const mimetype = guessMimetype(b64)
             const ext = guessExt(mimetype)
             const label = FIELD_LABELS[field] || allFields[field]?.string || field
