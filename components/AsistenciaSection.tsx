@@ -14,11 +14,12 @@ import {
 } from '@/components/ui/alert-dialog'
 import {
   Fingerprint, RefreshCw, XCircle, Trash2, MapPin, ExternalLink, Users, CheckCircle2, CircleDashed, LogOut,
-  ChevronLeft, ChevronRight, Settings2,
+  ChevronLeft, ChevronRight, Settings2, BarChart3,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { AsistenciaZonas } from '@/components/AsistenciaZonas'
+import { AsistenciaEstadisticas } from '@/components/AsistenciaEstadisticas'
 
 interface Marca {
   id: string
@@ -93,6 +94,7 @@ export function AsistenciaSection() {
   const [deleteMarca, setDeleteMarca] = useState<Marca | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [showZonas, setShowZonas] = useState(false)
+  const [showEstadisticas, setShowEstadisticas] = useState(false)
 
   useEffect(() => {
     (async () => {
@@ -192,6 +194,15 @@ export function AsistenciaSection() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant={showEstadisticas ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowEstadisticas((v) => !v)}
+            className="h-8 gap-1.5"
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+            Estadísticas
+          </Button>
           {canDelete && (
             <Button variant="outline" size="sm" onClick={() => setShowZonas((v) => !v)} className="h-8 gap-1.5">
               <Settings2 className="h-3.5 w-3.5" />
@@ -205,6 +216,7 @@ export function AsistenciaSection() {
         </div>
       </div>
 
+      {showEstadisticas && <AsistenciaEstadisticas conductores={conductores} />}
       {canDelete && showZonas && <AsistenciaZonas />}
 
       {/* Filtros */}
