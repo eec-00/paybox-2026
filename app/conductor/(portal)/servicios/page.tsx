@@ -114,6 +114,8 @@ interface Stats {
   total: number
   porEtapa: Record<string, number>
   clientes: string[]
+  subtotal: number
+  subPorEtapa: Record<string, number>
 }
 
 type PendingConfirm = { taskId: number; stepIndex: number; action: 'start' | 'mark' | 'skip' }
@@ -1440,6 +1442,9 @@ export default function ConductorServiciosPage() {
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-1">
             <p className="text-5xl font-extrabold text-[#1a2332]" style={{ fontFamily: 'Montserrat, sans-serif' }}>{stats.total}</p>
             <p className="text-xs text-gray-400 font-medium">servicios este mes</p>
+            {stats.subtotal > 0 && (
+              <p className="text-[11px] text-gray-400">+{stats.subtotal} subtarea{stats.subtotal === 1 ? '' : 's'}</p>
+            )}
           </div>
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-2">
             {stageEntries.length === 0 ? (

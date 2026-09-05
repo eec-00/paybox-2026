@@ -54,7 +54,7 @@ async function odooCall<T = unknown>(
 }
 
 // Base fields always present on project.task
-const BASE_FIELDS = ['name', 'stage_id', 'partner_id', 'date_deadline']
+const BASE_FIELDS = ['name', 'stage_id', 'partner_id', 'date_deadline', 'parent_id']
 
 // Candidate x_studio fields — validated at runtime via fields_get
 const CANDIDATE_X_FIELDS = [
@@ -105,7 +105,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const idParam = searchParams.get('id')
     const stageFilter = searchParams.get('stage') || ''
-    const limitParam = parseInt(searchParams.get('limit') || '500')
+    // El proyecto "Servicio de Transporte" ya supera las 2500 tareas. Con un
+    // límite bajo (antes 500) y orden alfabético descendente, las subtareas
+    // (ej. "Devolución de vacío", "Retiro de vacío – Exportación") — cuyo
+    // nombre no empieza con "S0XXXX" — quedaban siempre fuera del corte junto
+    // con miles de servicios antiguos, invisibles en el panel admin sin que
+    // nadie lo notara. Se sube el límite por defecto muy por encima del
+    // total actual para no perder datos silenciosamente.
+    const limitParam = parseInt(searchParams.get('limit') || '10000')
     const debugFields = searchParams.get('fields') === '1'
 
     const uid = await odooAuth()
@@ -210,7 +217,7 @@ export async function GET(request: Request) {
     const domain: unknown[] = [['project_id', '=', projectId]]
     if (stageFilter) domain.push(['stage_id.name', 'ilike', stageFilter])
 
-    const tasks = await odooCall<unknown[]>(
+    const tasks = await odooCall<any[]>(
       uid,
       'project.task',
       'search_read',
@@ -221,6 +228,40 @@ export async function GET(request: Request) {
         limit: limitParam,
       }
     )
+
+    // Las subtareas (ej. "Devolución de vacío", "Retiro de vacío –
+    // Exportación") se crean duplicando una plantilla en blanco (ver
+    // automatización de Odoo), no copiando los datos del servicio padre —
+    // así que contenedor, booking, agencia y almacén de devolución les
+    // quedan vacíos en la tabla aunque describen el mismo servicio. Si vienen
+    // vacíos, se completan con los del servicio padre (nunca se pisa lo que
+    // la subtarea sí trae propio, como su placa/conductor).
+    const PARENT_FALLBACK_FIELDS = [
+      'x_studio_nmero_de_contenedor', 'x_studio_referenciabooking',
+      'x_studio_agencia', 'x_studio_almacen_de_devolucion',
+    ].filter(f => validFields.includes(f))
+
+    if (PARENT_FALLBACK_FIELDS.length > 0) {
+      const parentIds = Array.from(new Set(
+        tasks
+          .filter(t => Array.isArray(t.parent_id) && PARENT_FALLBACK_FIELDS.some(f => !t[f]))
+          .map(t => t.parent_id[0] as number)
+      ))
+      if (parentIds.length > 0) {
+        const parents = await odooCall<any[]>(
+          uid, 'project.task', 'read', [parentIds], { fields: PARENT_FALLBACK_FIELDS }
+        )
+        const parentById = new Map(parents.map(p => [p.id, p]))
+        for (const t of tasks) {
+          if (!Array.isArray(t.parent_id)) continue
+          const parent = parentById.get(t.parent_id[0])
+          if (!parent) continue
+          for (const f of PARENT_FALLBACK_FIELDS) {
+            if (!t[f] && parent[f]) t[f] = parent[f]
+          }
+        }
+      }
+    }
 
     const stages = await odooCall<{ id: number; name: string }[]>(
       uid,

@@ -194,19 +194,31 @@ export async function GET(req: NextRequest) {
     }
     tasks.sort((a, b) => servicioKeyFor(b).localeCompare(servicioKeyFor(a), undefined, { numeric: true }))
 
-    // Compute stats
+    // Compute stats. Las subtareas (ej. "Devolución de vacío", parent_id
+    // seteado) son parte del mismo servicio del conductor, no un servicio
+    // aparte — no cuentan como "servicio" en el total ni en porEtapa/clientes,
+    // pero se reportan aparte (subtotal/subPorEtapa) para no perder el dato.
+    const mainTasks = (tasks as any[]).filter(t => !t.parent_id)
+    const subTasks = (tasks as any[]).filter(t => t.parent_id)
+    const stageOf = (t: any) => Array.isArray(t.stage_id) ? t.stage_id[1] : 'Sin etapa'
     const stats = {
-      total: tasks.length,
-      porEtapa: (tasks as any[]).reduce<Record<string, number>>((acc, t) => {
-        const stage = Array.isArray(t.stage_id) ? t.stage_id[1] : 'Sin etapa'
+      total: mainTasks.length,
+      porEtapa: mainTasks.reduce<Record<string, number>>((acc, t) => {
+        const stage = stageOf(t)
         acc[stage] = (acc[stage] || 0) + 1
         return acc
       }, {}),
       clientes: [...new Set<string>(
-        (tasks as any[])
+        mainTasks
           .map(t => Array.isArray(t.partner_id) ? t.partner_id[1] as string : '')
           .filter(Boolean)
       )],
+      subtotal: subTasks.length,
+      subPorEtapa: subTasks.reduce<Record<string, number>>((acc, t) => {
+        const stage = stageOf(t)
+        acc[stage] = (acc[stage] || 0) + 1
+        return acc
+      }, {}),
     }
 
     const [{ data: completados }, { data: progreso }] = await Promise.all([

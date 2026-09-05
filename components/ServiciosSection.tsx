@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { RefreshCw, Search, XCircle, Truck, Pencil, Info } from 'lucide-react'
+import { RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight } from 'lucide-react'
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
 import { tipoServicioLabelFor, TIPOS_SERVICIO } from '@/lib/servicios/hitos'
 
@@ -34,7 +34,19 @@ interface OdooTask {
   x_studio_es_isotanque_lleno?: boolean
   x_studio_es_isotanque_vacio?: boolean
   x_studio_almacen_de_devolucion?: [number, string] | false
+  // Presente cuando la tarea es una subtarea (ej. "Devolución de vacío",
+  // "Retiro de vacío – Exportación") vinculada a un servicio principal.
+  parent_id?: [number, string] | false
   [key: string]: unknown
+}
+
+/** Código del servicio (ej. "S02459") a partir de su nombre completo. Para
+ * una subtarea (parent_id seteado) usa el código del servicio padre, ya que
+ * su propio nombre ("Devolución de vacío", "Retiro de vacío – Exportación")
+ * no lo trae. */
+function servicioCodigo(t: OdooTask): string {
+  const nameSource = t.parent_id ? t.parent_id[1] : t.name
+  return nameSource.includes(' - ') ? nameSource.split(' - ')[0] : nameSource
 }
 
 interface OdooStage { id: number; name: string }
@@ -117,6 +129,10 @@ export function ServiciosSection() {
       }
       const data = await res.json()
       const loadedTasks: OdooTask[] = data.tasks ?? []
+      // Orden por código de servicio, no alfabético por nombre completo: una
+      // subtarea no trae el "S0XXXX" en su propio nombre, así que ordenar por
+      // nombre la manda siempre al final de la lista, lejos de su servicio.
+      loadedTasks.sort((a, b) => servicioCodigo(b).localeCompare(servicioCodigo(a), undefined, { numeric: true }))
       setTasks(loadedTasks)
       setStages(data.stages ?? [])
       setValidFields(data.validFields ?? [])
@@ -165,6 +181,7 @@ export function ServiciosSection() {
       if (!q) return true
       const searchable = [
         t.name,
+        servicioCodigo(t),
         m2oName(t.partner_id),
         m2oName(t.x_studio_conductor),
         t.x_studio_nmero_de_contenedor || '',
@@ -403,7 +420,7 @@ export function ServiciosSection() {
                   ) : (
                     paginated.map((task) => {
                       const stageName = task.stage_id ? task.stage_id[1] : ''
-                      const code = task.name.includes(' - ') ? task.name.split(' - ')[0] : task.name
+                      const code = servicioCodigo(task)
                       return (
                         <TableRow key={task.id} className="hover:bg-muted/30 text-xs">
                           <TableCell className="p-1">
@@ -431,6 +448,12 @@ export function ServiciosSection() {
                           </TableCell>
                           <TableCell className="font-medium whitespace-nowrap" title={task.name}>
                             {code}
+                            {task.parent_id && (
+                              <div className="flex items-center gap-1 text-[10px] font-normal text-amber-600" title={`Subtarea vinculada a ${code}`}>
+                                <CornerDownRight className="h-2.5 w-2.5 shrink-0" />
+                                <span className="truncate max-w-[140px]">{task.name}</span>
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell className="text-center">
                             {stageName ? (
