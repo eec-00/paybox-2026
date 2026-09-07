@@ -28,6 +28,7 @@ import {
   CalendarClock,
   Briefcase,
   Fingerprint,
+  PackageSearch,
 } from 'lucide-react'
 
 interface FlatItem {
@@ -194,6 +195,15 @@ export function Sidebar({
           label: 'Geocercas',
           icon: MapPin,
           description: 'Zonas GPS Navitel',
+          adminOnly: false,
+        },
+        {
+          type: 'item',
+          id: 'servicios-contenedores',
+          href: '/servicios/contenedores',
+          label: 'Contenedores',
+          icon: PackageSearch,
+          description: 'Devoluciones/retiros con otro conductor',
           adminOnly: false,
         },
       ],

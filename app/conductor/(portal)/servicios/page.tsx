@@ -161,9 +161,15 @@ function formatTime(val: string | number | false | undefined): string {
 }
 function formatDate(val: string | false | undefined): string {
   if (!val || val === 'false') return '—'
-  const d = new Date(String(val))
+  // x_studio_fecha_de_la_programacin es un campo "date" puro en Odoo
+  // ("YYYY-MM-DD", sin hora). `new Date("2026-09-07")` lo interpreta como
+  // medianoche UTC, y toLocaleDateString sin timeZone lo muestra en la hora
+  // local del navegador — en Perú (UTC-5) eso corre el día 07 al 06. Se
+  // ancla explícitamente a UTC en el parseo y en el formateo para que
+  // siempre muestre la fecha tal cual la manda Odoo.
+  const d = new Date(`${String(val)}T00:00:00Z`)
   if (isNaN(d.getTime())) return String(val)
-  return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
+  return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', timeZone: 'UTC' })
 }
 function getStageStyle(stage: string) {
   const lower = stage.toLowerCase()

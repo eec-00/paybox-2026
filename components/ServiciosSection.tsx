@@ -8,6 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight } from 'lucide-react'
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
 import { tipoServicioLabelFor, TIPOS_SERVICIO } from '@/lib/servicios/hitos'
+import { calcularProgreso, ProgresoBadge } from '@/lib/servicios/progreso'
+import { createClient } from '@/lib/supabase/client'
 
 interface OdooTask {
   id: number
@@ -102,14 +104,18 @@ function extractPlacaLast6(val: [number, string] | false): string {
 const PAGE_SIZE = 50
 
 export function ServiciosSection() {
+  const supabase = createClient()
   const [tasks, setTasks] = useState<OdooTask[]>([])
   const [stages, setStages] = useState<OdooStage[]>([])
   const [validFields, setValidFields] = useState<string[]>([])
+  const [progresoMap, setProgresoMap] = useState<Map<number, number>>(new Map())
+  const [completadosSet, setCompletadosSet] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState('all')
   const [tipoFilter, setTipoFilter] = useState('all')
+  const [progresoFilter, setProgresoFilter] = useState('all')
   const [conductorFilter, setConductorFilter] = useState('all')
   const [clienteFilter, setClienteFilter] = useState('all')
   const [fechaFilter, setFechaFilter] = useState('')
@@ -122,7 +128,11 @@ export function ServiciosSection() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/servicios')
+      const [res, progresoRes, completadosRes] = await Promise.all([
+        fetch('/api/servicios'),
+        supabase.from('conductor_servicios_progreso').select('servicio_id, step_actual'),
+        supabase.from('conductor_servicios_completados').select('servicio_id'),
+      ])
       if (!res.ok) {
         const body = await res.json()
         throw new Error(body.error || 'Error al cargar servicios')
@@ -136,6 +146,10 @@ export function ServiciosSection() {
       setTasks(loadedTasks)
       setStages(data.stages ?? [])
       setValidFields(data.validFields ?? [])
+      setProgresoMap(new Map(
+        (progresoRes.data ?? []).map((p: { servicio_id: number; step_actual: number }) => [p.servicio_id, p.step_actual])
+      ))
+      setCompletadosSet(new Set((completadosRes.data ?? []).map((c: { servicio_id: number }) => c.servicio_id)))
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -173,6 +187,7 @@ export function ServiciosSection() {
         if (stageName !== stageFilter) return false
       }
       if (tipoFilter !== 'all' && tipoServicioLabelFor(t) !== tipoFilter) return false
+      if (progresoFilter !== 'all' && calcularProgreso(t, progresoMap, completadosSet).estado !== progresoFilter) return false
       if (conductorFilter !== 'all' && m2oName(t.x_studio_conductor) !== conductorFilter) return false
       if (clienteFilter !== 'all' && m2oName(t.partner_id) !== clienteFilter) return false
       if (almacenDestinoFilter !== 'all' && m2oName(t.x_studio_almacen_de_destino) !== almacenDestinoFilter) return false
@@ -191,7 +206,7 @@ export function ServiciosSection() {
       ].join(' ').toLowerCase()
       return searchable.includes(q)
     })
-  }, [tasks, search, stageFilter, tipoFilter, conductorFilter, clienteFilter, almacenDestinoFilter, almacenRetiroFilter, fechaFilter])
+  }, [tasks, search, stageFilter, tipoFilter, progresoFilter, progresoMap, completadosSet, conductorFilter, clienteFilter, almacenDestinoFilter, almacenRetiroFilter, fechaFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -199,6 +214,7 @@ export function ServiciosSection() {
   const handleSearch = (val: string) => { setSearch(val); setPage(1) }
   const handleStage = (val: string) => { setStageFilter(val); setPage(1) }
   const handleTipo = (val: string) => { setTipoFilter(val); setPage(1) }
+  const handleProgreso = (val: string) => { setProgresoFilter(val); setPage(1) }
   const handleConductor = (val: string) => { setConductorFilter(val); setPage(1) }
   const handleCliente = (val: string) => { setClienteFilter(val); setPage(1) }
   const handleFecha = (val: string) => { setFechaFilter(val); setPage(1) }
@@ -209,6 +225,7 @@ export function ServiciosSection() {
     setSearch('')
     setStageFilter('all')
     setTipoFilter('all')
+    setProgresoFilter('all')
     setConductorFilter('all')
     setClienteFilter('all')
     setFechaFilter('')
@@ -216,7 +233,7 @@ export function ServiciosSection() {
     setAlmacenRetiroFilter('all')
     setPage(1)
   }
-  const hasFilters = search || stageFilter !== 'all' || tipoFilter !== 'all' ||
+  const hasFilters = search || stageFilter !== 'all' || tipoFilter !== 'all' || progresoFilter !== 'all' ||
     conductorFilter !== 'all' || clienteFilter !== 'all' || fechaFilter ||
     almacenDestinoFilter !== 'all' || almacenRetiroFilter !== 'all'
 
@@ -291,6 +308,18 @@ export function ServiciosSection() {
             {Object.values(TIPOS_SERVICIO).map((t) => (
               <SelectItem key={t.key} value={t.label}>{t.label}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={progresoFilter} onValueChange={handleProgreso}>
+          <SelectTrigger className="h-9 text-xs w-[160px]">
+            <SelectValue placeholder="Progreso del conductor" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Progreso: Todos</SelectItem>
+            <SelectItem value="sin_iniciar">🔴 Sin iniciar</SelectItem>
+            <SelectItem value="en_proceso">🟡 En proceso</SelectItem>
+            <SelectItem value="completado">🟢 Acabada</SelectItem>
           </SelectContent>
         </Select>
 
@@ -397,6 +426,7 @@ export function ServiciosSection() {
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[100px]">Código</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs w-10 text-center">Etapa</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[150px]">Tipo de Servicio</TableHead>
+                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[130px]">Progreso</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[180px]">Cliente</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[110px]">F. Programación</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px]">Hora Cita</TableHead>
@@ -413,7 +443,7 @@ export function ServiciosSection() {
                 <TableBody>
                   {paginated.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={16} className="text-center py-12 text-muted-foreground text-sm">
+                      <TableCell colSpan={17} className="text-center py-12 text-muted-foreground text-sm">
                         No se encontraron servicios con los filtros aplicados
                       </TableCell>
                     </TableRow>
@@ -464,6 +494,9 @@ export function ServiciosSection() {
                             ) : '—'}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">{tipoServicioLabelFor(task)}</TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <ProgresoBadge progreso={calcularProgreso(task, progresoMap, completadosSet)} />
+                          </TableCell>
                           <TableCell className="whitespace-nowrap">{m2oName(task.partner_id)}</TableCell>
                           <TableCell className="whitespace-nowrap">{formatDate(task.x_studio_fecha_de_la_programacin)}</TableCell>
                           <TableCell className="text-center whitespace-nowrap">{formatOdooTime(task.x_studio_hora_de_cita)}</TableCell>

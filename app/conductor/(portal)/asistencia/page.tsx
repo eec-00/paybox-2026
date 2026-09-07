@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { MapPin, CheckCircle2, Loader2, RefreshCw, Clock, ExternalLink, LogOut, Info } from 'lucide-react'
+import { MapPin, CheckCircle2, Loader2, RefreshCw, Clock, ExternalLink, LogOut, Info, AlertTriangle, X } from 'lucide-react'
 
 type GeoLocation = { lat: number; lng: number; accuracy: number }
 type Accion = 'entrada' | 'salida'
@@ -52,6 +52,11 @@ export default function ConductorAsistenciaPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [zonasActivas, setZonasActivas] = useState<{ nombre: string; radio_metros: number }[]>([])
+  // Cancelar es LIFO: si ya hay entrada Y salida, solo se puede cancelar la
+  // salida (fue lo último que se marcó); recién con la salida cancelada se
+  // puede cancelar la entrada. El modal de confirmación es compartido.
+  const [confirmCancelar, setConfirmCancelar] = useState<Accion | null>(null)
+  const [cancelando, setCancelando] = useState(false)
 
   const [locationBlocked, setLocationBlocked] = useState(false)
   const [locationPermState, setLocationPermState] = useState<'prompt' | 'denied' | 'checking' | null>(null)
@@ -153,6 +158,36 @@ export default function ConductorAsistenciaPage() {
       setLocationPermState(null)
     }
   }, [conductorId, conductorNombre, conductorDni, supabase, fetchMarcas, ultimaHoy])
+
+  // Cancela la marca de hoy: "salida" limpia solo los campos de salida
+  // (vuelve a quedar como "entrada marcada, sin salida"); "entrada" borra la
+  // fila completa del día (solo se ofrece cuando no hay salida marcada).
+  const handleCancelar = useCallback(async (accion: Accion) => {
+    if (!conductorId || !ultimaHoy || cancelando) return
+    setCancelando(true)
+    setError(null)
+    try {
+      if (accion === 'salida') {
+        const { error: updateError } = await supabase
+          .from('asistencias_conductor')
+          .update({ salida_at: null, salida_lat: null, salida_lng: null, salida_accuracy: null })
+          .eq('id', ultimaHoy.id)
+        if (updateError) throw updateError
+      } else {
+        const { error: deleteError } = await supabase
+          .from('asistencias_conductor')
+          .delete()
+          .eq('id', ultimaHoy.id)
+        if (deleteError) throw deleteError
+      }
+      await fetchMarcas(conductorId)
+    } catch (e: any) {
+      setError(e.message || 'Error al cancelar la marca')
+    } finally {
+      setCancelando(false)
+      setConfirmCancelar(null)
+    }
+  }, [conductorId, ultimaHoy, cancelando, supabase, fetchMarcas])
 
   const attachPermissionWatcher = useCallback((status: PermissionStatus) => {
     permStatusRef.current = status
@@ -294,6 +329,19 @@ export default function ConductorAsistenciaPage() {
             }
           </button>
         )}
+
+        {/* Cancelar: LIFO — con entrada y salida marcadas solo se ofrece
+            cancelar la salida (fue la última acción); recién al cancelarla
+            se puede cancelar la entrada. */}
+        {yaMarcoEntradaHoy && (
+          <button
+            onClick={() => setConfirmCancelar(yaMarcoSalidaHoy ? 'salida' : 'entrada')}
+            disabled={cancelando}
+            className="w-full mt-2 py-2 text-xs font-semibold text-red-500 hover:text-red-600 hover:underline disabled:opacity-50 transition-colors"
+          >
+            {yaMarcoSalidaHoy ? 'Cancelar salida' : 'Cancelar entrada'}
+          </button>
+        )}
       </div>
 
       {/* Marca de hoy */}
@@ -376,6 +424,46 @@ export default function ConductorAsistenciaPage() {
               >
                 Cancelar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmación de cancelar entrada/salida — acción irreversible */}
+      {confirmCancelar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center">
+                <AlertTriangle className="h-8 w-8 text-red-500" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-[#1a2332]">
+                  ¿Cancelar {confirmCancelar === 'salida' ? 'tu salida' : 'tu entrada'} de hoy?
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {confirmCancelar === 'salida'
+                    ? 'Se borrará la hora de salida que marcaste. Tu entrada se mantiene, y podrás volver a marcar la salida cuando quieras.'
+                    : 'Se borrará por completo tu marca de entrada de hoy.'}
+                  {' '}Esta acción <strong>no se puede deshacer</strong>.
+                </p>
+              </div>
+              <div className="flex gap-2 w-full">
+                <button
+                  onClick={() => setConfirmCancelar(null)}
+                  disabled={cancelando}
+                  className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-500 font-semibold text-sm disabled:opacity-50 active:scale-95 transition-transform"
+                >
+                  Volver
+                </button>
+                <button
+                  onClick={() => handleCancelar(confirmCancelar)}
+                  disabled={cancelando}
+                  className="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold text-sm disabled:opacity-60 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                >
+                  {cancelando ? <><Loader2 className="h-4 w-4 animate-spin" />Cancelando...</> : <><X className="h-4 w-4" />Sí, cancelar</>}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -73,6 +73,8 @@ const CANDIDATE_X_FIELDS = [
   'x_studio_es_importacion',
   'x_studio_modalidad_de_devolucion',
   'x_studio_modalidad_de_retiro',
+  'x_studio_subtarea_de_devolucion_creada',
+  'x_studio_subtarea_de_retiro_creada',
   ...TIPO_SERVICIO_BOOL_FIELDS,
   // TIEMPOS OPERATIVOS (genéricos, se mantienen por compatibilidad)
   'x_studio_saliendo_de_la_cochera',
