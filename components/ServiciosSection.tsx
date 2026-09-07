@@ -5,11 +5,16 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight } from 'lucide-react'
+import { RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight, RotateCcw, Loader2 } from 'lucide-react'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
 import { tipoServicioLabelFor, TIPOS_SERVICIO } from '@/lib/servicios/hitos'
 import { calcularProgreso, ProgresoBadge } from '@/lib/servicios/progreso'
 import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 
 interface OdooTask {
   id: number
@@ -123,6 +128,8 @@ export function ServiciosSection() {
   const [almacenRetiroFilter, setAlmacenRetiroFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [editingTask, setEditingTask] = useState<OdooTask | null>(null)
+  const [resetTask, setResetTask] = useState<OdooTask | null>(null)
+  const [resetting, setResetting] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
@@ -158,6 +165,27 @@ export function ServiciosSection() {
   }
 
   useEffect(() => { fetchData() }, [])
+
+  const handleConfirmReset = async () => {
+    if (!resetTask) return
+    setResetting(true)
+    try {
+      const res = await fetch('/api/servicios/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: resetTask.id }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Error al reiniciar el servicio')
+      toast.success('Servicio reiniciado — el conductor puede volver a marcar sus horas desde cero')
+      setResetTask(null)
+      fetchData()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al reiniciar el servicio')
+    } finally {
+      setResetting(false)
+    }
+  }
 
   const conductorOptions = useMemo(() => {
     const names = new Set(tasks.map((t) => m2oName(t.x_studio_conductor)).filter((n) => n !== '—'))
@@ -248,6 +276,24 @@ export function ServiciosSection() {
         onSaved={() => { setEditingTask(null); fetchData() }}
       />
     )}
+    <AlertDialog open={!!resetTask} onOpenChange={(o) => !o && !resetting && setResetTask(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Reiniciar este servicio?</AlertDialogTitle>
+          <AlertDialogDescription>
+            <strong>{resetTask && servicioCodigo(resetTask)}</strong> — {resetTask?.x_studio_conductor ? m2oName(resetTask.x_studio_conductor) : 'sin conductor'}.
+            Se borrarán todas las horas que el conductor ya marcó y el servicio vuelve a la primera etapa, para que pueda empezar a marcar de cero.
+            Esta acción <strong>no se puede deshacer</strong>.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={resetting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmReset} disabled={resetting} className="bg-amber-600 hover:bg-amber-700">
+            {resetting ? <span className="flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />Reiniciando...</span> : 'Sí, reiniciar'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -423,6 +469,7 @@ export function ServiciosSection() {
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
                     <TableHead className="w-10" />
                     <TableHead className="w-10" />
+                    <TableHead className="w-10" />
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[100px]">Código</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs w-10 text-center">Etapa</TableHead>
                     <TableHead className="whitespace-nowrap font-bold text-xs min-w-[150px]">Tipo de Servicio</TableHead>
@@ -443,7 +490,7 @@ export function ServiciosSection() {
                 <TableBody>
                   {paginated.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={17} className="text-center py-12 text-muted-foreground text-sm">
+                      <TableCell colSpan={18} className="text-center py-12 text-muted-foreground text-sm">
                         No se encontraron servicios con los filtros aplicados
                       </TableCell>
                     </TableRow>
@@ -475,6 +522,17 @@ export function ServiciosSection() {
                                 <Info className="h-3.5 w-3.5" />
                               </Button>
                             </Link>
+                          </TableCell>
+                          <TableCell className="p-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-amber-600"
+                              onClick={() => setResetTask(task)}
+                              title="Reiniciar servicio (borra las horas marcadas por el conductor)"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </Button>
                           </TableCell>
                           <TableCell className="font-medium whitespace-nowrap" title={task.name}>
                             {code}
