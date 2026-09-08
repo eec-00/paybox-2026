@@ -5,7 +5,13 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight, RotateCcw, Loader2 } from 'lucide-react'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
+import {
+  RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight, RotateCcw, Loader2,
+  Columns, Filter, ArrowUp, ArrowDown, ArrowUpDown,
+} from 'lucide-react'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -107,6 +113,109 @@ function extractPlacaLast6(val: [number, string] | false): string {
 }
 
 const PAGE_SIZE = 50
+const PROGRESO_RANK: Record<string, number> = { sin_iniciar: 0, en_proceso: 1, completado: 2 }
+const HIDDEN_COLUMNS_STORAGE_KEY = 'paybox_servicios_columnas_ocultas'
+
+type ProgresoCtx = { progresoMap: Map<number, number>; completadosSet: Set<number> }
+
+// Columnas "de datos" — ordenables y ocultables. El Código y las 3 acciones
+// (editar/ver/reiniciar) quedan fijas fuera de esta lista: son la forma de
+// identificar y operar cada fila, no tendría sentido poder esconderlas.
+interface ColumnDef {
+  key: string
+  label: string
+  headClass?: string
+  cellClass?: string
+  sortValue: (t: OdooTask, ctx: ProgresoCtx) => string | number
+  render: (t: OdooTask, ctx: ProgresoCtx) => React.ReactNode
+}
+
+const COLUMNS: ColumnDef[] = [
+  {
+    key: 'etapa', label: 'Etapa', headClass: 'w-10 text-center', cellClass: 'text-center',
+    sortValue: (t) => (t.stage_id ? t.stage_id[1] : ''),
+    render: (t) => {
+      const stageName = t.stage_id ? t.stage_id[1] : ''
+      return stageName ? <span className={`inline-block w-3 h-3 rounded-full ${stageDotColor(stageName)}`} title={stageName} /> : '—'
+    },
+  },
+  {
+    key: 'tipo', label: 'Tipo de Servicio', headClass: 'min-w-[150px]',
+    sortValue: (t) => tipoServicioLabelFor(t),
+    render: (t) => tipoServicioLabelFor(t),
+  },
+  {
+    key: 'progreso', label: 'Progreso', headClass: 'min-w-[130px]',
+    sortValue: (t, ctx) => {
+      const p = calcularProgreso(t, ctx.progresoMap, ctx.completadosSet)
+      return PROGRESO_RANK[p.estado] * 1000 + (p.totalHitos > 0 ? p.stepActual / p.totalHitos : 0)
+    },
+    render: (t, ctx) => <ProgresoBadge progreso={calcularProgreso(t, ctx.progresoMap, ctx.completadosSet)} />,
+  },
+  {
+    key: 'cliente', label: 'Cliente', headClass: 'min-w-[180px]',
+    sortValue: (t) => m2oName(t.partner_id),
+    render: (t) => m2oName(t.partner_id),
+  },
+  {
+    key: 'fecha', label: 'F. Programación', headClass: 'min-w-[110px]',
+    sortValue: (t) => t.x_studio_fecha_de_la_programacin || '',
+    render: (t) => formatDate(t.x_studio_fecha_de_la_programacin),
+  },
+  {
+    key: 'horaCita', label: 'Hora Cita', headClass: 'min-w-[90px] text-center', cellClass: 'text-center',
+    sortValue: (t) => (typeof t.x_studio_hora_de_cita === 'number' ? t.x_studio_hora_de_cita : -1),
+    render: (t) => formatOdooTime(t.x_studio_hora_de_cita),
+  },
+  {
+    key: 'placaCamion', label: 'Placa Camión', headClass: 'min-w-[80px]', cellClass: 'font-mono',
+    sortValue: (t) => extractPlacaLast6(t.x_studio_placa),
+    render: (t) => extractPlacaLast6(t.x_studio_placa),
+  },
+  {
+    key: 'placaCarreta', label: 'Placa Carreta', headClass: 'min-w-[80px]', cellClass: 'font-mono',
+    sortValue: (t) => extractPlacaLast6(t.x_studio_placa_carreta),
+    render: (t) => extractPlacaLast6(t.x_studio_placa_carreta),
+  },
+  {
+    key: 'conductor', label: 'Conductor', headClass: 'min-w-[180px]',
+    sortValue: (t) => m2oName(t.x_studio_conductor),
+    render: (t) => m2oName(t.x_studio_conductor),
+  },
+  {
+    key: 'refBooking', label: 'Ref/Booking', headClass: 'min-w-[130px]',
+    sortValue: (t) => t.x_studio_referenciabooking || '',
+    render: (t) => t.x_studio_referenciabooking || '—',
+  },
+  {
+    key: 'agencia', label: 'Agencia', headClass: 'min-w-[120px]',
+    sortValue: (t) => t.x_studio_agencia || '',
+    render: (t) => t.x_studio_agencia || '—',
+  },
+  {
+    key: 'contenedor', label: 'N° Contenedor', headClass: 'min-w-[140px]', cellClass: 'font-mono',
+    sortValue: (t) => t.x_studio_nmero_de_contenedor || '',
+    render: (t) => t.x_studio_nmero_de_contenedor || '—',
+  },
+  {
+    key: 'almacenRetiro', label: 'Almacén Retiro', headClass: 'min-w-[200px]',
+    sortValue: (t) => m2oName(t.x_studio_almacen_de_retiro),
+    render: (t) => (
+      <span className="line-clamp-2 leading-snug text-[11px] max-w-[220px] block" title={m2oName(t.x_studio_almacen_de_retiro)}>
+        {m2oName(t.x_studio_almacen_de_retiro)}
+      </span>
+    ),
+  },
+  {
+    key: 'almacenDestino', label: 'Almacén Destino', headClass: 'min-w-[200px]',
+    sortValue: (t) => m2oName(t.x_studio_almacen_de_destino),
+    render: (t) => (
+      <span className="line-clamp-2 leading-snug text-[11px] max-w-[220px] block" title={m2oName(t.x_studio_almacen_de_destino)}>
+        {m2oName(t.x_studio_almacen_de_destino)}
+      </span>
+    ),
+  },
+]
 
 export function ServiciosSection() {
   const supabase = createClient()
@@ -131,6 +240,43 @@ export function ServiciosSection() {
   const [resetTask, setResetTask] = useState<OdooTask | null>(null)
   const [resetting, setResetting] = useState(false)
 
+  // Móvil: los filtros ocupan mucho espacio y estorban — quedan colapsados
+  // detrás de un botón "Filtros" salvo que el usuario los abra.
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+
+  // Ordenar por columna (clic en el encabezado) — no se persiste, es por sesión.
+  const [sortKey, setSortKey] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  // Columnas ocultas — se guardan en localStorage por dispositivo, para que
+  // cada quien vea la tabla como prefiere sin afectar a los demás.
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set())
+  const [columnsPrefsLoaded, setColumnsPrefsLoaded] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HIDDEN_COLUMNS_STORAGE_KEY)
+      if (raw) setHiddenColumns(new Set(JSON.parse(raw)))
+    } catch { /* localStorage no disponible o dato corrupto: se ignora */ }
+    setColumnsPrefsLoaded(true)
+  }, [])
+
+  useEffect(() => {
+    if (!columnsPrefsLoaded) return // evita pisar lo guardado con el estado inicial vacío
+    try {
+      localStorage.setItem(HIDDEN_COLUMNS_STORAGE_KEY, JSON.stringify(Array.from(hiddenColumns)))
+    } catch { /* ignorar */ }
+  }, [hiddenColumns, columnsPrefsLoaded])
+
+  const toggleColumn = (key: string) => {
+    setHiddenColumns((prev) => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+  const visibleColumns = useMemo(() => COLUMNS.filter((c) => !hiddenColumns.has(c.key)), [hiddenColumns])
+
   const fetchData = async () => {
     setLoading(true)
     setError(null)
@@ -149,6 +295,8 @@ export function ServiciosSection() {
       // Orden por código de servicio, no alfabético por nombre completo: una
       // subtarea no trae el "S0XXXX" en su propio nombre, así que ordenar por
       // nombre la manda siempre al final de la lista, lejos de su servicio.
+      // Este es el orden por defecto; el usuario puede cambiarlo tocando los
+      // encabezados de la tabla.
       loadedTasks.sort((a, b) => servicioCodigo(b).localeCompare(servicioCodigo(a), undefined, { numeric: true }))
       setTasks(loadedTasks)
       setStages(data.stages ?? [])
@@ -236,8 +384,42 @@ export function ServiciosSection() {
     })
   }, [tasks, search, stageFilter, tipoFilter, progresoFilter, progresoMap, completadosSet, conductorFilter, clienteFilter, almacenDestinoFilter, almacenRetiroFilter, fechaFilter])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  // Orden elegido por el usuario tocando un encabezado. "Código" se ordena
+  // con el mismo criterio numérico que el orden por defecto de fetchData.
+  const sorted = useMemo(() => {
+    if (!sortKey) return filtered
+    const dirMul = sortDir === 'asc' ? 1 : -1
+    const ctx: ProgresoCtx = { progresoMap, completadosSet }
+    if (sortKey === 'codigo') {
+      return [...filtered].sort((a, b) => servicioCodigo(a).localeCompare(servicioCodigo(b), undefined, { numeric: true }) * dirMul)
+    }
+    const col = COLUMNS.find((c) => c.key === sortKey)
+    if (!col) return filtered
+    return [...filtered].sort((a, b) => {
+      const va = col.sortValue(a, ctx)
+      const vb = col.sortValue(b, ctx)
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dirMul
+      return String(va).localeCompare(String(vb), undefined, { numeric: true }) * dirMul
+    })
+  }, [filtered, sortKey, sortDir, progresoMap, completadosSet])
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+    setPage(1)
+  }
+
+  function SortIcon({ colKey }: { colKey: string }) {
+    if (sortKey !== colKey) return <ArrowUpDown className="h-3 w-3 opacity-30" />
+    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3 text-primary" /> : <ArrowDown className="h-3 w-3 text-primary" />
+  }
 
   const handleSearch = (val: string) => { setSearch(val); setPage(1) }
   const handleStage = (val: string) => { setStageFilter(val); setPage(1) }
@@ -261,9 +443,12 @@ export function ServiciosSection() {
     setAlmacenRetiroFilter('all')
     setPage(1)
   }
-  const hasFilters = search || stageFilter !== 'all' || tipoFilter !== 'all' || progresoFilter !== 'all' ||
-    conductorFilter !== 'all' || clienteFilter !== 'all' || fechaFilter ||
-    almacenDestinoFilter !== 'all' || almacenRetiroFilter !== 'all'
+  const activeFilterCount = [
+    stageFilter !== 'all', tipoFilter !== 'all', progresoFilter !== 'all',
+    conductorFilter !== 'all', clienteFilter !== 'all', !!fechaFilter,
+    almacenDestinoFilter !== 'all', almacenRetiroFilter !== 'all',
+  ].filter(Boolean).length
+  const hasFilters = !!search || activeFilterCount > 0
 
   return (
     <>
@@ -304,37 +489,84 @@ export function ServiciosSection() {
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Servicios de Transporte</h2>
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              Proyecto Odoo · {loading ? '...' : `${filtered.length} de ${tasks.length} registros`}
+              Proyecto Odoo · {loading ? '...' : `${sorted.length} de ${tasks.length} registros`}
             </p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={fetchData}
-          disabled={loading}
-          className="h-8 gap-1.5"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Móvil: botón para mostrar/ocultar los filtros */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setMobileFiltersOpen((v) => !v)}
+            className="h-8 gap-1.5 sm:hidden"
+          >
+            <Filter className="h-3.5 w-3.5" />
+            Filtros
+            {activeFilterCount > 0 && (
+              <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                <Columns className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Columnas</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-h-[70vh] overflow-y-auto">
+              <DropdownMenuLabel>Mostrar/ocultar columnas</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {COLUMNS.map((c) => (
+                <DropdownMenuCheckboxItem
+                  key={c.key}
+                  checked={!hiddenColumns.has(c.key)}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={() => toggleColumn(c.key)}
+                >
+                  {c.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+              {hiddenColumns.size > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <button
+                    onClick={() => setHiddenColumns(new Set())}
+                    className="w-full text-left px-2 py-1.5 text-xs text-primary hover:underline"
+                  >
+                    Mostrar todas
+                  </button>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="h-8 gap-1.5">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Actualizar</span>
+          </Button>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2 bg-card/40 p-3 rounded-xl border border-border/50 shadow-sm">
-        <div className="flex items-center gap-1.5 flex-1 min-w-[180px] bg-background border rounded-lg px-3 h-9">
-          <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <input
-            type="text"
-            placeholder="Buscar código, cliente, conductor, contenedor..."
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-          />
-        </div>
+      {/* Buscador — siempre visible, es el control más usado */}
+      <div className="flex items-center gap-1.5 bg-background border rounded-lg px-3 h-9 shadow-sm">
+        <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <input
+          type="text"
+          placeholder="Buscar código, cliente, conductor, contenedor..."
+          value={search}
+          onChange={(e) => handleSearch(e.target.value)}
+          className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+        />
+      </div>
 
+      {/* Filtros — en móvil quedan colapsados detrás del botón "Filtros" */}
+      <div className={`${mobileFiltersOpen ? 'flex' : 'hidden'} sm:flex flex-wrap items-center gap-2 bg-card/40 p-3 rounded-xl border border-border/50 shadow-sm`}>
         <Select value={stageFilter} onValueChange={handleStage}>
-          <SelectTrigger className="h-9 text-xs w-[180px]">
+          <SelectTrigger className="h-9 text-xs w-full sm:w-[180px]">
             <SelectValue placeholder="Todas las etapas" />
           </SelectTrigger>
           <SelectContent>
@@ -346,7 +578,7 @@ export function ServiciosSection() {
         </Select>
 
         <Select value={tipoFilter} onValueChange={handleTipo}>
-          <SelectTrigger className="h-9 text-xs w-[190px]">
+          <SelectTrigger className="h-9 text-xs w-full sm:w-[190px]">
             <SelectValue placeholder="Tipo de Servicio" />
           </SelectTrigger>
           <SelectContent>
@@ -358,7 +590,7 @@ export function ServiciosSection() {
         </Select>
 
         <Select value={progresoFilter} onValueChange={handleProgreso}>
-          <SelectTrigger className="h-9 text-xs w-[160px]">
+          <SelectTrigger className="h-9 text-xs w-full sm:w-[160px]">
             <SelectValue placeholder="Progreso del conductor" />
           </SelectTrigger>
           <SelectContent>
@@ -370,7 +602,7 @@ export function ServiciosSection() {
         </Select>
 
         <Select value={conductorFilter} onValueChange={handleConductor}>
-          <SelectTrigger className="h-9 text-xs w-40">
+          <SelectTrigger className="h-9 text-xs w-full sm:w-40">
             <SelectValue placeholder="Por Conductor" />
           </SelectTrigger>
           <SelectContent>
@@ -382,7 +614,7 @@ export function ServiciosSection() {
         </Select>
 
         <Select value={clienteFilter} onValueChange={handleCliente}>
-          <SelectTrigger className="h-9 text-xs w-40">
+          <SelectTrigger className="h-9 text-xs w-full sm:w-40">
             <SelectValue placeholder="Por Cliente" />
           </SelectTrigger>
           <SelectContent>
@@ -397,12 +629,12 @@ export function ServiciosSection() {
           type="date"
           value={fechaFilter}
           onChange={(e) => handleFecha(e.target.value)}
-          className="h-9 text-xs border rounded-lg px-2 bg-background text-muted-foreground focus:text-foreground outline-none"
+          className="h-9 text-xs border rounded-lg px-2 bg-background text-muted-foreground focus:text-foreground outline-none w-full sm:w-auto"
           title="Por Fecha"
         />
 
         <Select value={almacenRetiroFilter} onValueChange={handleAlmacenRetiro}>
-          <SelectTrigger className="h-9 text-xs w-[180px]">
+          <SelectTrigger className="h-9 text-xs w-full sm:w-[180px]">
             <SelectValue placeholder="Por Almacén de Retiro" />
           </SelectTrigger>
           <SelectContent>
@@ -414,7 +646,7 @@ export function ServiciosSection() {
         </Select>
 
         <Select value={almacenDestinoFilter} onValueChange={handleAlmacenDestino}>
-          <SelectTrigger className="h-9 text-xs w-[180px]">
+          <SelectTrigger className="h-9 text-xs w-full sm:w-[180px]">
             <SelectValue placeholder="Por Almacén de Destino" />
           </SelectTrigger>
           <SelectContent>
@@ -427,7 +659,8 @@ export function ServiciosSection() {
 
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 px-2 text-muted-foreground hover:text-destructive">
-            <XCircle className="h-4 w-4" />
+            <XCircle className="h-4 w-4 sm:mr-0 mr-1.5" />
+            <span className="sm:hidden">Limpiar filtros</span>
           </Button>
         )}
       </div>
@@ -470,34 +703,34 @@ export function ServiciosSection() {
                     <TableHead className="w-10" />
                     <TableHead className="w-10" />
                     <TableHead className="w-10" />
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[100px]">Código</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs w-10 text-center">Etapa</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[150px]">Tipo de Servicio</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[130px]">Progreso</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[180px]">Cliente</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[110px]">F. Programación</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[90px]">Hora Cita</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[80px]">Placa Camión</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[80px]">Placa Carreta</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[180px]">Conductor</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[130px]">Ref/Booking</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[120px]">Agencia</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[140px]">N° Contenedor</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[200px]">Almacén Retiro</TableHead>
-                    <TableHead className="whitespace-nowrap font-bold text-xs min-w-[200px]">Almacén Destino</TableHead>
+                    <TableHead
+                      className="whitespace-nowrap font-bold text-xs min-w-[100px] cursor-pointer select-none hover:text-primary transition-colors"
+                      onClick={() => handleSort('codigo')}
+                    >
+                      <span className="inline-flex items-center gap-1">Código <SortIcon colKey="codigo" /></span>
+                    </TableHead>
+                    {visibleColumns.map((c) => (
+                      <TableHead
+                        key={c.key}
+                        className={`whitespace-nowrap font-bold text-xs cursor-pointer select-none hover:text-primary transition-colors ${c.headClass || ''}`}
+                        onClick={() => handleSort(c.key)}
+                      >
+                        <span className="inline-flex items-center gap-1">{c.label} <SortIcon colKey={c.key} /></span>
+                      </TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginated.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={18} className="text-center py-12 text-muted-foreground text-sm">
+                      <TableCell colSpan={4 + visibleColumns.length} className="text-center py-12 text-muted-foreground text-sm">
                         No se encontraron servicios con los filtros aplicados
                       </TableCell>
                     </TableRow>
                   ) : (
                     paginated.map((task) => {
-                      const stageName = task.stage_id ? task.stage_id[1] : ''
                       const code = servicioCodigo(task)
+                      const ctx: ProgresoCtx = { progresoMap, completadosSet }
                       return (
                         <TableRow key={task.id} className="hover:bg-muted/30 text-xs">
                           <TableCell className="p-1">
@@ -543,37 +776,11 @@ export function ServiciosSection() {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell className="text-center">
-                            {stageName ? (
-                              <span
-                                className={`inline-block w-3 h-3 rounded-full ${stageDotColor(stageName)}`}
-                                title={stageName}
-                              />
-                            ) : '—'}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">{tipoServicioLabelFor(task)}</TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            <ProgresoBadge progreso={calcularProgreso(task, progresoMap, completadosSet)} />
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">{m2oName(task.partner_id)}</TableCell>
-                          <TableCell className="whitespace-nowrap">{formatDate(task.x_studio_fecha_de_la_programacin)}</TableCell>
-                          <TableCell className="text-center whitespace-nowrap">{formatOdooTime(task.x_studio_hora_de_cita)}</TableCell>
-                          <TableCell className="whitespace-nowrap font-mono">{extractPlacaLast6(task.x_studio_placa)}</TableCell>
-                          <TableCell className="whitespace-nowrap font-mono">{extractPlacaLast6(task.x_studio_placa_carreta)}</TableCell>
-                          <TableCell className="whitespace-nowrap">{m2oName(task.x_studio_conductor)}</TableCell>
-                          <TableCell className="whitespace-nowrap">{task.x_studio_referenciabooking || '—'}</TableCell>
-                          <TableCell className="whitespace-nowrap">{task.x_studio_agencia || '—'}</TableCell>
-                          <TableCell className="whitespace-nowrap font-mono">{task.x_studio_nmero_de_contenedor || '—'}</TableCell>
-                          <TableCell className="max-w-[220px]">
-                            <span className="line-clamp-2 leading-snug text-[11px]" title={m2oName(task.x_studio_almacen_de_retiro)}>
-                              {m2oName(task.x_studio_almacen_de_retiro)}
-                            </span>
-                          </TableCell>
-                          <TableCell className="max-w-[220px]">
-                            <span className="line-clamp-2 leading-snug text-[11px]" title={m2oName(task.x_studio_almacen_de_destino)}>
-                              {m2oName(task.x_studio_almacen_de_destino)}
-                            </span>
-                          </TableCell>
+                          {visibleColumns.map((c) => (
+                            <TableCell key={c.key} className={`whitespace-nowrap ${c.cellClass || ''}`}>
+                              {c.render(task, ctx)}
+                            </TableCell>
+                          ))}
                         </TableRow>
                       )
                     })
@@ -587,7 +794,7 @@ export function ServiciosSection() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length}
+                Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} de {sorted.length}
               </span>
               <div className="flex items-center gap-1">
                 <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(1)} disabled={page === 1}>«</Button>
