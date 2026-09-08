@@ -245,8 +245,10 @@ export function ServiciosSection() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   // Ordenar por columna (clic en el encabezado) — no se persiste, es por sesión.
-  const [sortKey, setSortKey] = useState<string | null>(null)
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  // Por defecto ordenado por fecha de programación, de más reciente a más
+  // antigua — el usuario puede cambiarlo tocando cualquier encabezado.
+  const [sortKey, setSortKey] = useState<string | null>('fecha')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   // Columnas ocultas — se guardan en localStorage por dispositivo, para que
   // cada quien vea la tabla como prefiere sin afectar a los demás.
