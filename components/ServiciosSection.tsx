@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem,
+  DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import {
   RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight, RotateCcw, Loader2,
-  Columns, Filter, ArrowUp, ArrowDown, ArrowUpDown,
+  Columns, Filter, ArrowUp, ArrowDown, ArrowUpDown, Download, FileSpreadsheet,
 } from 'lucide-react'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -19,8 +20,14 @@ import {
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
 import { tipoServicioLabelFor, TIPOS_SERVICIO } from '@/lib/servicios/hitos'
 import { calcularProgreso, ProgresoBadge } from '@/lib/servicios/progreso'
+import {
+  EXPORT_FORMATS, buildQuimtiaRow, buildEyMRow, buildCroslandRow,
+  QUIMTIA_COLUMNS, EYM_COLUMNS, CROSLAND_COLUMNS, type ExportClientFormat,
+} from '@/lib/servicios/exportFormats'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import ExcelJS from 'exceljs'
+import { saveAs } from 'file-saver'
 
 interface OdooTask {
   id: number
@@ -337,6 +344,64 @@ export function ServiciosSection() {
     }
   }
 
+  // Exportar Excel por cliente — cada uno tiene su propia plantilla de
+  // columnas (ver lib/servicios/exportFormats). Respeta los filtros que ya
+  // tenga puesta la tabla (ej. fecha) y además filtra por el cliente elegido,
+  // sin importar qué tenga puesto el filtro "Por Cliente".
+  const [exportingFormat, setExportingFormat] = useState<ExportClientFormat | null>(null)
+
+  const handleExport = async (formatKey: ExportClientFormat) => {
+    setExportingFormat(formatKey)
+    try {
+      const format = EXPORT_FORMATS[formatKey]
+      const rows = sorted.filter((t) => format.matchClient(m2oName(t.partner_id)))
+      if (rows.length === 0) {
+        toast.error(`No hay servicios de ${format.label} con los filtros actuales`)
+        return
+      }
+
+      const ctx: ProgresoCtx = { progresoMap, completadosSet }
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet(format.label)
+
+      if (formatKey === 'quimtia') {
+        worksheet.columns = QUIMTIA_COLUMNS
+        rows.forEach((t) => worksheet.addRow(buildQuimtiaRow(t, ctx)))
+      } else if (formatKey === 'eym') {
+        worksheet.columns = EYM_COLUMNS
+        rows.forEach((t) => worksheet.addRow(buildEyMRow(t, ctx)))
+      } else {
+        worksheet.columns = CROSLAND_COLUMNS
+        rows.forEach((t, i) => worksheet.addRow(buildCroslandRow(t, ctx, i + 1)))
+      }
+
+      // Estilo de cabecera (igual al resto de exportaciones del sistema)
+      const headerRow = worksheet.getRow(1)
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2332' } }
+        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 11 }
+        cell.alignment = { vertical: 'middle', horizontal: 'center' }
+      })
+      headerRow.height = 25
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return
+        row.eachCell((cell) => {
+          cell.alignment = { vertical: 'middle' }
+          cell.border = { bottom: { style: 'thin', color: { argb: 'FFECF0F1' } } }
+        })
+      })
+
+      const buffer = await workbook.xlsx.writeBuffer()
+      const fecha = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+      saveAs(new Blob([buffer]), `Servicios_${format.label.replace(/\s/g, '')}_${fecha}.xlsx`)
+      toast.success(`Excel de ${format.label} generado (${rows.length} servicios)`)
+    } catch (err: any) {
+      toast.error(err.message || 'Error al exportar')
+    } finally {
+      setExportingFormat(null)
+    }
+  }
+
   const conductorOptions = useMemo(() => {
     const names = new Set(tasks.map((t) => m2oName(t.x_studio_conductor)).filter((n) => n !== '—'))
     return Array.from(names).sort()
@@ -511,6 +576,25 @@ export function ServiciosSection() {
               </span>
             )}
           </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5" disabled={!!exportingFormat}>
+                {exportingFormat ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">Exportar</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Exportar Excel por cliente</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {(Object.keys(EXPORT_FORMATS) as ExportClientFormat[]).map((key) => (
+                <DropdownMenuItem key={key} onClick={() => handleExport(key)} disabled={!!exportingFormat} className="gap-2">
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  Formato {EXPORT_FORMATS[key].label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
