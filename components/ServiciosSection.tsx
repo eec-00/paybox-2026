@@ -11,12 +11,15 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight, RotateCcw, Loader2,
-  Columns, Filter, ArrowUp, ArrowDown, ArrowUpDown, Download, FileSpreadsheet,
+  Columns, Filter, ArrowUp, ArrowDown, ArrowUpDown, Download, FileSpreadsheet, CalendarRange,
 } from 'lucide-react'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
 import { tipoServicioLabelFor, TIPOS_SERVICIO } from '@/lib/servicios/hitos'
 import { calcularProgreso, ProgresoBadge } from '@/lib/servicios/progreso'
@@ -88,6 +91,27 @@ function formatDate(value: string | false): string {
 function m2oName(value: [number, string] | false): string {
   if (!value) return '—'
   return value[1]
+}
+
+function toDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+function todayStr(): string {
+  return toDateStr(new Date())
+}
+/** Lunes a domingo de la semana en curso (hora local del dispositivo). */
+function currentWeekRange(): { start: string; end: string } {
+  const now = new Date()
+  const dow = now.getDay() // 0 domingo .. 6 sábado
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow))
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  return { start: toDateStr(monday), end: toDateStr(sunday) }
+}
+function matchesDateRange(t: OdooTask, start: string, end: string): boolean {
+  const fecha = t.x_studio_fecha_de_la_programacin
+  return typeof fecha === 'string' && fecha >= start && fecha <= end
 }
 
 
@@ -345,18 +369,41 @@ export function ServiciosSection() {
   }
 
   // Exportar Excel por cliente — cada uno tiene su propia plantilla de
-  // columnas (ver lib/servicios/exportFormats). Respeta los filtros que ya
-  // tenga puesta la tabla (ej. fecha) y además filtra por el cliente elegido,
-  // sin importar qué tenga puesto el filtro "Por Cliente".
+  // columnas (ver lib/servicios/exportFormats). Antes de generar el archivo
+  // se pregunta el rango de fechas (hoy / esta semana / personalizado);
+  // además de la fecha, siempre filtra por el cliente elegido y respeta los
+  // demás filtros que ya tenga puesta la tabla (conductor, etapa, etc.).
   const [exportingFormat, setExportingFormat] = useState<ExportClientFormat | null>(null)
+  const [exportDialogFormat, setExportDialogFormat] = useState<ExportClientFormat | null>(null)
+  const [exportRangeMode, setExportRangeMode] = useState<'hoy' | 'semana' | 'custom'>('hoy')
+  const [exportStart, setExportStart] = useState(todayStr())
+  const [exportEnd, setExportEnd] = useState(todayStr())
 
-  const handleExport = async (formatKey: ExportClientFormat) => {
+  const openExportDialog = (formatKey: ExportClientFormat) => {
+    setExportRangeMode('hoy')
+    setExportStart(todayStr())
+    setExportEnd(todayStr())
+    setExportDialogFormat(formatKey)
+  }
+
+  const activeExportRange = (): { start: string; end: string } => {
+    if (exportRangeMode === 'hoy') { const t = todayStr(); return { start: t, end: t } }
+    if (exportRangeMode === 'semana') return currentWeekRange()
+    return { start: exportStart, end: exportEnd }
+  }
+
+  const handleConfirmExport = async () => {
+    if (!exportDialogFormat) return
+    const formatKey = exportDialogFormat
+    const { start, end } = activeExportRange()
+    if (!start || !end) { toast.error('Selecciona un rango de fechas válido'); return }
+
     setExportingFormat(formatKey)
     try {
       const format = EXPORT_FORMATS[formatKey]
-      const rows = sorted.filter((t) => format.matchClient(m2oName(t.partner_id)))
+      const rows = sorted.filter((t) => format.matchClient(m2oName(t.partner_id)) && matchesDateRange(t, start, end))
       if (rows.length === 0) {
-        toast.error(`No hay servicios de ${format.label} con los filtros actuales`)
+        toast.error(`No hay servicios de ${format.label} en ese rango de fechas`)
         return
       }
 
@@ -392,9 +439,10 @@ export function ServiciosSection() {
       })
 
       const buffer = await workbook.xlsx.writeBuffer()
-      const fecha = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-      saveAs(new Blob([buffer]), `Servicios_${format.label.replace(/\s/g, '')}_${fecha}.xlsx`)
+      const rango = start === end ? start.replace(/-/g, '') : `${start.replace(/-/g, '')}_a_${end.replace(/-/g, '')}`
+      saveAs(new Blob([buffer]), `Servicios_${format.label.replace(/\s/g, '')}_${rango}.xlsx`)
       toast.success(`Excel de ${format.label} generado (${rows.length} servicios)`)
+      setExportDialogFormat(null)
     } catch (err: any) {
       toast.error(err.message || 'Error al exportar')
     } finally {
@@ -469,6 +517,15 @@ export function ServiciosSection() {
       return String(va).localeCompare(String(vb), undefined, { numeric: true }) * dirMul
     })
   }, [filtered, sortKey, sortDir, progresoMap, completadosSet])
+
+  const exportPreviewCount = useMemo(() => {
+    if (!exportDialogFormat) return 0
+    const { start, end } = activeExportRange()
+    if (!start || !end) return 0
+    const format = EXPORT_FORMATS[exportDialogFormat]
+    return sorted.filter((t) => format.matchClient(m2oName(t.partner_id)) && matchesDateRange(t, start, end)).length
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exportDialogFormat, exportRangeMode, exportStart, exportEnd, sorted])
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
   const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -546,6 +603,88 @@ export function ServiciosSection() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    <Dialog open={!!exportDialogFormat} onOpenChange={(o) => !o && !exportingFormat && setExportDialogFormat(null)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarRange className="h-4 w-4" />
+            Exportar {exportDialogFormat && EXPORT_FORMATS[exportDialogFormat].label}
+          </DialogTitle>
+          <DialogDescription>
+            Elige el rango de fechas de programación a incluir en el Excel.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 py-1">
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              { value: 'hoy', label: 'Hoy' },
+              { value: 'semana', label: 'Esta semana' },
+              { value: 'custom', label: 'Personalizado' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setExportRangeMode(opt.value)}
+                className={`px-3 py-2 text-sm rounded-md border transition-all font-medium ${
+                  exportRangeMode === opt.value
+                    ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                    : 'bg-background hover:bg-muted border-border text-foreground/80'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {exportRangeMode === 'custom' && (
+            <div className="flex items-center gap-2">
+              <div className="flex-1 space-y-1">
+                <label className="text-xs text-muted-foreground">Desde</label>
+                <input
+                  type="date"
+                  value={exportStart}
+                  onChange={(e) => setExportStart(e.target.value)}
+                  className="w-full h-9 text-sm border rounded-md px-2 bg-background"
+                />
+              </div>
+              <div className="flex-1 space-y-1">
+                <label className="text-xs text-muted-foreground">Hasta</label>
+                <input
+                  type="date"
+                  value={exportEnd}
+                  min={exportStart}
+                  onChange={(e) => setExportEnd(e.target.value)}
+                  className="w-full h-9 text-sm border rounded-md px-2 bg-background"
+                />
+              </div>
+            </div>
+          )}
+
+          {exportRangeMode !== 'custom' && (
+            <p className="text-xs text-muted-foreground">
+              {(() => {
+                const { start, end } = activeExportRange()
+                return start === end ? `Fecha: ${formatDate(start)}` : `Del ${formatDate(start)} al ${formatDate(end)}`
+              })()}
+            </p>
+          )}
+
+          <p className="text-xs font-medium text-foreground bg-muted/40 rounded-md px-3 py-2">
+            {exportPreviewCount} servicio{exportPreviewCount !== 1 ? 's' : ''} coinciden con este rango
+          </p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setExportDialogFormat(null)} disabled={!!exportingFormat}>
+            Cancelar
+          </Button>
+          <Button onClick={handleConfirmExport} disabled={!!exportingFormat || exportPreviewCount === 0} className="gap-1.5">
+            {exportingFormat ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            Exportar Excel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -588,7 +727,7 @@ export function ServiciosSection() {
               <DropdownMenuLabel>Exportar Excel por cliente</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {(Object.keys(EXPORT_FORMATS) as ExportClientFormat[]).map((key) => (
-                <DropdownMenuItem key={key} onClick={() => handleExport(key)} disabled={!!exportingFormat} className="gap-2">
+                <DropdownMenuItem key={key} onClick={() => openExportDialog(key)} disabled={!!exportingFormat} className="gap-2">
                   <FileSpreadsheet className="h-3.5 w-3.5" />
                   Formato {EXPORT_FORMATS[key].label}
                 </DropdownMenuItem>
