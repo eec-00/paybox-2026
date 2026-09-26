@@ -67,26 +67,14 @@ interface Cliente {
 
 interface LocationPoint { lat: number; lng: number }
 
-interface GeoLinkMatch {
+interface AutoGeolink {
+  tipo: 'individual' | 'conjunto'
   url: string
-  matchedPlaca: string
-  createDate: string
-  expiraAt: string | null // null = permanente
-  expired: boolean
+  expiraAt: string | null
+  placas: string[]
+  referenciaBooking: string | null
 }
 
-/** Normaliza una placa para comparar "AFQ-733" (Navitel) contra
- * "Freightliner/CL112/AFQ733" (Odoo, vía extractPlaca) sin depender de
- * guiones, marca/modelo u otro formato — solo letras y números. */
-function normalizePlaca(value: string): string {
-  return value.toUpperCase().replace(/[^A-Z0-9]/g, '')
-}
-function extractPlacaCandidate(val: [number, string] | false | undefined): string {
-  if (!val) return ''
-  const name = val[1]
-  if (!name) return ''
-  return name.includes('/') ? name.split('/').pop() || name : name
-}
 function formatOdooDateTime(iso: string): string {
   return new Date(iso).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' })
 }
@@ -154,10 +142,9 @@ export default function ServicioDetailPage() {
   const [hitoFotos, setHitoFotos] = useState<HitoFoto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [geolink, setGeolink] = useState<GeoLinkMatch | null>(null)
-  const [geolinkLoading, setGeolinkLoading] = useState(false)
-  const [geolinkError, setGeolinkError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [autoGeolinks, setAutoGeolinks] = useState<AutoGeolink[]>([])
+  const [autoGeolinksLoading, setAutoGeolinksLoading] = useState(true)
 
   const fetchDetail = async () => {
     setLoading(true)
@@ -193,67 +180,35 @@ export default function ServicioDetailPage() {
 
   useEffect(() => { if (id) fetchDetail() }, [id])
 
-  // Busca si la placa del camión (o, si no, la carreta) de este servicio
-  // tiene un geoenlace de seguimiento GPS activo en Navitel, para no tener
-  // que ir a buscarlo manualmente en Servicios > Geoenlaces.
+  // Geoenlaces que la automatización vinculó específicamente a ESTE servicio
+  // (individual y/o "en conjunto" — ver app/api/automatizacion/geoenlaces-auto).
+  // Solo se muestran los vinculados a este servicio: un geoenlace que un usuario
+  // creó a mano para el mismo camión es independiente y nunca se asigna acá.
   useEffect(() => {
-    const placaCamion = extractPlacaCandidate(task?.x_studio_placa)
-    const placaCarreta = extractPlacaCandidate(task?.x_studio_placa_carreta)
-    if (!placaCamion && !placaCarreta) { setGeolink(null); return }
-
+    if (!id) return
     let cancelled = false
-    setGeolinkLoading(true)
-    setGeolinkError(null)
-    fetch('/api/navitel/geolink/list')
+    setAutoGeolinksLoading(true)
+    fetch(`/api/servicios/${id}/geoenlace-automatico`)
       .then((res) => res.json())
-      .then((data) => {
-        if (cancelled) return
-        if (!data.success) { setGeolinkError(data.error || 'Error al buscar geoenlaces'); return }
-
-        const candidates = [placaCamion, placaCarreta].filter(Boolean).map(normalizePlaca)
-        type RawGeolink = { url: string; create_date: string; lifetime?: { to: string } | null; trackers?: { alias: string }[] }
-        const matches = (data.geolinks as RawGeolink[]).filter((g) =>
-          g.trackers?.some((t) => candidates.includes(normalizePlaca(t.alias)))
-        )
-        if (matches.length === 0) { setGeolink(null); return }
-
-        const withExpiry = matches.map((g) => ({
-          g,
-          expired: !!g.lifetime && new Date(g.lifetime.to) < new Date(),
-        }))
-        // Prioriza uno activo (no expirado); si no hay, el más reciente igual.
-        const chosen = withExpiry.find((m) => !m.expired) || withExpiry[0]
-        const matchedTracker = chosen.g.trackers?.find((t) => candidates.includes(normalizePlaca(t.alias)))
-
-        setGeolink({
-          url: chosen.g.url,
-          matchedPlaca: matchedTracker?.alias || placaCamion || placaCarreta,
-          createDate: chosen.g.create_date,
-          expiraAt: chosen.g.lifetime?.to || null,
-          expired: chosen.expired,
-        })
-      })
-      .catch(() => { if (!cancelled) setGeolinkError('Error de conexión al buscar geoenlaces') })
-      .finally(() => { if (!cancelled) setGeolinkLoading(false) })
-
+      .then((data) => { if (!cancelled) setAutoGeolinks(data.success ? data.geolinks : []) })
+      .catch(() => { if (!cancelled) setAutoGeolinks([]) })
+      .finally(() => { if (!cancelled) setAutoGeolinksLoading(false) })
     return () => { cancelled = true }
-  }, [task?.x_studio_placa, task?.x_studio_placa_carreta])
+  }, [id])
 
-  const copyGeolink = async () => {
-    if (!geolink) return
+  const copyLink = async (url: string) => {
     try {
-      await navigator.clipboard.writeText(geolink.url)
+      await navigator.clipboard.writeText(url)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch { /* silent */ }
   }
-  const shareGeolink = async () => {
-    if (!geolink) return
+  const shareLink = async (url: string, label: string) => {
     if (navigator.share) {
-      try { await navigator.share({ title: `Geoenlace ${geolink.matchedPlaca}`, url: geolink.url }) }
-      catch (err) { if ((err as Error).name !== 'AbortError') copyGeolink() }
+      try { await navigator.share({ title: `Geoenlace ${label}`, url }) }
+      catch (err) { if ((err as Error).name !== 'AbortError') copyLink(url) }
     } else {
-      copyGeolink()
+      copyLink(url)
     }
   }
 
@@ -340,84 +295,79 @@ export default function ServicioDetailPage() {
           </div>
 
           {/* Geoenlace GPS */}
-          <div className="bg-card border rounded-xl shadow-sm p-4">
-            <h3 className="text-sm font-bold mb-3 text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+          <div className="bg-card border rounded-xl shadow-sm p-4 space-y-4">
+            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
               <Link2 className="h-3.5 w-3.5" />
               Geoenlace GPS
             </h3>
-            {geolinkLoading ? (
+
+            {autoGeolinksLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                 Buscando geoenlace para este vehículo...
               </div>
-            ) : geolinkError ? (
-              <p className="text-sm text-destructive">{geolinkError}</p>
-            ) : !geolink ? (
-              <p className="text-sm text-muted-foreground">
-                Sin geoenlace de seguimiento para este vehículo. Puedes crear uno en{' '}
-                <Link href="/servicios/geoenlaces" className="text-primary hover:underline font-medium">
-                  Servicios → Geoenlaces
-                </Link>.
-              </p>
+            ) : autoGeolinks.length > 0 ? (
+              autoGeolinks.map((g) => (
+                <div key={g.url} className="space-y-2.5 pb-4 last:pb-0 border-b last:border-b-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 border rounded text-xs font-medium ${g.tipo === 'conjunto' ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400' : 'bg-primary/10 text-primary border-primary/20'}`}>
+                        {g.tipo === 'conjunto' ? `SERVICIO EN CONJUNTO — ${g.referenciaBooking}` : 'Automático'}
+                      </span>
+                      {g.placas.map((p) => (
+                        <span key={p} className="inline-flex items-center gap-1 px-2 py-0.5 bg-muted text-muted-foreground border rounded text-xs">
+                          <Truck className="h-2.5 w-2.5" />
+                          {p}
+                        </span>
+                      ))}
+                      {g.expiraAt && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded text-xs">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+                          Activo hasta {formatOdooDateTime(g.expiraAt)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => copyLink(g.url)}
+                        title="Copiar enlace"
+                        className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md border hover:bg-muted/50 transition-colors"
+                      >
+                        {copied ? <CheckCircle className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                      </button>
+                      <a
+                        href={g.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Abrir en pestaña nueva"
+                        className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md border hover:bg-muted/50 transition-colors"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                      <button
+                        onClick={() => shareLink(g.url, g.placas.join(', '))}
+                        title="Compartir"
+                        className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md border hover:bg-muted/50 transition-colors"
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="rounded-lg overflow-hidden border">
+                    <iframe
+                      key={g.url}
+                      src={g.url}
+                      className="w-full h-[420px] border-0"
+                      loading="lazy"
+                      title={`Seguimiento GPS ${g.placas.join(', ')}`}
+                    />
+                  </div>
+                </div>
+              ))
             ) : (
-              <div className="space-y-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded text-xs font-medium">
-                      <Truck className="h-2.5 w-2.5" />
-                      {geolink.matchedPlaca}
-                    </span>
-                    {geolink.expiraAt === null ? (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded text-xs">
-                        ∞ Permanente
-                      </span>
-                    ) : geolink.expired ? (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-muted text-muted-foreground border border-border rounded text-xs">
-                        Expirado
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded text-xs">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
-                        Activo hasta {formatOdooDateTime(geolink.expiraAt)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={copyGeolink}
-                      title="Copiar enlace"
-                      className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md border hover:bg-muted/50 transition-colors"
-                    >
-                      {copied ? <CheckCircle className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                    </button>
-                    <a
-                      href={geolink.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Abrir en pestaña nueva"
-                      className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md border hover:bg-muted/50 transition-colors"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                    <button
-                      onClick={shareGeolink}
-                      title="Compartir"
-                      className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md border hover:bg-muted/50 transition-colors"
-                    >
-                      <Share2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-                <div className="rounded-lg overflow-hidden border">
-                  <iframe
-                    key={geolink.url}
-                    src={geolink.url}
-                    className="w-full h-[420px] border-0"
-                    loading="lazy"
-                    title={`Seguimiento GPS ${geolink.matchedPlaca}`}
-                  />
-                </div>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Este servicio todavía no tiene geoenlace. Se crea automáticamente 3h antes de su hora de cita, o apenas el conductor lo inicia.
+              </p>
             )}
           </div>
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { VehiclesList } from '@/components/VehiclesList'
+import { GeoenlacesAutoSection } from '@/components/GeoenlacesAutoSection'
 import { Link2 } from 'lucide-react'
 
 export default function GeoenlacesPage() {
@@ -13,6 +14,7 @@ export default function GeoenlacesPage() {
           <p className="text-muted-foreground">Flota GPS Navitel · Crea geoenlaces para uno o varios vehículos</p>
         </div>
       </div>
+      <GeoenlacesAutoSection />
       <VehiclesList />
     </div>
   )

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -74,6 +75,8 @@ export function VehiclesList() {
   const [loadingGeolinks, setLoadingGeolinks] = useState(true)
   const [geolinksError, setGeolinksError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [selectedGeolinkIds, setSelectedGeolinkIds] = useState<Set<number>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const [historial, setHistorial] = useState<HistorialEntry[]>([])
   const [loadingHistorial, setLoadingHistorial] = useState(false)
@@ -220,6 +223,48 @@ export function VehiclesList() {
     } finally {
       setCreatingLink(false)
     }
+  }
+
+  const toggleGeolink = (id: number) =>
+    setSelectedGeolinkIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  const allGeolinksSelected = geolinks.length > 0 && geolinks.every(g => selectedGeolinkIds.has(g.id))
+
+  const toggleAllGeolinks = () =>
+    setSelectedGeolinkIds(allGeolinksSelected ? new Set() : new Set(geolinks.map(g => g.id)))
+
+  const handleBulkDeleteGeolinks = async () => {
+    const ids = Array.from(selectedGeolinkIds)
+    if (ids.length === 0) return
+    if (!window.confirm(`¿Eliminar ${ids.length} geoenlace${ids.length !== 1 ? 's' : ''}?`)) return
+    setBulkDeleting(true)
+    setGeolinksError(null)
+    const results = await Promise.all(ids.map(async id => {
+      try {
+        const res = await fetch('/api/navitel/geolink/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        })
+        const data = await res.json()
+        return { id, ok: !!data.success, error: data.error as string | undefined }
+      } catch {
+        return { id, ok: false, error: 'Error de conexión' }
+      }
+    }))
+    const deleted = results.filter(r => r.ok).map(r => r.id)
+    const failed = results.filter(r => !r.ok)
+    setGeolinks(prev => prev.filter(g => !deleted.includes(g.id)))
+    setSelectedGeolinkIds(new Set(failed.map(f => f.id)))
+    if (failed.length > 0) {
+      setGeolinksError(`No se pudieron eliminar ${failed.length} geoenlace(s): ${failed[0].error || 'Error'}`)
+    }
+    setBulkDeleting(false)
   }
 
   const handleDeleteGeolink = async (id: number) => {
@@ -698,6 +743,23 @@ export function VehiclesList() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {geolinks.length > 0 && (
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                  <Checkbox checked={allGeolinksSelected} onCheckedChange={toggleAllGeolinks} />
+                  Todos
+                </label>
+              )}
+              {selectedGeolinkIds.size > 0 && (
+                <Button
+                  variant="destructive" size="sm" className="h-8"
+                  onClick={handleBulkDeleteGeolinks} disabled={bulkDeleting}
+                >
+                  {bulkDeleting
+                    ? <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+                  Eliminar ({selectedGeolinkIds.size})
+                </Button>
+              )}
               <Button
                 variant="outline" size="sm" className="h-8 w-8 p-0"
                 onClick={fetchGeolinks} disabled={loadingGeolinks}
@@ -752,6 +814,12 @@ export function VehiclesList() {
                         : 'bg-muted/25 border-border/60 hover:bg-muted/40'
                     )}
                   >
+                    <Checkbox
+                      className="mr-3 shrink-0"
+                      checked={selectedGeolinkIds.has(geolink.id)}
+                      onCheckedChange={() => toggleGeolink(geolink.id)}
+                      aria-label="Seleccionar geoenlace"
+                    />
                     <div className="flex-1 min-w-0 space-y-1.5">
                       <div className="flex flex-wrap items-center gap-1">
                         {geolink.trackers?.length > 0 ? (
