@@ -24,11 +24,16 @@ CREATE POLICY "conductor_select_completados"
   ON public.conductor_servicios_completados FOR SELECT
   USING (conductor_id = auth.uid());
 
-CREATE POLICY "admin_select_completados"
+DROP POLICY IF EXISTS "admin_select_completados" ON public.conductor_servicios_completados;
+CREATE POLICY "admin_or_servicios_select_completados"
   ON public.conductor_servicios_completados FOR SELECT
   USING (
     EXISTS (
       SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role IN ('admin', 'developer')
+      WHERE id = auth.uid()
+        AND (
+          role IN ('admin', 'developer')
+          OR (module_permissions->>'servicios')::jsonb->>'enabled' = 'true'
+        )
     )
   );

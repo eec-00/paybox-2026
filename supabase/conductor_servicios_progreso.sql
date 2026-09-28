@@ -19,12 +19,17 @@ CREATE POLICY "conductor_manage_progreso"
   USING (conductor_id = auth.uid())
   WITH CHECK (conductor_id = auth.uid());
 
--- Admins can read all
-CREATE POLICY "admin_select_progreso"
+-- Admins, developers y usuarios con permiso del módulo "servicios" pueden ver todo
+DROP POLICY IF EXISTS "admin_select_progreso" ON public.conductor_servicios_progreso;
+CREATE POLICY "admin_or_servicios_select_progreso"
   ON public.conductor_servicios_progreso FOR SELECT
   USING (
     EXISTS (
       SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role IN ('admin', 'developer')
+      WHERE id = auth.uid()
+        AND (
+          role IN ('admin', 'developer')
+          OR (module_permissions->>'servicios')::jsonb->>'enabled' = 'true'
+        )
     )
   );

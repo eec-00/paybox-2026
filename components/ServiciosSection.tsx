@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
@@ -10,7 +11,7 @@ import {
   DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import {
-  RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight, RotateCcw, Loader2,
+  RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight, RotateCcw, Loader2, CheckCircle2,
   Columns, Filter, ArrowUp, ArrowDown, ArrowUpDown, Download, FileSpreadsheet, CalendarRange,
 } from 'lucide-react'
 import {
@@ -270,6 +271,10 @@ export function ServiciosSection() {
   const [editingTask, setEditingTask] = useState<OdooTask | null>(null)
   const [resetTask, setResetTask] = useState<OdooTask | null>(null)
   const [resetting, setResetting] = useState(false)
+  const [resetConfirmCode, setResetConfirmCode] = useState('')
+  const [finalizeTask, setFinalizeTask] = useState<OdooTask | null>(null)
+  const [finalizing, setFinalizing] = useState(false)
+  const [finalizeConfirmCode, setFinalizeConfirmCode] = useState('')
 
   // Móvil: los filtros ocupan mucho espacio y estorban — quedan colapsados
   // detrás de un botón "Filtros" salvo que el usuario los abra.
@@ -348,7 +353,7 @@ export function ServiciosSection() {
   useEffect(() => { fetchData() }, [])
 
   const handleConfirmReset = async () => {
-    if (!resetTask) return
+    if (!resetTask || resetConfirmCode.trim().toUpperCase() !== servicioCodigo(resetTask).toUpperCase()) return
     setResetting(true)
     try {
       const res = await fetch('/api/servicios/reset', {
@@ -365,6 +370,29 @@ export function ServiciosSection() {
       toast.error(err.message || 'Error al reiniciar el servicio')
     } finally {
       setResetting(false)
+    }
+  }
+
+  // Para cuando el conductor dejó un servicio a medias y no sabe cómo
+  // cerrarlo en la app — el admin lo declara finalizado directamente.
+  const handleConfirmFinalize = async () => {
+    if (!finalizeTask || finalizeConfirmCode.trim().toUpperCase() !== servicioCodigo(finalizeTask).toUpperCase()) return
+    setFinalizing(true)
+    try {
+      const res = await fetch('/api/servicios/finalizar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: finalizeTask.id }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body.error || 'Error al finalizar el servicio')
+      toast.success('Servicio finalizado')
+      setFinalizeTask(null)
+      fetchData()
+    } catch (err: any) {
+      toast.error(err.message || 'Error al finalizar el servicio')
+    } finally {
+      setFinalizing(false)
     }
   }
 
@@ -595,10 +623,60 @@ export function ServiciosSection() {
             Esta acción <strong>no se puede deshacer</strong>.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <div className="space-y-1.5">
+          <label className="text-xs text-muted-foreground">
+            Para confirmar, escribe el código <strong>{resetTask && servicioCodigo(resetTask)}</strong>:
+          </label>
+          <Input
+            value={resetConfirmCode}
+            onChange={(e) => setResetConfirmCode(e.target.value)}
+            placeholder={resetTask ? servicioCodigo(resetTask) : ''}
+            disabled={resetting}
+            autoComplete="off"
+          />
+        </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={resetting}>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={handleConfirmReset} disabled={resetting} className="bg-amber-600 hover:bg-amber-700">
+          <AlertDialogAction
+            onClick={handleConfirmReset}
+            disabled={resetting || !resetTask || resetConfirmCode.trim().toUpperCase() !== servicioCodigo(resetTask).toUpperCase()}
+            className="bg-amber-600 hover:bg-amber-700"
+          >
             {resetting ? <span className="flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />Reiniciando...</span> : 'Sí, reiniciar'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    <AlertDialog open={!!finalizeTask} onOpenChange={(o) => !o && !finalizing && setFinalizeTask(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Finalizar este servicio?</AlertDialogTitle>
+          <AlertDialogDescription>
+            <strong>{finalizeTask && servicioCodigo(finalizeTask)}</strong> — {finalizeTask?.x_studio_conductor ? m2oName(finalizeTask.x_studio_conductor) : 'sin conductor'}.
+            Esto hará que se finalice directamente el servicio, sin pasar por el conductor: pasa a la etapa &quot;Servicio Finalizado&quot; y queda como Completado, tal cual si el conductor hubiera marcado el último hito.
+            Úsalo solo cuando el conductor dejó el servicio a medias y no puede cerrarlo él mismo.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-1.5">
+          <label className="text-xs text-muted-foreground">
+            Para confirmar, escribe el código <strong>{finalizeTask && servicioCodigo(finalizeTask)}</strong>:
+          </label>
+          <Input
+            value={finalizeConfirmCode}
+            onChange={(e) => setFinalizeConfirmCode(e.target.value)}
+            placeholder={finalizeTask ? servicioCodigo(finalizeTask) : ''}
+            disabled={finalizing}
+            autoComplete="off"
+          />
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={finalizing}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirmFinalize}
+            disabled={finalizing || !finalizeTask || finalizeConfirmCode.trim().toUpperCase() !== servicioCodigo(finalizeTask).toUpperCase()}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            {finalizing ? <span className="flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />Finalizando...</span> : 'Sí, finalizar'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -928,6 +1006,7 @@ export function ServiciosSection() {
                     <TableHead className="w-10" />
                     <TableHead className="w-10" />
                     <TableHead className="w-10" />
+                    <TableHead className="w-10" />
                     <TableHead
                       className="whitespace-nowrap font-bold text-xs min-w-[100px] cursor-pointer select-none hover:text-primary transition-colors"
                       onClick={() => handleSort('codigo')}
@@ -986,10 +1065,21 @@ export function ServiciosSection() {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-muted-foreground hover:text-amber-600"
-                              onClick={() => setResetTask(task)}
+                              onClick={() => { setResetTask(task); setResetConfirmCode('') }}
                               title="Reiniciar servicio (borra las horas marcadas por el conductor)"
                             >
                               <RotateCcw className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                          <TableCell className="p-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-emerald-600"
+                              onClick={() => { setFinalizeTask(task); setFinalizeConfirmCode('') }}
+                              title="Finalizar servicio directamente (sin pasar por el conductor)"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
                             </Button>
                           </TableCell>
                           <TableCell className="font-medium whitespace-nowrap" title={task.name}>
