@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
 import { tipoServicioLabelFor, TIPOS_SERVICIO } from '@/lib/servicios/hitos'
-import { calcularProgreso, ProgresoBadge } from '@/lib/servicios/progreso'
+import { calcularProgreso, ProgresoBadge, ultimoHitoMarcado } from '@/lib/servicios/progreso'
 import {
   EXPORT_FORMATS, buildQuimtiaRow, buildEyMRow, buildCroslandRow,
   QUIMTIA_COLUMNS, EYM_COLUMNS, CROSLAND_COLUMNS, type ExportClientFormat,
@@ -183,6 +183,11 @@ const COLUMNS: ColumnDef[] = [
       return PROGRESO_RANK[p.estado] * 1000 + (p.totalHitos > 0 ? p.stepActual / p.totalHitos : 0)
     },
     render: (t, ctx) => <ProgresoBadge progreso={calcularProgreso(t, ctx.progresoMap, ctx.completadosSet)} />,
+  },
+  {
+    key: 'fase', label: 'Fase', headClass: 'min-w-[160px]',
+    sortValue: (t, ctx) => calcularProgreso(t, ctx.progresoMap, ctx.completadosSet).stepActual,
+    render: (t, ctx) => ultimoHitoMarcado(t, ctx.progresoMap, ctx.completadosSet) ?? '-',
   },
   {
     key: 'cliente', label: 'Cliente', headClass: 'min-w-[180px]',

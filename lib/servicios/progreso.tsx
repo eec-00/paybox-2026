@@ -19,6 +19,19 @@ export function calcularProgreso(
   return { estado: 'sin_iniciar', stepActual: 0, totalHitos }
 }
 
+// Último hito que marcó el conductor (step_actual = cantidad de hitos ya
+// marcados, así que es el hito en stepActual - 1). null si no marcó ninguno.
+export function ultimoHitoMarcado(
+  task: TaskTypeFlags & { id: number },
+  progresoMap: Map<number, number>,
+  completadosSet: Set<number>
+): string | null {
+  const hitos = getHitosForTask(task)
+  const { stepActual } = calcularProgreso(task, progresoMap, completadosSet)
+  if (stepActual <= 0) return null
+  return hitos[Math.min(stepActual, hitos.length) - 1]?.label ?? null
+}
+
 export function ProgresoBadge({ progreso }: { progreso: ProgresoServicio }) {
   if (progreso.estado === 'completado') {
     return (
