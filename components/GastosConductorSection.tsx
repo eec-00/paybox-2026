@@ -12,9 +12,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { GastoConductor } from '@/lib/types/database.types'
+import { GastosConductorExportModal, type DatosServicio } from '@/components/GastosConductorExportModal'
 
 export function GastosConductorSection() {
     const [gastos, setGastos] = useState<GastoConductor[]>([])
+    // Placa / contenedor / guía viven en Odoo, no en gastos_conductor
+    const [datosServicio, setDatosServicio] = useState<Record<number, DatosServicio>>({})
+    const [loadingDatos, setLoadingDatos] = useState(false)
     const [loading, setLoading] = useState(true)
     const [estadoFilter, setEstadoFilter] = useState<'all' | 'pendiente' | 'pagado'>('all')
     const [search, setSearch] = useState('')
@@ -43,10 +47,27 @@ export function GastosConductorSection() {
                 .order('created_at', { ascending: false })
             if (error) throw error
             setGastos(data || [])
+            fetchDatosServicio(data || [])
         } catch (err) {
             console.error('Error fetching gastos:', err)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const fetchDatosServicio = async (lista: GastoConductor[]) => {
+        const ids = Array.from(new Set(lista.map(g => g.servicio_id).filter(Boolean)))
+        if (ids.length === 0) return
+        setLoadingDatos(true)
+        try {
+            const res = await fetch(`/api/servicios/datos-gasto?ids=${ids.join(',')}`)
+            const json = await res.json()
+            if (!res.ok) throw new Error(json.error)
+            setDatosServicio(json.servicios || {})
+        } catch (err) {
+            console.error('Error fetching datos de servicio:', err)
+        } finally {
+            setLoadingDatos(false)
         }
     }
 
@@ -56,14 +77,14 @@ export function GastosConductorSection() {
         if (!deleteGasto) return
         setDeleting(true)
         try {
-            await supabase.from('calendario_pagos').delete().eq('gasto_conductor_id', deleteGasto.id)
-            const { error } = await supabase.from('gastos_conductor').delete().eq('id', deleteGasto.id)
-            if (error) throw error
+            const res = await fetch(`/api/finanzas/gastos-conductor?id=${deleteGasto.id}`, { method: 'DELETE' })
+            const json = await res.json()
+            if (!res.ok) throw new Error(json.error)
             setDeleteGasto(null)
             fetchGastos()
         } catch (err) {
             console.error('Error al eliminar:', err)
-            alert('Error al eliminar el gasto.')
+            alert(`Error al eliminar el gasto: ${err instanceof Error ? err.message : err}`)
         } finally {
             setDeleting(false)
         }
@@ -103,7 +124,11 @@ export function GastosConductorSection() {
         if (estadoFilter !== 'all' && g.estado !== estadoFilter) return false
         if (search.trim()) {
             const q = search.toLowerCase()
+            const d = datosServicio[g.servicio_id]
             return (
+                (d?.placa ?? '').toLowerCase().includes(q) ||
+                (d?.contenedor ?? '').toLowerCase().includes(q) ||
+                (d?.guia ?? '').toLowerCase().includes(q) ||
                 g.conductor_nombre.toLowerCase().includes(q) ||
                 g.servicio_nombre.toLowerCase().includes(q) ||
                 g.descripcion.toLowerCase().includes(q)
@@ -111,6 +136,12 @@ export function GastosConductorSection() {
         }
         return true
     })
+
+    const datoServicio = (g: GastoConductor, campo: keyof DatosServicio) => {
+        const valor = datosServicio[g.servicio_id]?.[campo]
+        if (valor) return valor
+        return loadingDatos ? <span className="text-muted-foreground">…</span> : <span className="text-muted-foreground">—</span>
+    }
 
     const pendientes = gastos.filter(g => g.estado === 'pendiente').length
     const totalPendiente = gastos
@@ -132,10 +163,13 @@ export function GastosConductorSection() {
                         </p>
                     </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={fetchGastos} disabled={loading} className="h-8 gap-1.5">
-                    <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-                    Actualizar
-                </Button>
+                <div className="flex items-center gap-2">
+                    <GastosConductorExportModal gastos={gastos} datosServicio={datosServicio} />
+                    <Button variant="outline" size="sm" onClick={fetchGastos} disabled={loading} className="h-8 gap-1.5">
+                        <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                        Actualizar
+                    </Button>
+                </div>
             </div>
 
             {/* Filters */}
@@ -144,7 +178,7 @@ export function GastosConductorSection() {
                     <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <input
                         type="text"
-                        placeholder="Buscar conductor, servicio, descripción..."
+                        placeholder="Buscar conductor, servicio, placa, contenedor, guía..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
@@ -180,6 +214,9 @@ export function GastosConductorSection() {
                                     <TableHead className="whitespace-nowrap font-bold text-xs">Fecha</TableHead>
                                     <TableHead className="whitespace-nowrap font-bold text-xs">Conductor</TableHead>
                                     <TableHead className="whitespace-nowrap font-bold text-xs">Servicio</TableHead>
+                                    <TableHead className="whitespace-nowrap font-bold text-xs">Placa</TableHead>
+                                    <TableHead className="whitespace-nowrap font-bold text-xs">Contenedor</TableHead>
+                                    <TableHead className="whitespace-nowrap font-bold text-xs">N° Guía</TableHead>
                                     <TableHead className="whitespace-nowrap font-bold text-xs">Descripción</TableHead>
                                     <TableHead className="whitespace-nowrap font-bold text-xs text-right">Monto</TableHead>
                                     <TableHead className="whitespace-nowrap font-bold text-xs text-center">Estado</TableHead>
@@ -190,7 +227,7 @@ export function GastosConductorSection() {
                             <TableBody>
                                 {filtered.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="text-center py-12 text-muted-foreground text-sm">
+                                        <TableCell colSpan={11} className="text-center py-12 text-muted-foreground text-sm">
                                             No se encontraron gastos
                                         </TableCell>
                                     </TableRow>
@@ -202,6 +239,9 @@ export function GastosConductorSection() {
                                             <TableCell className="max-w-[160px]">
                                                 <span className="line-clamp-1 text-[11px]" title={gasto.servicio_nombre}>{gasto.servicio_nombre}</span>
                                             </TableCell>
+                                            <TableCell className="whitespace-nowrap font-mono text-[11px]">{datoServicio(gasto, 'placa')}</TableCell>
+                                            <TableCell className="whitespace-nowrap font-mono text-[11px]">{datoServicio(gasto, 'contenedor')}</TableCell>
+                                            <TableCell className="whitespace-nowrap font-mono text-[11px]">{datoServicio(gasto, 'guia')}</TableCell>
                                             <TableCell className="max-w-[200px]">
                                                 <span className="line-clamp-2" title={gasto.descripcion}>{gasto.descripcion}</span>
                                             </TableCell>
@@ -344,6 +384,9 @@ export function GastosConductorSection() {
                                     </span>
                                 </div>
                                 <div className="col-span-2"><p className="text-xs text-muted-foreground uppercase tracking-wide">Servicio</p><p className="font-semibold">{detailGasto.servicio_nombre}</p></div>
+                                <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Placa</p><p className="font-semibold font-mono">{datoServicio(detailGasto, 'placa')}</p></div>
+                                <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Contenedor</p><p className="font-semibold font-mono">{datoServicio(detailGasto, 'contenedor')}</p></div>
+                                <div className="col-span-2"><p className="text-xs text-muted-foreground uppercase tracking-wide">N° Guía</p><p className="font-semibold font-mono">{datoServicio(detailGasto, 'guia')}</p></div>
                                 <div className="col-span-2"><p className="text-xs text-muted-foreground uppercase tracking-wide">Descripción</p><p className="font-medium">{detailGasto.descripcion}</p></div>
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Monto</p><p className="font-bold text-xl text-primary">{detailGasto.moneda === 'soles' ? 'S/' : '$'} {detailGasto.monto}</p></div>
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Registrado</p><p className="font-semibold">{new Date(detailGasto.created_at).toLocaleDateString('es-PE')}</p></div>

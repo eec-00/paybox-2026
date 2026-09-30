@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS } from '@/lib/servicios/hitos'
+import { ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS, detectTipoServicio, type TaskTypeFlags } from '@/lib/servicios/hitos'
 
 const ODOO_URL = (process.env.ODOO_URL || process.env.URL_ODOO || '').trim().replace(/\/$/, '')
 const ODOO_DB = (process.env.ODOO_DB || process.env.DB || '').trim()
@@ -281,6 +281,35 @@ export async function GET(request: Request) {
   }
 }
 
+const INICIO_DESCARGA_FIELD = 'x_studio_inicio_descarga'
+
+async function moverImportacionAEnCliente(
+  uid: number,
+  taskId: number
+): Promise<{ stageId: number; stageName: string } | null> {
+  const flagFields = ['x_studio_es_import', 'x_studio_es_tarea_de_devolucion_de_vacio', 'x_studio_es_tarea_de_retiro_de_vacio', 'x_studio_almacen_de_devolucion']
+  const meta = await odooCall<Record<string, unknown>>(uid, 'project.task', 'fields_get', [flagFields], { attributes: ['type'] })
+  const [task] = await odooCall<(TaskTypeFlags & { stage_id: [number, string] | false; project_id: [number, string] | false })[]>(
+    uid, 'project.task', 'read', [[taskId]], { fields: ['stage_id', 'project_id', ...flagFields.filter(f => f in meta)] }
+  )
+  if (!task || detectTipoServicio(task) !== 'importacion' || !task.project_id) return null
+
+  const stages = await odooCall<{ id: number; name: string; sequence: number }[]>(
+    uid, 'project.task.type', 'search_read',
+    [[['project_ids', 'in', [task.project_id[0]]]]],
+    { fields: ['id', 'name', 'sequence'], order: 'sequence asc, id asc' }
+  )
+  const target = stages.find(s => s.name.trim().toLowerCase() === 'en cliente')
+  if (!target) return null
+
+  const currentIdx = task.stage_id ? stages.findIndex(s => s.id === (task.stage_id as [number, string])[0]) : -1
+  const targetIdx = stages.indexOf(target)
+  if (currentIdx >= targetIdx) return null
+
+  await odooCall(uid, 'project.task', 'write', [[taskId], { stage_id: target.id }])
+  return { stageId: target.id, stageName: target.name }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -355,7 +384,19 @@ export async function POST(request: Request) {
       await odooCall(uid, 'project.task', 'write', [[id], validFields])
     }
 
-    return NextResponse.json({ ok: true, ...(skipped.length ? { skipped } : {}) })
+    // Importación: al marcar "Inicio descarga" el servicio pasa a la etapa
+    // "En Cliente". Solo avanza — si ya está en una etapa posterior (ej. un
+    // admin corrigiendo la hora de un servicio ya finalizado) no la regresa.
+    let stageUpdate: { stageId: number; stageName: string } | null = null
+    if (validFields[INICIO_DESCARGA_FIELD]) {
+      try {
+        stageUpdate = await moverImportacionAEnCliente(uid, id)
+      } catch (e) {
+        console.error('No se pudo mover a "En Cliente":', e instanceof Error ? e.message : e)
+      }
+    }
+
+    return NextResponse.json({ ok: true, ...(skipped.length ? { skipped } : {}), ...(stageUpdate ?? {}) })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error)
     console.error('Error POST /api/servicios:', msg)

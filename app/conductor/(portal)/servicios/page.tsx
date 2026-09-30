@@ -596,7 +596,12 @@ export default function ConductorServiciosPage() {
       ])
 
       if (res.ok) {
-        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, [hito.field]: value } : t))
+        const data = await res.json().catch(() => ({}))
+        setTasks(prev => prev.map(t => t.id === taskId ? {
+          ...t,
+          [hito.field]: value,
+          ...(data.stageId ? { stage_id: [data.stageId, data.stageName] as [number, string] } : {}),
+        } : t))
       }
 
       if (location) {
