@@ -209,6 +209,48 @@ function getAlmacenRetiro(task: ServicioTask): string {
 function getAlmacenDestino(task: ServicioTask): string {
   return extractName(task.x_studio_almacen_de_destino)
 }
+function getAlmacenDevolucion(task: ServicioTask): string {
+  return extractName(task.x_studio_almacen_de_devolucion)
+}
+
+/** Almacenes a donde tiene que ir el conductor. En importación se agrega el
+ * almacén/depósito de devolución del vacío; en la subtarea "Devolución de
+ * vacío" ese es su destino real, así que va primero y destacado (retiro y
+ * destino ahí suelen venir vacíos porque la subtarea sale de una plantilla). */
+function AlmacenesInfo({ task }: { task: ServicioTask }) {
+  const tipo = detectTipoServicio(task)
+  const retiro = getAlmacenRetiro(task)
+  const destino = getAlmacenDestino(task)
+  const devolucion = getAlmacenDevolucion(task)
+  const esSubtareaDevolucion = tipo === 'devolucion_vacio'
+  const row = (label: string, value: string, destacado = false) => (
+    <p>
+      <span className={destacado ? 'text-[#f5a623] font-semibold' : 'text-gray-400'}>{label}: </span>
+      <span className="font-semibold text-[#1a2332]">{value}</span>
+    </p>
+  )
+  return (
+    <div className="flex items-start gap-3 bg-white rounded-xl px-3.5 py-2.5 border border-gray-100">
+      <Building2 className="h-4 w-4 text-[#f5a623] shrink-0 mt-0.5" />
+      <div className="text-xs space-y-1">
+        {esSubtareaDevolucion ? (
+          <>
+            {row('Devolver en', devolucion === '—' ? 'Por definir — consulta con tu coordinador' : devolucion, true)}
+            {retiro !== '—' && row('Retiro', retiro)}
+            {destino !== '—' && row('Destino', destino)}
+          </>
+        ) : (
+          <>
+            {row('Retiro', retiro)}
+            {row('Destino', destino)}
+            {tipo === 'importacion' && row('Devolución', devolucion === '—' ? 'Por definir' : devolucion)}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function getSteps(task: ServicioTask): HitoDef[] {
   return getHitosForTask(task)
 }
@@ -1148,8 +1190,6 @@ export default function ConductorServiciosPage() {
     const tracto = getTracto(task)
     const carreta = extractPlaca(task.x_studio_placa_carreta)
     const tiempos = getTiempos(task)
-    const almacenRetiro = getAlmacenRetiro(task)
-    const almacenDestino = getAlmacenDestino(task)
     const fecha = formatDate(task.x_studio_fecha_de_la_programacin)
     const horaCita = task.x_studio_hora_de_cita ? formatTime(task.x_studio_hora_de_cita) : null
 
@@ -1226,13 +1266,7 @@ export default function ConductorServiciosPage() {
           )}
 
           {/* Almacenes */}
-          <div className="flex items-start gap-3 bg-white rounded-xl px-3.5 py-2.5 border border-gray-100">
-            <Building2 className="h-4 w-4 text-[#f5a623] shrink-0 mt-0.5" />
-            <div className="text-xs space-y-1">
-              <p><span className="text-gray-400">Retiro: </span><span className="font-semibold text-[#1a2332]">{almacenRetiro}</span></p>
-              <p><span className="text-gray-400">Destino: </span><span className="font-semibold text-[#1a2332]">{almacenDestino}</span></p>
-            </div>
-          </div>
+          <AlmacenesInfo task={task} />
 
           {/* Tiempos */}
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
@@ -1546,8 +1580,6 @@ export default function ConductorServiciosPage() {
         const carreta = extractPlaca(task.x_studio_placa_carreta)
         const booking = extractName(task.x_studio_referenciabooking)
         const agencia = extractName(task.x_studio_agencia)
-        const almacenRetiro = getAlmacenRetiro(task)
-        const almacenDestino = getAlmacenDestino(task)
         const fecha = formatDate(task.x_studio_fecha_de_la_programacin)
         const horaCita = task.x_studio_hora_de_cita ? formatTime(task.x_studio_hora_de_cita) : null
         const stageStyle = getStageStyle(stage)
@@ -1662,13 +1694,7 @@ export default function ConductorServiciosPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3 bg-white rounded-xl px-3.5 py-2.5 border border-gray-100">
-                    <Building2 className="h-4 w-4 text-[#f5a623] shrink-0 mt-0.5" />
-                    <div className="text-xs space-y-1">
-                      <p><span className="text-gray-400">Retiro: </span><span className="font-semibold text-[#1a2332]">{almacenRetiro}</span></p>
-                      <p><span className="text-gray-400">Destino: </span><span className="font-semibold text-[#1a2332]">{almacenDestino}</span></p>
-                    </div>
-                  </div>
+                  <AlmacenesInfo task={task} />
 
                   <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
                     <div className="flex items-center gap-2 px-3.5 py-2.5 border-b border-gray-100">

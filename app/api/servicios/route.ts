@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
-import { ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS, detectTipoServicio, type TaskTypeFlags } from '@/lib/servicios/hitos'
+import {
+  ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS, MODALIDAD_DEVOLUCION_FIELD, MODALIDAD_OTRO_CONDUCTOR,
+  detectTipoServicio, type TaskTypeFlags,
+} from '@/lib/servicios/hitos'
 
 const ODOO_URL = (process.env.ODOO_URL || process.env.URL_ODOO || '').trim().replace(/\/$/, '')
 const ODOO_DB = (process.env.ODOO_DB || process.env.DB || '').trim()
@@ -310,6 +313,28 @@ async function moverImportacionAEnCliente(
   return { stageId: target.id, stageName: target.name }
 }
 
+/** Pone la fecha de programación del servicio padre a sus subtareas de
+ * devolución de vacío que todavía no tengan fecha (nunca pisa una fecha ya
+ * puesta a mano). La subtarea la crea Odoo de forma síncrona al guardar la
+ * modalidad, así que ya existe cuando se llama esto. */
+async function fecharSubtareaDevolucion(uid: number, parentId: number): Promise<void> {
+  const [parent] = await odooCall<{ x_studio_fecha_de_la_programacin: string | false }[]>(
+    uid, 'project.task', 'read', [[parentId]], { fields: ['x_studio_fecha_de_la_programacin'] }
+  )
+  if (!parent?.x_studio_fecha_de_la_programacin) return
+  const subtareas = await odooCall<number[]>(
+    uid, 'project.task', 'search',
+    [[
+      ['parent_id', '=', parentId],
+      ['x_studio_fecha_de_la_programacin', '=', false],
+      '|', ['x_studio_es_tarea_de_devolucion_de_vacio', '=', true], ['name', 'ilike', 'devoluci'],
+    ]]
+  )
+  if (subtareas.length) {
+    await odooCall(uid, 'project.task', 'write', [subtareas, { x_studio_fecha_de_la_programacin: parent.x_studio_fecha_de_la_programacin }])
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -342,6 +367,19 @@ export async function POST(request: Request) {
         { fields: ['id', 'name'], order: 'name asc', limit: 300 }
       )
       return NextResponse.json({ empleados })
+    }
+
+    // partners → búsqueda de contactos de Odoo para los campos de almacén
+    // (retiro/destino/devolución son many2one a res.partner). Se busca en el
+    // servidor porque son miles de contactos — no se puede bajar la lista entera.
+    if (body.action === 'partners') {
+      const q = String(body.q || '').trim()
+      if (q.length < 2) return NextResponse.json({ partners: [] })
+      const uid = await odooAuth()
+      const res = await odooCall<[number, string][]>(
+        uid, 'res.partner', 'name_search', [], { name: q, operator: 'ilike', limit: 30 }
+      )
+      return NextResponse.json({ partners: res.map(([id, name]) => ({ id, name })) })
     }
 
     // flota → lista de vehículos para selects de placa
@@ -393,6 +431,17 @@ export async function POST(request: Request) {
         stageUpdate = await moverImportacionAEnCliente(uid, id)
       } catch (e) {
         console.error('No se pudo mover a "En Cliente":', e instanceof Error ? e.message : e)
+      }
+    }
+
+    // Al pasar la devolución a "Otro conductor", Odoo crea la subtarea
+    // "Devolución de vacío" sin fecha — queda perdida al fondo de la tabla.
+    // Se le pone la misma fecha de programación del servicio original.
+    if (validFields[MODALIDAD_DEVOLUCION_FIELD] === MODALIDAD_OTRO_CONDUCTOR) {
+      try {
+        await fecharSubtareaDevolucion(uid, id)
+      } catch (e) {
+        console.error('No se pudo poner fecha a la subtarea de devolución:', e instanceof Error ? e.message : e)
       }
     }
 

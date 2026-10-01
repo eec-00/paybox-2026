@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight, RotateCcw, Loader2, CheckCircle2,
-  Columns, Filter, ArrowUp, ArrowDown, ArrowUpDown, Download, FileSpreadsheet, CalendarRange,
+  Columns, Filter, ArrowUp, ArrowDown, ArrowUpDown, Download, FileSpreadsheet, CalendarRange, SlidersHorizontal, AlertTriangle,
 } from 'lucide-react'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -22,6 +22,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
+import { ServiciosExportDialog } from '@/components/ServiciosExportDialog'
 import { tipoServicioLabelFor, TIPOS_SERVICIO } from '@/lib/servicios/hitos'
 import { calcularProgreso, ProgresoBadge, ultimoHitoMarcado } from '@/lib/servicios/progreso'
 import {
@@ -74,6 +75,14 @@ function servicioCodigo(t: OdooTask): string {
 }
 
 interface OdooStage { id: number; name: string }
+
+/** Subtarea (devolución/retiro de vacío) que Odoo creó sin conductor y nadie
+ * asignó todavía — si no se marca, se pierde y el contenedor no se devuelve. */
+function faltaConductor(t: OdooTask): boolean {
+  if (!t.parent_id || t.x_studio_conductor) return false
+  const stage = (t.stage_id ? t.stage_id[1] : '').toLowerCase()
+  return !stage.includes('finaliz') && !stage.includes('cancel') && !stage.includes('cerrado')
+}
 
 function formatOdooTime(value: number | false): string {
   if (!value && value !== 0) return '—'
@@ -217,7 +226,12 @@ const COLUMNS: ColumnDef[] = [
   {
     key: 'conductor', label: 'Conductor', headClass: 'min-w-[180px]',
     sortValue: (t) => m2oName(t.x_studio_conductor),
-    render: (t) => m2oName(t.x_studio_conductor),
+    render: (t) => faltaConductor(t) ? (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 text-[11px] font-semibold whitespace-nowrap dark:bg-red-950/50 dark:text-red-300 dark:border-red-900">
+        <AlertTriangle className="h-3 w-3" />
+        Falta asignar conductor
+      </span>
+    ) : m2oName(t.x_studio_conductor),
   },
   {
     key: 'refBooking', label: 'Ref/Booking', headClass: 'min-w-[130px]',
@@ -272,6 +286,7 @@ export function ServiciosSection() {
   const [fechaFilter, setFechaFilter] = useState('')
   const [almacenDestinoFilter, setAlmacenDestinoFilter] = useState('all')
   const [almacenRetiroFilter, setAlmacenRetiroFilter] = useState('all')
+  const [soloSinConductor, setSoloSinConductor] = useState(false)
   const [page, setPage] = useState(1)
   const [editingTask, setEditingTask] = useState<OdooTask | null>(null)
   const [resetTask, setResetTask] = useState<OdooTask | null>(null)
@@ -411,6 +426,7 @@ export function ServiciosSection() {
   const [exportRangeMode, setExportRangeMode] = useState<'hoy' | 'semana' | 'custom'>('hoy')
   const [exportStart, setExportStart] = useState(todayStr())
   const [exportEnd, setExportEnd] = useState(todayStr())
+  const [customExportOpen, setCustomExportOpen] = useState(false)
 
   const openExportDialog = (formatKey: ExportClientFormat) => {
     setExportRangeMode('hoy')
@@ -506,6 +522,7 @@ export function ServiciosSection() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
     return tasks.filter((t) => {
+      if (soloSinConductor && !faltaConductor(t)) return false
       if (stageFilter !== 'all') {
         const stageName = t.stage_id ? t.stage_id[1] : ''
         if (stageName !== stageFilter) return false
@@ -530,7 +547,7 @@ export function ServiciosSection() {
       ].join(' ').toLowerCase()
       return searchable.includes(q)
     })
-  }, [tasks, search, stageFilter, tipoFilter, progresoFilter, progresoMap, completadosSet, conductorFilter, clienteFilter, almacenDestinoFilter, almacenRetiroFilter, fechaFilter])
+  }, [tasks, search, stageFilter, tipoFilter, progresoFilter, progresoMap, completadosSet, conductorFilter, clienteFilter, almacenDestinoFilter, almacenRetiroFilter, fechaFilter, soloSinConductor])
 
   // Orden elegido por el usuario tocando un encabezado. "Código" se ordena
   // con el mismo criterio numérico que el orden por defecto de fetchData.
@@ -598,13 +615,15 @@ export function ServiciosSection() {
     setFechaFilter('')
     setAlmacenDestinoFilter('all')
     setAlmacenRetiroFilter('all')
+    setSoloSinConductor(false)
     setPage(1)
   }
   const activeFilterCount = [
     stageFilter !== 'all', tipoFilter !== 'all', progresoFilter !== 'all',
     conductorFilter !== 'all', clienteFilter !== 'all', !!fechaFilter,
-    almacenDestinoFilter !== 'all', almacenRetiroFilter !== 'all',
+    almacenDestinoFilter !== 'all', almacenRetiroFilter !== 'all', soloSinConductor,
   ].filter(Boolean).length
+  const sinConductorCount = useMemo(() => tasks.filter(faltaConductor).length, [tasks])
   const hasFilters = !!search || activeFilterCount > 0
 
   return (
@@ -686,6 +705,15 @@ export function ServiciosSection() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+    <ServiciosExportDialog
+      open={customExportOpen}
+      onOpenChange={setCustomExportOpen}
+      tasks={tasks}
+      stages={stages}
+      progresoMap={progresoMap}
+      completadosSet={completadosSet}
+      defaults={{ conductor: conductorFilter, cliente: clienteFilter, tipo: tipoFilter, etapa: stageFilter, progreso: progresoFilter }}
+    />
     <Dialog open={!!exportDialogFormat} onOpenChange={(o) => !o && !exportingFormat && setExportDialogFormat(null)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -807,6 +835,11 @@ export function ServiciosSection() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setCustomExportOpen(true)} disabled={!!exportingFormat} className="gap-2">
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Personalizado (semana, conductor…)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuLabel>Exportar Excel por cliente</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {(Object.keys(EXPORT_FORMATS) as ExportClientFormat[]).map((key) => (
@@ -972,6 +1005,26 @@ export function ServiciosSection() {
           </Button>
         )}
       </div>
+
+      {/* Aviso: subtareas de devolución/retiro sin conductor responsable */}
+      {!loading && sinConductorCount > 0 && (
+        <div className="flex items-center justify-between gap-3 flex-wrap bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 dark:bg-red-950/40 dark:border-red-900 dark:text-red-200">
+          <div className="flex items-center gap-2 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              <strong>{sinConductorCount}</strong> subtarea{sinConductorCount !== 1 ? 's' : ''} de devolución/retiro de vacío sin conductor responsable asignado.
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant={soloSinConductor ? 'default' : 'outline'}
+            className="h-8 border-red-300 dark:border-red-800"
+            onClick={() => { setSoloSinConductor((v) => !v); setPage(1) }}
+          >
+            {soloSinConductor ? 'Ver todos los servicios' : 'Ver solo estas'}
+          </Button>
+        </div>
+      )}
 
       {/* Error */}
       {error && (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,11 @@ import {
   Loader2, Save, Truck, Clock, User, Package,
   Calendar, Hash, Building2, MapPin, Info,
 } from 'lucide-react'
-import { getHitosForTask, tipoServicioLabelFor, type HitoDef, type TaskTypeFlags } from '@/lib/servicios/hitos'
+import {
+  getHitosForTask, tipoServicioLabelFor, detectTipoServicio,
+  MODALIDAD_DEVOLUCION_FIELD, MODALIDAD_MISMO_CONDUCTOR, MODALIDAD_OTRO_CONDUCTOR,
+  type HitoDef, type TaskTypeFlags,
+} from '@/lib/servicios/hitos'
 
 interface Stage { id: number; name: string }
 interface Conductor { id: number; name: string }
@@ -145,6 +149,114 @@ function PlacaSelect({
   )
 }
 
+// Almacén (many2one a res.partner): buscador que consulta Odoo mientras se
+// escribe — son miles de contactos, no se puede bajar la lista entera.
+// `value` es el [id, nombre] elegido, o false si quedó vacío.
+interface Partner { id: number; name: string }
+
+function PartnerSelect({
+  value,
+  onChange,
+  placeholder,
+  shortcut,
+}: {
+  value: Partner | false
+  onChange: (v: Partner | false) => void
+  placeholder: string
+  /** Atajo opcional debajo del campo, ej. "Igual al de retiro" */
+  shortcut?: { label: string; value: Partner | false }
+}) {
+  const [text, setText] = useState(value ? value.name : '')
+  const [options, setOptions] = useState<Partner[]>([])
+  const [open, setOpen] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reqId = useRef(0)
+
+  useEffect(() => { setText(value ? value.name : '') }, [value])
+
+  const search = (q: string) => {
+    if (timer.current) clearTimeout(timer.current)
+    if (q.trim().length < 2) { setOptions([]); return }
+    timer.current = setTimeout(() => {
+      const id = ++reqId.current
+      setSearching(true)
+      fetch('/api/servicios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'partners', q }),
+      })
+        .then(r => r.json())
+        .then(d => { if (id === reqId.current) setOptions(d.partners ?? []) })
+        .catch(() => {})
+        .finally(() => { if (id === reqId.current) setSearching(false) })
+    }, 250)
+  }
+
+  const handleChange = (val: string) => {
+    setText(val)
+    setOpen(true)
+    if (!val.trim()) onChange(false)
+    search(val)
+  }
+
+  const elegir = (p: Partner | false) => {
+    onChange(p)
+    setText(p ? p.name : '')
+    setOpen(false)
+  }
+
+  // Texto escrito que no corresponde a ningún almacén elegido
+  const sinElegir = !!text.trim() && !(value && value.name === text)
+  const puedeAtajo = shortcut?.value && !(value && shortcut.value && value.id === shortcut.value.id)
+
+  return (
+    <div className="space-y-0.5">
+      <div className="relative">
+        <Input
+          value={text}
+          onChange={e => handleChange(e.target.value)}
+          onFocus={() => text.trim().length >= 2 && setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder={placeholder}
+          className={`h-9 text-xs pr-7 ${sinElegir ? 'border-amber-400' : ''}`}
+          autoComplete="off"
+        />
+        {searching && <Loader2 className="h-3.5 w-3.5 animate-spin absolute right-2 top-2.5 text-muted-foreground" />}
+        {open && text.trim().length >= 2 && (
+          <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-md border bg-popover shadow-lg">
+            {options.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-muted-foreground">{searching ? 'Buscando...' : 'Sin resultados'}</p>
+            ) : options.map(o => (
+              <button
+                key={o.id}
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => elegir(o)}
+                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted ${value && value.id === o.id ? 'bg-primary/10 font-semibold' : ''}`}
+              >
+                {o.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {sinElegir && !open && (
+        <p className="text-[10px] text-amber-600">Elige un almacén de la lista para que se guarde.</p>
+      )}
+      {puedeAtajo && shortcut && (
+        <button type="button" onClick={() => elegir(shortcut.value)} className="text-[10px] text-primary hover:underline">
+          {shortcut.label}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function m2oPartner(val: unknown): Partner | false {
+  return Array.isArray(val) && val.length === 2 ? { id: val[0] as number, name: String(val[1]) } : false
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved }: ServiciosEditModalProps) {
@@ -165,6 +277,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
     nContenedor:  pick(validFields, 'x_studio_numero_de_contenedor', 'x_studio_nmero_de_contenedor'),
     almRetiro:    pick(validFields, 'x_studio_almacen_de_retiro', 'x_studio_almacn_de_retiro'),
     almDestino:   pick(validFields, 'x_studio_almacen_de_destino', 'x_studio_almacn_de_destino'),
+    almDevolucion: pick(validFields, 'x_studio_almacen_de_devolucion'),
     esImport:     pick(validFields, 'x_studio_es_importacion', 'x_studio_es_importacin'),
   }
 
@@ -187,6 +300,30 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
   const [agencia,      setAgencia]      = useState((task[F.agencia] as string) || '')
   const [nContenedor,  setNContenedor]  = useState((task[F.nContenedor] as string) || '')
   const [esImport,     setEsImport]     = useState(Boolean(task[F.esImport]))
+
+  // Quién devuelve el contenedor vacío — solo en el servicio de importación
+  // original (no en la subtarea). Lo marca el conductor en la app al salir
+  // del cliente, pero acá se puede definir o corregir antes. Con "Otro
+  // conductor" Odoo crea la subtarea "Devolución de vacío" automáticamente.
+  const muestraModalidad = !task.parent_id
+    && detectTipoServicio(task as TaskTypeFlags) === 'importacion'
+    && validFields.includes(MODALIDAD_DEVOLUCION_FIELD)
+  const origModalidad = (task[MODALIDAD_DEVOLUCION_FIELD] as string) || ''
+  const subtareaCreada = Boolean(task.x_studio_subtarea_de_devolucion_creada)
+  const [modalidad, setModalidad] = useState(origModalidad)
+
+  // Almacenes. El de devolución solo aplica a importación y a la subtarea de
+  // devolución de vacío (es a donde el conductor lleva el contenedor vacío).
+  // Igual que en Odoo, se define en el servicio original: la subtarea no
+  // guarda uno propio, muestra el del padre (la API lo completa desde ahí) y
+  // ahí queda de solo lectura.
+  const tipoServicio = detectTipoServicio(task as TaskTypeFlags)
+  const muestraDevolucion = (tipoServicio === 'importacion' || tipoServicio === 'devolucion_vacio')
+    && validFields.includes(F.almDevolucion)
+  const devolucionEditable = muestraDevolucion && !task.parent_id
+  const [almRetiro,     setAlmRetiro]     = useState<Partner | false>(m2oPartner(task[F.almRetiro]))
+  const [almDestino,    setAlmDestino]    = useState<Partner | false>(m2oPartner(task[F.almDestino]))
+  const [almDevolucion, setAlmDevolucion] = useState<Partner | false>(m2oPartner(task[F.almDevolucion]))
   const [tiempos, setTiempos] = useState<Record<string, string>>(() =>
     Object.fromEntries(hitos.map(h => [h.field, floatToTime(task[h.field])]))
   )
@@ -251,6 +388,13 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
       if (agencia !== orig.agencia) fields[F.agencia] = agencia || false
       if (nContenedor !== orig.nContenedor) fields[F.nContenedor] = nContenedor || false
       if (esImport !== orig.esImport) fields[F.esImport] = esImport
+      const partnerId = (p: Partner | false) => (p ? p.id : false)
+      if (partnerId(almRetiro) !== partnerId(m2oPartner(task[F.almRetiro]))) fields[F.almRetiro] = partnerId(almRetiro)
+      if (partnerId(almDestino) !== partnerId(m2oPartner(task[F.almDestino]))) fields[F.almDestino] = partnerId(almDestino)
+      if (devolucionEditable && partnerId(almDevolucion) !== partnerId(m2oPartner(task[F.almDevolucion]))) {
+        fields[F.almDevolucion] = partnerId(almDevolucion)
+      }
+      if (muestraModalidad && modalidad && modalidad !== origModalidad) fields[MODALIDAD_DEVOLUCION_FIELD] = modalidad
       for (const h of hitos) {
         const val = tiempos[h.field] ?? ''
         if (val !== (orig.tiempos[h.field] ?? '')) fields[h.field] = timeToFloat(val)
@@ -374,6 +518,30 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                   </SelectContent>
                 </Select>
               </div>
+              {muestraModalidad && (
+                <div className="space-y-1">
+                  <FieldLabel>Devolución del contenedor vacío</FieldLabel>
+                  <Select value={modalidad} onValueChange={setModalidad}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Sin definir (lo elige el conductor)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={MODALIDAD_MISMO_CONDUCTOR}>Lo devuelve el mismo conductor</SelectItem>
+                      <SelectItem value={MODALIDAD_OTRO_CONDUCTOR}>Lo devuelve otro conductor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {modalidad === MODALIDAD_OTRO_CONDUCTOR && !subtareaCreada && (
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      Al guardar se crea la subtarea &quot;Devolución de vacío&quot; con la misma fecha de este servicio. Luego asígnale el conductor desde la tabla.
+                    </p>
+                  )}
+                  {modalidad === MODALIDAD_MISMO_CONDUCTOR && origModalidad === MODALIDAD_OTRO_CONDUCTOR && subtareaCreada && (
+                    <p className="text-[11px] text-amber-600 leading-snug">
+                      La subtarea de devolución que ya se creó no se borra sola — elimínala en Odoo si ya no corresponde.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Detalles logísticos */}
@@ -395,12 +563,34 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
               </div>
               <div className="space-y-1">
                 <FieldLabel>Almacén de Retiro</FieldLabel>
-                <ReadonlyField value={m2oName(task[F.almRetiro])} />
+                <PartnerSelect value={almRetiro} onChange={setAlmRetiro} placeholder="Buscar almacén..." />
               </div>
-              <div className="space-y-1">
-                <FieldLabel>Almacén de Destino</FieldLabel>
-                <ReadonlyField value={m2oName(task[F.almDestino])} />
-              </div>
+              {/* En la subtarea de devolución el destino es el almacén de
+                  devolución (igual que en Odoo, que ahí no muestra Destino) */}
+              {tipoServicio !== 'devolucion_vacio' && (
+                <div className="space-y-1">
+                  <FieldLabel>Almacén de Destino</FieldLabel>
+                  <PartnerSelect value={almDestino} onChange={setAlmDestino} placeholder="Buscar almacén..." />
+                </div>
+              )}
+              {muestraDevolucion && (
+                <div className="space-y-1">
+                  <FieldLabel>Almacén de Devolución (vacío)</FieldLabel>
+                  {devolucionEditable ? (
+                    <PartnerSelect
+                      value={almDevolucion}
+                      onChange={setAlmDevolucion}
+                      placeholder="Buscar depósito..."
+                      shortcut={{ label: 'Usar el mismo almacén de retiro', value: almRetiro }}
+                    />
+                  ) : (
+                    <>
+                      <ReadonlyField value={m2oName(task[F.almDevolucion])} />
+                      <p className="text-[10px] text-muted-foreground">Se toma del servicio original — para cambiarlo, edita ese servicio.</p>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
