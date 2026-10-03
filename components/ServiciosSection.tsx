@@ -643,7 +643,7 @@ export function ServiciosSection() {
           <AlertDialogTitle>¿Reiniciar este servicio?</AlertDialogTitle>
           <AlertDialogDescription>
             <strong>{resetTask && servicioCodigo(resetTask)}</strong> — {resetTask?.x_studio_conductor ? m2oName(resetTask.x_studio_conductor) : 'sin conductor'}.
-            Se borrarán todas las horas que el conductor ya marcó y el servicio vuelve a la primera etapa, para que pueda empezar a marcar de cero.
+            Se borrarán todas las horas y ubicaciones en el mapa que el conductor ya marcó, y el servicio vuelve a la primera etapa, para que pueda empezar a marcar de cero.
             Esta acción <strong>no se puede deshacer</strong>.
           </AlertDialogDescription>
         </AlertDialogHeader>

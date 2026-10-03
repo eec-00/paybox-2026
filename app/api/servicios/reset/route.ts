@@ -51,20 +51,23 @@ const TIPO_FIELDS = [
 
 export async function POST(request: NextRequest) {
   try {
-    // Solo admin/developer puede reiniciar un servicio — reinicia horas
-    // marcadas por el conductor, es una acción irreversible.
+    // Admin/developer o usuarios con acceso al módulo "servicios" — reinicia
+    // horas marcadas por el conductor, es una acción irreversible (la UI pide
+    // escribir el código del servicio antes de confirmar).
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
     const { data: callerProfile } = await supabase
       .from('user_profiles')
-      .select('role')
+      .select('role, module_permissions')
       .eq('id', user.id)
       .single()
 
-    if (!callerProfile || (callerProfile.role !== 'admin' && callerProfile.role !== 'developer')) {
-      return NextResponse.json({ error: 'Se requiere rol de administrador' }, { status: 403 })
+    const isAdminRole = callerProfile?.role === 'admin' || callerProfile?.role === 'developer'
+    const hasServicios = (callerProfile?.module_permissions as any)?.servicios?.enabled === true
+    if (!callerProfile || (!isAdminRole && !hasServicios)) {
+      return NextResponse.json({ error: 'Se requiere acceso al módulo de Servicios' }, { status: 403 })
     }
 
     const { id } = await request.json()
@@ -127,9 +130,12 @@ export async function POST(request: NextRequest) {
     // conductor lo muestre como "sin iniciar" de nuevo (RLS solo deja al
     // admin leer estas tablas, no borrarlas — se usa el cliente de servicio).
     const admin = createAdminClient()
+    // También se borran los puntos GPS de cada hito: si no, el detalle del
+    // servicio seguiría mostrando mapas de marcas que ya no existen.
     await Promise.all([
       admin.from('conductor_servicios_progreso').delete().eq('servicio_id', taskId),
       admin.from('conductor_servicios_completados').delete().eq('servicio_id', taskId),
+      admin.from('service_locations').delete().eq('task_id', taskId),
     ])
 
     return NextResponse.json({ ok: true, stageId, stageName })

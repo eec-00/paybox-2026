@@ -49,19 +49,22 @@ async function odooCall<T = unknown>(
 
 export async function POST(request: NextRequest) {
   try {
-    // Solo admin/developer — cierra el servicio saltándose al conductor.
+    // Admin/developer o usuarios con acceso al módulo "servicios" — cierra el
+    // servicio saltándose al conductor.
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
     const { data: callerProfile } = await supabase
       .from('user_profiles')
-      .select('role')
+      .select('role, module_permissions')
       .eq('id', user.id)
       .single()
 
-    if (!callerProfile || (callerProfile.role !== 'admin' && callerProfile.role !== 'developer')) {
-      return NextResponse.json({ error: 'Se requiere rol de administrador' }, { status: 403 })
+    const isAdminRole = callerProfile?.role === 'admin' || callerProfile?.role === 'developer'
+    const hasServicios = (callerProfile?.module_permissions as any)?.servicios?.enabled === true
+    if (!callerProfile || (!isAdminRole && !hasServicios)) {
+      return NextResponse.json({ error: 'Se requiere acceso al módulo de Servicios' }, { status: 403 })
     }
 
     const { id } = await request.json()
