@@ -60,10 +60,10 @@ function m2oFull(val: [number, string] | false): string {
 }
 /** Mayúsculas sin tildes — el estilo que usan en estos reportes (ASCII
  * plano) para nombres, sedes y el texto de STATUS. */
-function caps(s: string): string {
+export function caps(s: string): string {
   return stripDiacritics(s).toUpperCase()
 }
-function m2oLast6(val: [number, string] | false): string {
+export function m2oLast6(val: [number, string] | false): string {
   const full = m2oFull(val)
   if (!full) return ''
   return full.slice(-6).trim()
@@ -72,7 +72,7 @@ function m2oLast6(val: [number, string] | false): string {
 /** "QUIMTIA S.A., Quimtia CD Lurín Eucaliptos" → "CD Lurín Eucaliptos"
  * (toma lo de después de la coma y le saca el nombre del cliente si se
  * repite al inicio de la sede). */
-function shortSiteName(val: [number, string] | false, clienteName: string): string {
+export function shortSiteName(val: [number, string] | false, clienteName: string): string {
   const full = m2oFull(val)
   if (!full) return ''
   if (SITE_ABBREVIATIONS[full]) return SITE_ABBREVIATIONS[full]
@@ -90,7 +90,7 @@ function shortSiteName(val: [number, string] | false, clienteName: string): stri
  * { tipo: 'Importación', tamano: '40', carga: 'General', zona: 'Zona 7' }.
  * Las subtareas (ej. "Devolución de vacío") no siguen este patrón — para
  * esas devuelve null y el llamador deja esas columnas en blanco. */
-function parseTaskNameParts(name: string): { tipo: string; tamano: string; carga: string; zona: string } | null {
+export function parseTaskNameParts(name: string): { tipo: string; tamano: string; carga: string; zona: string } | null {
   const match = name.match(/\(([^)]+)\)\s*$/)
   if (!match) return null
   const parts = match[1].split(',').map((p) => p.trim())

@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight, RotateCcw, Loader2, CheckCircle2,
-  Columns, Filter, ArrowUp, ArrowDown, ArrowUpDown, Download, FileSpreadsheet, CalendarRange, SlidersHorizontal, AlertTriangle,
+  Columns, Filter, ArrowUp, ArrowDown, ArrowUpDown, Download, FileSpreadsheet, CalendarRange, SlidersHorizontal, AlertTriangle, FileText,
 } from 'lucide-react'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
 import { ServiciosExportDialog } from '@/components/ServiciosExportDialog'
+import { ServiciosResumenDialog } from '@/components/ServiciosResumenDialog'
 import { tipoServicioLabelFor, TIPOS_SERVICIO } from '@/lib/servicios/hitos'
 import { calcularProgreso, ProgresoBadge, ultimoHitoMarcado } from '@/lib/servicios/progreso'
 import {
@@ -427,6 +428,7 @@ export function ServiciosSection() {
   const [exportStart, setExportStart] = useState(todayStr())
   const [exportEnd, setExportEnd] = useState(todayStr())
   const [customExportOpen, setCustomExportOpen] = useState(false)
+  const [resumenOpen, setResumenOpen] = useState(false)
 
   const openExportDialog = (formatKey: ExportClientFormat) => {
     setExportRangeMode('hoy')
@@ -714,6 +716,13 @@ export function ServiciosSection() {
       completadosSet={completadosSet}
       defaults={{ conductor: conductorFilter, cliente: clienteFilter, tipo: tipoFilter, etapa: stageFilter, progreso: progresoFilter }}
     />
+    <ServiciosResumenDialog
+      open={resumenOpen}
+      onOpenChange={setResumenOpen}
+      tasks={tasks}
+      progresoMap={progresoMap}
+      completadosSet={completadosSet}
+    />
     <Dialog open={!!exportDialogFormat} onOpenChange={(o) => !o && !exportingFormat && setExportDialogFormat(null)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -825,6 +834,18 @@ export function ServiciosSection() {
                 {activeFilterCount}
               </span>
             )}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={() => setResumenOpen(true)}
+            disabled={loading}
+            title="Reporte PDF de cumplimiento de conductores por semana o rango de fechas"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Exportar resumen</span>
           </Button>
 
           <DropdownMenu>

@@ -11,7 +11,6 @@ import {
   Home,
   Megaphone,
   Calendar,
-  MapPin,
   Zap,
   ChevronDown,
   ChevronRight,
@@ -29,6 +28,7 @@ import {
   Briefcase,
   Fingerprint,
   PackageSearch,
+  Timer,
 } from 'lucide-react'
 
 interface FlatItem {
@@ -167,7 +167,7 @@ export function Sidebar({
       id: 'servicios',
       label: 'Servicios',
       icon: Layers,
-      description: 'Trailers, flota y zonas',
+      description: 'Trailers, flota y sobrecostos',
       adminOnly: false,
       children: [
         {
@@ -190,20 +190,20 @@ export function Sidebar({
         },
         {
           type: 'item',
-          id: 'servicios-geocercas',
-          href: '/servicios/geocercas',
-          label: 'Geocercas',
-          icon: MapPin,
-          description: 'Zonas GPS Navitel',
-          adminOnly: false,
-        },
-        {
-          type: 'item',
           id: 'servicios-contenedores',
           href: '/servicios/contenedores',
           label: 'Contenedores',
           icon: PackageSearch,
           description: 'Devoluciones/retiros con otro conductor',
+          adminOnly: false,
+        },
+        {
+          type: 'item',
+          id: 'servicios-sobrecostos',
+          href: '/servicios/sobrecostos',
+          label: 'Sobrecostos (Beta)',
+          icon: Timer,
+          description: 'Horas de estadía QUIMTIA',
           adminOnly: false,
         },
       ],

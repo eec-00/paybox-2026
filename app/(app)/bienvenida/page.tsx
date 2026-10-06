@@ -21,7 +21,7 @@ export default function BienvenidaPage() {
     }] : []),
     ...(canSee('servicios') ? [{
       label: 'Servicios',
-      description: 'Gestión de trailers, geoenlaces y geocercas GPS',
+      description: 'Gestión de trailers, geoenlaces y sobrecostos',
       href: '/servicios/trailers',
       icon: Layers,
       color: 'text-blue-600',
