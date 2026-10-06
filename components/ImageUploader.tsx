@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Upload, X, Sparkles, Image as ImageIcon, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { compressImage } from '@/lib/image/compress'
 
 // Declaración de tipos para PDF.js
 declare global {
@@ -145,8 +146,8 @@ export function ImageUploader({ initialImages = [], onImagesChange, onOCRComplet
         viewport: viewport
       }).promise
       
-      // Convertir canvas a base64 JPEG con calidad 95%
-      const base64Image = canvas.toDataURL('image/jpeg', 0.95)
+      // Convertir canvas a base64 JPEG con calidad 85%
+      const base64Image = canvas.toDataURL('image/jpeg', 0.85)
       
       console.log('PDF convertido a imagen exitosamente')
       return base64Image
@@ -273,8 +274,9 @@ export function ImageUploader({ initialImages = [], onImagesChange, onOCRComplet
           // Subir la imagen convertida
           return await uploadImage(imageFile)
         } else {
-          // Subir imagen normal
-          return await uploadImage(file)
+          // Subir imagen normal (comprimida suave para no afectar el OCR)
+          const compressed = await compressImage(file, { maxSize: 2000, quality: 0.8, skipBelowBytes: 500 * 1024 })
+          return await uploadImage(compressed)
         }
       })
       

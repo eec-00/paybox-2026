@@ -13,6 +13,7 @@ import {
   getHitosForTask, detectTipoServicio, tipoServicioLabelFor, type HitoDef,
   MODALIDAD_DEVOLUCION_FIELD, MODALIDAD_MISMO_CONDUCTOR, MODALIDAD_OTRO_CONDUCTOR,
 } from '@/lib/servicios/hitos'
+import { compressImage } from '@/lib/image/compress'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -51,8 +52,9 @@ const EMPTY_GASTO: NewGastoForm = {
   uploading: false,
 }
 
-async function uploadGastoFoto(file: File): Promise<string> {
+async function uploadGastoFoto(original: File): Promise<string> {
   const supabase = createClient()
+  const file = await compressImage(original)
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
   const path = `gastos-conductor/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
   const { error } = await supabase.storage.from('comprobantes').upload(path, file, {
@@ -64,8 +66,9 @@ async function uploadGastoFoto(file: File): Promise<string> {
   return data.publicUrl
 }
 
-async function uploadHitoFoto(taskId: number, hitoKey: string, file: File): Promise<string> {
+async function uploadHitoFoto(taskId: number, hitoKey: string, original: File): Promise<string> {
   const supabase = createClient()
+  const file = await compressImage(original)
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
   const path = `hitos-servicio/${taskId}/${hitoKey}-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
   const { error } = await supabase.storage.from('comprobantes').upload(path, file, {
