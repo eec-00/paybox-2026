@@ -14,7 +14,8 @@ import { exportarSobrecostosExcel } from '@/lib/servicios/sobrecostosExcel'
 import { m2oLast6 } from '@/lib/servicios/exportFormats'
 
 const TIPO_LABEL: Record<SobrecostoInfo['tipo'], string> = {
-  despacho: 'Despacho / Recojo',
+  despacho: 'Despacho',
+  recojo: 'Recojo',
   importacion: 'Importación',
   exportacion: 'Exportación',
 }

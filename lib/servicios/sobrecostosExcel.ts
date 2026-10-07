@@ -146,7 +146,7 @@ export async function exportarSobrecostosExcel(
     const retiro = caps(shortSiteName(m2o(task.x_studio_almacen_de_retiro), cliente))
     const destino = caps(shortSiteName(m2o(task.x_studio_almacen_de_destino), cliente))
     const contenedor = (task.x_studio_nmero_de_contenedor as string | false) || ''
-    const tipoTxt = parts ? caps(parts.tipo) : info ? caps(info.tipo) : ''
+    const tipoTxt = info?.tipo === 'recojo' ? 'RECOJO' : parts ? caps(parts.tipo) : info ? caps(info.tipo) : ''
 
     const values = [
       idx + 1,
@@ -155,7 +155,7 @@ export async function exportarSobrecostosExcel(
       info?.tipo === 'exportacion' ? '' : destino,
       (task.x_studio_referenciabooking as string | false) || '-',
       tipoTxt,
-      contenedor || (info?.tipo === 'despacho' ? 'CARGA SUELTA' : ''),
+      contenedor || (info?.tipo === 'despacho' || info?.tipo === 'recojo' ? 'CARGA SUELTA' : ''),
       '', // guía de remisión: se llena a mano
       '', // guía transportista: se llena a mano
       retiro,

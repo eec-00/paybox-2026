@@ -2,13 +2,15 @@
 // Sobrecostos por estadía (solo cliente QUIMTIA).
 //
 // Reglas (definidas por operaciones):
-//  - Despacho / Recojo: tramo 1 "Llegada a punto de carga" → "Salida origen"
-//                       + tramo 2 "Llegada destino" → "Salida destino".
+//  - Despacho y Recojo vienen de Odoo con el mismo tipo (x_studio_es_despacho).
+//    Se distinguen por el almacén de retiro: si es un CD de QUIMTIA (Lurín
+//    Eucaliptos o Callao) es Despacho; cualquier otro es Recojo.
+//  - Despacho:          desde "Llegada destino" hasta "Salida destino".
+//  - Recojo:            desde "Llegada a punto de carga" hasta "Salida origen".
 //  - Importación:       desde "Llegada a cliente" hasta "Salida de cliente".
 //  - Exportación:       tramo 1 "Llegada a cliente" → "Salida de cliente"
 //                       + tramo 2 "Ingreso terminal/almacén destino" →
-//                       "Entrega contenedor lleno" (no existe un hito de
-//                       "salida" del almacén destino; la entrega es el último).
+//                       "Entrega contenedor lleno".
 //  - Las primeras 5 horas (sumando los tramos) son libres; desde las 5 h se
 //    genera alerta y todo lo que pase de ahí es tiempo con sobrecosto.
 //
@@ -32,7 +34,7 @@ export interface SobrecostoTask extends TaskTypeFlags {
   [key: string]: unknown
 }
 
-export type TipoSobrecosto = 'despacho' | 'importacion' | 'exportacion'
+export type TipoSobrecosto = 'despacho' | 'recojo' | 'importacion' | 'exportacion'
 
 /** Dónde ocurre el tramo — define el nombre del sitio en el Excel */
 export type LugarTramo = 'retiro' | 'destino' | 'cliente'
@@ -62,17 +64,19 @@ export interface SobrecostoInfo {
   completo: boolean
 }
 
-const REGLAS: Record<TipoSobrecosto, { label: string; lugar: LugarTramo; inicio: string; fin: string; inicioAlt?: string; inicioLabel: string; finLabel: string }[]> = {
+const REGLAS: Record<TipoSobrecosto, { label: string; lugar: LugarTramo; inicio: string; fin: string; inicioLabel: string; finLabel: string }[]> = {
   despacho: [
-    { label: 'Punto de carga', lugar: 'retiro', inicio: 'llegada_punto_carga', fin: 'salida_origen', inicioLabel: 'Llegada', finLabel: 'Salida' },
     { label: 'Destino', lugar: 'destino', inicio: 'llegada_destino', fin: 'salida_destino', inicioLabel: 'Llegada', finLabel: 'Salida' },
+  ],
+  recojo: [
+    { label: 'Punto de carga', lugar: 'retiro', inicio: 'llegada_punto_carga', fin: 'salida_origen', inicioLabel: 'Llegada', finLabel: 'Salida' },
   ],
   importacion: [
     { label: 'Cliente', lugar: 'destino', inicio: 'llegada_cliente', fin: 'salida_cliente', inicioLabel: 'Llegada', finLabel: 'Salida' },
   ],
   exportacion: [
     { label: 'Cliente', lugar: 'cliente', inicio: 'llegada_cliente', fin: 'salida_cliente', inicioLabel: 'Llegada', finLabel: 'Salida' },
-    { label: 'Almacén destino', lugar: 'destino', inicio: 'ingreso_terminal_destino', inicioAlt: 'llegada_terminal_destino', fin: 'entrega_contenedor_lleno', inicioLabel: 'Ingreso', finLabel: 'Fin' },
+    { label: 'Almacén destino', lugar: 'destino', inicio: 'ingreso_terminal_destino', fin: 'entrega_contenedor_lleno', inicioLabel: 'Ingreso', finLabel: 'Fin' },
   ],
 }
 
@@ -80,9 +84,25 @@ export function esQuimtia(task: { partner_id: [number, string] | false }): boole
   return !!task.partner_id && task.partner_id[1].toUpperCase().includes('QUIMTIA')
 }
 
-export function tipoSobrecosto(task: TaskTypeFlags): TipoSobrecosto | null {
+/** Almacenes de retiro propios de QUIMTIA: si el servicio sale de uno de
+ * estos es un Despacho; si sale de cualquier otro sitio es un Recojo. */
+const ALMACENES_DESPACHO = [
+  'QUIMTIA S.A., Quimtia CD Lurín Eucaliptos',
+  'QUIMTIA S.A., Quimtia CD Callao',
+].map(normalizar)
+
+function normalizar(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase()
+}
+
+export function tipoSobrecosto(task: TaskTypeFlags & { x_studio_almacen_de_retiro?: unknown }): TipoSobrecosto | null {
   const tipo = detectTipoServicio(task)
-  return tipo === 'despacho' || tipo === 'importacion' || tipo === 'exportacion' ? tipo : null
+  if (tipo === 'despacho') {
+    const retiro = task.x_studio_almacen_de_retiro
+    const nombre = Array.isArray(retiro) && typeof retiro[1] === 'string' ? normalizar(retiro[1]) : ''
+    return ALMACENES_DESPACHO.includes(nombre) ? 'despacho' : 'recojo'
+  }
+  return tipo === 'importacion' || tipo === 'exportacion' ? tipo : null
 }
 
 function horaMin(task: SobrecostoTask, key: string): number | null {
@@ -107,7 +127,7 @@ export function calcularSobrecosto(task: SobrecostoTask, now = new Date()): Sobr
   const ahora = ahoraMin(task.x_studio_fecha_de_la_programacin, now)
   let base = 0 // fin del tramo anterior: el siguiente tramo no puede empezar antes (cruce de medianoche)
   const tramos: Tramo[] = REGLAS[tipo].map((r) => {
-    let inicio = horaMin(task, r.inicio) ?? (r.inicioAlt ? horaMin(task, r.inicioAlt) : null)
+    let inicio = horaMin(task, r.inicio)
     let fin = horaMin(task, r.fin)
     if (inicio !== null) {
       while (inicio < base) inicio += 1440
