@@ -315,8 +315,12 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
     .filter(h => validFields.includes(h.field))
 
   // Whether placa fields are many2one (value is [id, name]) or char
-  const placaCamionIsM2o = Array.isArray(task[F.placaCamion])
-  const placaCarretaIsM2o = Array.isArray(task[F.placaCarreta])
+  // Un many2one vacío llega como `false` (igual que un char vacío): solo un
+  // string indica campo de texto. Antes se miraba Array.isArray, y en tareas
+  // sin placa (ej. subtareas de devolución, que nacen en blanco) se mandaba
+  // el nombre del vehículo como texto y Odoo rechazaba la escritura.
+  const placaCamionIsM2o = typeof task[F.placaCamion] !== 'string'
+  const placaCarretaIsM2o = typeof task[F.placaCarreta] !== 'string'
 
   // Form state
   const [stageId,      setStageId]      = useState(String(m2oId(task.stage_id) || ''))

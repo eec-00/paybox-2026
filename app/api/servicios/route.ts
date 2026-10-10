@@ -431,13 +431,30 @@ export async function POST(request: Request) {
 
     // Validate fields exist before writing — invalid fields → skip silently
     const fieldNames = Object.keys(fields)
-    const existingMeta = await odooCall<Record<string, unknown>>(
-      uid, 'project.task', 'fields_get', [fieldNames], { attributes: ['type'] }
+    const existingMeta = await odooCall<Record<string, { type: string; relation?: string }>>(
+      uid, 'project.task', 'fields_get', [fieldNames], { attributes: ['type', 'relation'] }
     )
     const validFields = Object.fromEntries(
       Object.entries(fields).filter(([k]) => k in existingMeta)
     )
     const skipped = fieldNames.filter(k => !(k in existingMeta))
+
+    // Un many2one solo acepta el id. Si llega el nombre como texto (ej. la
+    // placa "MELGA/Semirremolque.../B9C997"), se busca el registro: Odoo
+    // rechazaría la escritura entera y no se guardaría nada.
+    for (const [k, v] of Object.entries(validFields)) {
+      const meta = existingMeta[k]
+      if (meta.type !== 'many2one' || typeof v !== 'string' || !meta.relation) continue
+      const nombre = v.trim()
+      let ids = await odooCall<number[]>(uid, meta.relation, 'search', [[['name', '=', nombre]]], { limit: 1 })
+      if (!ids.length && meta.relation === 'fleet.vehicle') {
+        ids = await odooCall<number[]>(uid, meta.relation, 'search', [[['license_plate', '=ilike', nombre]]], { limit: 1 })
+      }
+      if (!ids.length) {
+        return NextResponse.json({ error: `No se encontró "${nombre}" en Odoo — elígelo de la lista` }, { status: 400 })
+      }
+      validFields[k] = ids[0]
+    }
 
     // Valor previo del almacén de devolución, para llevar el cambio a la subtarea
     let almDevolucionAnterior: number | false | undefined
