@@ -34,6 +34,32 @@ function pick(validFields: string[], ...candidates: string[]): string {
   return candidates.find(c => validFields.includes(c)) ?? candidates[0]
 }
 
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** Datetime de Odoo (UTC, "2026-10-18 19:00:00") → valor de <input type="datetime-local"> en hora local */
+function odooDatetimeToInput(val: unknown): string {
+  if (typeof val !== 'string' || !val) return ''
+  const d = new Date(`${val.replace(' ', 'T')}Z`)
+  if (isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
+/** Valor de <input type="datetime-local"> (hora local) → datetime de Odoo en UTC */
+function inputToOdooDatetime(val: string): string | false {
+  if (!val) return false
+  const d = new Date(val)
+  if (isNaN(d.getTime())) return false
+  return d.toISOString().slice(0, 19).replace('T', ' ')
+}
+
+function formatOdooDatetime(val: unknown): string {
+  const v = odooDatetimeToInput(val)
+  if (!v) return ''
+  const [fecha, hora] = v.split('T')
+  const [y, m, d] = fecha.split('-')
+  return `${d}/${m}/${y} ${hora}`
+}
+
 function floatToTime(val: unknown): string {
   if (typeof val !== 'number' || val === 0) return ''
   const h = Math.floor(val)
@@ -278,6 +304,9 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
     almRetiro:    pick(validFields, 'x_studio_almacen_de_retiro', 'x_studio_almacn_de_retiro'),
     almDestino:   pick(validFields, 'x_studio_almacen_de_destino', 'x_studio_almacn_de_destino'),
     almDevolucion: pick(validFields, 'x_studio_almacen_de_devolucion'),
+    fechaMaxDevolucion: pick(validFields, 'x_studio_fecha_maxima_de_devolucion'),
+    // En la subtarea: campo relacionado (solo lectura) a la fecha del padre
+    fechaMaxDevolucionPadre: pick(validFields, 'x_studio_fecha_maxima_de_devolucion_1'),
     esImport:     pick(validFields, 'x_studio_es_importacion', 'x_studio_es_importacin'),
   }
 
@@ -324,6 +353,10 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
   const [almRetiro,     setAlmRetiro]     = useState<Partner | false>(m2oPartner(task[F.almRetiro]))
   const [almDestino,    setAlmDestino]    = useState<Partner | false>(m2oPartner(task[F.almDestino]))
   const [almDevolucion, setAlmDevolucion] = useState<Partner | false>(m2oPartner(task[F.almDevolucion]))
+  // Fecha máxima de devolución: igual que el almacén, se define en el
+  // servicio original — la subtarea la muestra automáticamente desde el padre.
+  const muestraFechaMaxDev = muestraDevolucion && validFields.includes(F.fechaMaxDevolucion)
+  const [fechaMaxDev, setFechaMaxDev] = useState(odooDatetimeToInput(task[F.fechaMaxDevolucion]))
   const [tiempos, setTiempos] = useState<Record<string, string>>(() =>
     Object.fromEntries(hitos.map(h => [h.field, floatToTime(task[h.field])]))
   )
@@ -393,6 +426,9 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
       if (partnerId(almDestino) !== partnerId(m2oPartner(task[F.almDestino]))) fields[F.almDestino] = partnerId(almDestino)
       if (devolucionEditable && partnerId(almDevolucion) !== partnerId(m2oPartner(task[F.almDevolucion]))) {
         fields[F.almDevolucion] = partnerId(almDevolucion)
+      }
+      if (devolucionEditable && muestraFechaMaxDev && fechaMaxDev !== odooDatetimeToInput(task[F.fechaMaxDevolucion])) {
+        fields[F.fechaMaxDevolucion] = inputToOdooDatetime(fechaMaxDev)
       }
       if (muestraModalidad && modalidad && modalidad !== origModalidad) fields[MODALIDAD_DEVOLUCION_FIELD] = modalidad
       for (const h of hitos) {
@@ -532,7 +568,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                   </Select>
                   {modalidad === MODALIDAD_OTRO_CONDUCTOR && !subtareaCreada && (
                     <p className="text-[11px] text-muted-foreground leading-snug">
-                      Al guardar se crea la subtarea &quot;Devolución de vacío&quot; con la misma fecha de este servicio. Luego asígnale el conductor desde la tabla.
+                      Al guardar se crea la subtarea &quot;Devolución de vacío&quot; con la misma fecha de este servicio, su almacén de devolución y su fecha máxima de devolución. Luego asígnale el conductor desde la tabla.
                     </p>
                   )}
                   {modalidad === MODALIDAD_MISMO_CONDUCTOR && origModalidad === MODALIDAD_OTRO_CONDUCTOR && subtareaCreada && (
@@ -588,6 +624,24 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                       <ReadonlyField value={m2oName(task[F.almDevolucion])} />
                       <p className="text-[10px] text-muted-foreground">Se toma del servicio original — para cambiarlo, edita ese servicio.</p>
                     </>
+                  )}
+                </div>
+              )}
+              {muestraFechaMaxDev && (
+                <div className="space-y-1">
+                  <FieldLabel>Fecha Máxima de Devolución</FieldLabel>
+                  {devolucionEditable ? (
+                    <>
+                      <Input
+                        type="datetime-local"
+                        value={fechaMaxDev}
+                        onChange={e => setFechaMaxDev(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                      <p className="text-[10px] text-muted-foreground">Si la devuelve otro conductor, la subtarea toma esta fecha automáticamente.</p>
+                    </>
+                  ) : (
+                    <ReadonlyField value={formatOdooDatetime(task[F.fechaMaxDevolucionPadre] || task[F.fechaMaxDevolucion])} />
                   )}
                 </div>
               )}

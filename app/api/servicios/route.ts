@@ -73,6 +73,9 @@ const CANDIDATE_X_FIELDS = [
   'x_studio_almacen_de_retiro',
   'x_studio_almacen_de_destino',
   'x_studio_almacen_de_devolucion',
+  'x_studio_fecha_maxima_de_devolucion',
+  // En la subtarea de devolución: relacionado (solo lectura) al del padre
+  'x_studio_fecha_maxima_de_devolucion_1',
   'x_studio_es_importacion',
   'x_studio_modalidad_de_devolucion',
   'x_studio_modalidad_de_retiro',
@@ -313,26 +316,44 @@ async function moverImportacionAEnCliente(
   return { stageId: target.id, stageName: target.name }
 }
 
-/** Pone la fecha de programación del servicio padre a sus subtareas de
- * devolución de vacío que todavía no tengan fecha (nunca pisa una fecha ya
- * puesta a mano). La subtarea la crea Odoo de forma síncrona al guardar la
- * modalidad, así que ya existe cuando se llama esto. */
-async function fecharSubtareaDevolucion(uid: number, parentId: number): Promise<void> {
-  const [parent] = await odooCall<{ x_studio_fecha_de_la_programacin: string | false }[]>(
-    uid, 'project.task', 'read', [[parentId]], { fields: ['x_studio_fecha_de_la_programacin'] }
+const ALMACEN_DEVOLUCION_FIELD = 'x_studio_almacen_de_devolucion'
+const SUBTAREA_DEVOLUCION_DOMAIN = ['|', ['x_studio_es_tarea_de_devolucion_de_vacio', '=', true], ['name', 'ilike', 'devoluci']]
+
+/** Completa las subtareas de devolución de vacío del servicio padre con lo
+ * que la automatización de Odoo no copia (duplica una plantilla en blanco):
+ * fecha de programación y almacén de devolución. Solo llena lo que esté
+ * vacío — nunca pisa algo puesto a mano. La fecha máxima de devolución no
+ * hace falta: en la subtarea es un campo relacionado al del padre. La
+ * subtarea la crea Odoo de forma síncrona al guardar la modalidad, así que
+ * ya existe cuando se llama esto. */
+async function completarSubtareaDevolucion(uid: number, parentId: number): Promise<void> {
+  const [parent] = await odooCall<{ x_studio_fecha_de_la_programacin: string | false; x_studio_almacen_de_devolucion: [number, string] | false }[]>(
+    uid, 'project.task', 'read', [[parentId]], { fields: ['x_studio_fecha_de_la_programacin', ALMACEN_DEVOLUCION_FIELD] }
   )
-  if (!parent?.x_studio_fecha_de_la_programacin) return
+  if (!parent) return
+  const copiar: [string, unknown][] = [
+    ['x_studio_fecha_de_la_programacin', parent.x_studio_fecha_de_la_programacin || false],
+    [ALMACEN_DEVOLUCION_FIELD, parent.x_studio_almacen_de_devolucion ? parent.x_studio_almacen_de_devolucion[0] : false],
+  ]
+  for (const [field, value] of copiar) {
+    if (!value) continue
+    const subtareas = await odooCall<number[]>(
+      uid, 'project.task', 'search',
+      [[['parent_id', '=', parentId], [field, '=', false], ...SUBTAREA_DEVOLUCION_DOMAIN]]
+    )
+    if (subtareas.length) await odooCall(uid, 'project.task', 'write', [subtareas, { [field]: value }])
+  }
+}
+
+/** Al cambiar el almacén de devolución del servicio padre, lo lleva también a
+ * sus subtareas de devolución que seguían con el valor anterior (o vacías) —
+ * si alguien le puso otro a mano a la subtarea, se respeta. */
+async function sincronizarAlmacenDevolucion(uid: number, parentId: number, anterior: number | false, nuevo: number | false): Promise<void> {
   const subtareas = await odooCall<number[]>(
     uid, 'project.task', 'search',
-    [[
-      ['parent_id', '=', parentId],
-      ['x_studio_fecha_de_la_programacin', '=', false],
-      '|', ['x_studio_es_tarea_de_devolucion_de_vacio', '=', true], ['name', 'ilike', 'devoluci'],
-    ]]
+    [[['parent_id', '=', parentId], [ALMACEN_DEVOLUCION_FIELD, 'in', [false, ...(anterior ? [anterior] : [])]], ...SUBTAREA_DEVOLUCION_DOMAIN]]
   )
-  if (subtareas.length) {
-    await odooCall(uid, 'project.task', 'write', [subtareas, { x_studio_fecha_de_la_programacin: parent.x_studio_fecha_de_la_programacin }])
-  }
+  if (subtareas.length) await odooCall(uid, 'project.task', 'write', [subtareas, { [ALMACEN_DEVOLUCION_FIELD]: nuevo }])
 }
 
 export async function POST(request: Request) {
@@ -418,6 +439,15 @@ export async function POST(request: Request) {
     )
     const skipped = fieldNames.filter(k => !(k in existingMeta))
 
+    // Valor previo del almacén de devolución, para llevar el cambio a la subtarea
+    let almDevolucionAnterior: number | false | undefined
+    if (ALMACEN_DEVOLUCION_FIELD in validFields) {
+      const [prev] = await odooCall<{ x_studio_almacen_de_devolucion: [number, string] | false }[]>(
+        uid, 'project.task', 'read', [[id]], { fields: [ALMACEN_DEVOLUCION_FIELD] }
+      )
+      almDevolucionAnterior = prev?.x_studio_almacen_de_devolucion ? prev.x_studio_almacen_de_devolucion[0] : false
+    }
+
     if (Object.keys(validFields).length > 0) {
       await odooCall(uid, 'project.task', 'write', [[id], validFields])
     }
@@ -435,13 +465,21 @@ export async function POST(request: Request) {
     }
 
     // Al pasar la devolución a "Otro conductor", Odoo crea la subtarea
-    // "Devolución de vacío" sin fecha — queda perdida al fondo de la tabla.
-    // Se le pone la misma fecha de programación del servicio original.
+    // "Devolución de vacío" en blanco (sin fecha queda perdida al fondo de la
+    // tabla, y sin almacén el conductor no sabe a dónde llevar el vacío).
+    // Se le copian la fecha de programación y el almacén de devolución.
     if (validFields[MODALIDAD_DEVOLUCION_FIELD] === MODALIDAD_OTRO_CONDUCTOR) {
       try {
-        await fecharSubtareaDevolucion(uid, id)
+        await completarSubtareaDevolucion(uid, id)
       } catch (e) {
-        console.error('No se pudo poner fecha a la subtarea de devolución:', e instanceof Error ? e.message : e)
+        console.error('No se pudo completar la subtarea de devolución:', e instanceof Error ? e.message : e)
+      }
+    }
+    if (almDevolucionAnterior !== undefined && validFields[ALMACEN_DEVOLUCION_FIELD] !== almDevolucionAnterior) {
+      try {
+        await sincronizarAlmacenDevolucion(uid, id, almDevolucionAnterior, validFields[ALMACEN_DEVOLUCION_FIELD] as number | false)
+      } catch (e) {
+        console.error('No se pudo actualizar el almacén de la subtarea de devolución:', e instanceof Error ? e.message : e)
       }
     }
 
