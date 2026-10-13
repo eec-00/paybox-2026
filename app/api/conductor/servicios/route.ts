@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS } from '@/lib/servicios/hitos'
+import { finalizadoPorEtapa } from '@/lib/servicios/progreso'
 
 // Datos operativos en vivo (hitos, GPS, servicios recién creados como subtareas
 // de devolución) — nunca debe servirse cacheado, ni la ruta ni los fetch a Odoo.
@@ -226,7 +227,12 @@ export async function GET(req: NextRequest) {
       supabase.from('conductor_servicios_progreso').select('servicio_id, step_actual').eq('conductor_id', user.id),
     ])
 
-    const completedServiceIds = completados?.map((c: { servicio_id: number }) => c.servicio_id) ?? []
+    // Si alguien de la oficina ya lo pasó a "Servicio Finalizado" en Odoo, para
+    // el conductor también queda acabado (misma regla que Servicios en PayBox).
+    const completedServiceIds = [...new Set([
+      ...(completados?.map((c: { servicio_id: number }) => c.servicio_id) ?? []),
+      ...(tasks as any[]).filter(t => finalizadoPorEtapa(t)).map(t => t.id as number),
+    ])]
     const servicioProgreso: Record<number, number> = {}
     for (const p of (progreso ?? []) as { servicio_id: number; step_actual: number }[]) {
       servicioProgreso[p.servicio_id] = p.step_actual

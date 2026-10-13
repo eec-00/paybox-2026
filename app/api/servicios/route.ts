@@ -187,7 +187,24 @@ export async function GET(request: Request) {
         }
       }
 
-      return NextResponse.json({ task, conductor, cliente })
+      // Etapas del proyecto del servicio, para la barra de etapas del detalle
+      let stages: { id: number; name: string }[] = []
+      try {
+        const [{ project_id }] = await odooCall<{ project_id: [number, string] | false }[]>(
+          uid, 'project.task', 'read', [[taskId]], { fields: ['project_id'] }
+        )
+        if (project_id) {
+          stages = await odooCall<{ id: number; name: string }[]>(
+            uid, 'project.task.type', 'search_read',
+            [[['project_ids', 'in', [project_id[0]]]]],
+            { fields: ['id', 'name'], order: 'sequence asc, id asc' }
+          )
+        }
+      } catch {
+        stages = []
+      }
+
+      return NextResponse.json({ task, conductor, cliente, stages })
     }
 
     if (debugFields) {
@@ -367,7 +384,7 @@ export async function POST(request: Request) {
       const uid = await odooAuth()
       const stages = await odooCall<{ id: number; name: string }[]>(
         uid, 'project.task.type', 'search_read',
-        [[['name', 'ilike', 'finaliz']]],
+        [[['name', '=ilike', 'servicio finalizado']]],
         { fields: ['id', 'name'], limit: 5 }
       )
       if (!stages.length) {

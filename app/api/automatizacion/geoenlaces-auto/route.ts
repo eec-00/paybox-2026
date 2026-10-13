@@ -214,7 +214,7 @@ export async function POST() {
       uid, 'project.task', 'fields_get', [CANDIDATE_FIELDS], { attributes: ['type'] }
     )
     const validFields = Object.keys(fieldsMeta)
-    const fields = ['id', 'name', 'parent_id', ...validFields]
+    const fields = ['id', 'name', 'parent_id', 'stage_id', ...validFields]
 
     const projects = await odooCall<{ id: number }[]>(
       uid, 'project.project', 'search_read',

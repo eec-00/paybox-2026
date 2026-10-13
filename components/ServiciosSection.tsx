@@ -26,6 +26,7 @@ import { ServiciosExportDialog } from '@/components/ServiciosExportDialog'
 import { ServiciosResumenDialog } from '@/components/ServiciosResumenDialog'
 import { tipoServicioLabelFor, TIPOS_SERVICIO } from '@/lib/servicios/hitos'
 import { calcularProgreso, ProgresoBadge, ultimoHitoMarcado } from '@/lib/servicios/progreso'
+import { guardarListaNavegacion } from '@/lib/servicios/navegacion'
 import {
   EXPORT_FORMATS, buildQuimtiaRow, buildEyMRow, buildCroslandRow,
   QUIMTIA_COLUMNS, EYM_COLUMNS, CROSLAND_COLUMNS, type ExportClientFormat,
@@ -131,6 +132,10 @@ const STAGE_DOT_COLORS: Record<string, string> = {
   'pre-operativo': 'bg-amber-500',
   'en ruta': 'bg-orange-500',
   'en cliente': 'bg-green-500',
+  'cargando': 'bg-yellow-400',
+  'finalizó carga': 'bg-cyan-500',
+  'finalizo carga': 'bg-cyan-500',
+  'servicio finalizado': 'bg-emerald-700',
   'facturación': 'bg-indigo-500',
   'facturacion': 'bg-indigo-500',
   'cerrado': 'bg-gray-400',
@@ -152,6 +157,18 @@ function extractPlacaLast6(val: [number, string] | false): string {
   const name = val[1]
   if (!name) return '—'
   return name.slice(-6).trim() || '—'
+}
+
+// "S01152 - Servicio de transporte (Importación, Contenedor 20, IMO, Zona 1)"
+// → "IMO". El 3er dato entre paréntesis es el Tipo de Carga del producto de
+// venta. Las subtareas (ej. "Devolución de vacío") no lo traen en su nombre:
+// se toma del servicio padre.
+function tipoCargaFor(t: OdooTask): string {
+  const fromName = (name: string) => {
+    const m = name.match(/\(([^()]*,[^()]*,[^()]*)\)/)
+    return m?.[1].split(',')[2]?.trim() || ''
+  }
+  return fromName(t.name) || (Array.isArray(t.parent_id) ? fromName(t.parent_id[1]) : '')
 }
 
 const PAGE_SIZE = 50
@@ -185,6 +202,11 @@ const COLUMNS: ColumnDef[] = [
     key: 'tipo', label: 'Tipo de Servicio', headClass: 'min-w-[150px]',
     sortValue: (t) => tipoServicioLabelFor(t),
     render: (t) => tipoServicioLabelFor(t),
+  },
+  {
+    key: 'tipoCarga', label: 'Tipo de Carga', headClass: 'min-w-[100px]',
+    sortValue: (t) => tipoCargaFor(t),
+    render: (t) => tipoCargaFor(t) || '—',
   },
   {
     key: 'progreso', label: 'Progreso', headClass: 'min-w-[130px]',
@@ -1128,7 +1150,10 @@ export function ServiciosSection() {
                             </Button>
                           </TableCell>
                           <TableCell className="p-1">
-                            <Link href={`/servicios/trailers/${task.id}`}>
+                            <Link
+                              href={`/servicios/trailers/${task.id}`}
+                              onClick={() => guardarListaNavegacion(sorted.map((t) => ({ id: t.id, codigo: servicioCodigo(t) })))}
+                            >
                               <Button
                                 variant="ghost"
                                 size="icon"

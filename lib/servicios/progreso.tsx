@@ -8,13 +8,30 @@ import { getHitosForTask, type TaskTypeFlags } from './hitos'
 // medianoche son indistinguibles ahí (ver FEATURES.MD).
 export type ProgresoServicio = { estado: 'sin_iniciar' | 'en_proceso' | 'completado'; stepActual: number; totalHitos: number }
 
+// Desde esta fecha de programación, un servicio en etapa "Servicio
+// Finalizado" (movido en Odoo o desde la tabla) cuenta como acabado aunque
+// el conductor no haya marcado los hitos. Los anteriores se dejan como estaban.
+const FINALIZADO_POR_ETAPA_DESDE = '2026-10-01'
+
+type TaskProgreso = TaskTypeFlags & {
+  id: number
+  stage_id?: [number, string] | false
+  x_studio_fecha_de_la_programacin?: string | false
+}
+
+export function finalizadoPorEtapa(task: Omit<TaskProgreso, 'id'>): boolean {
+  const stage = task.stage_id ? task.stage_id[1].trim().toLowerCase() : ''
+  const fecha = task.x_studio_fecha_de_la_programacin
+  return stage === 'servicio finalizado' && !!fecha && fecha >= FINALIZADO_POR_ETAPA_DESDE
+}
+
 export function calcularProgreso(
-  task: TaskTypeFlags & { id: number },
+  task: TaskProgreso,
   progresoMap: Map<number, number>,
   completadosSet: Set<number>
 ): ProgresoServicio {
   const totalHitos = getHitosForTask(task).length
-  if (completadosSet.has(task.id)) return { estado: 'completado', stepActual: totalHitos, totalHitos }
+  if (completadosSet.has(task.id) || finalizadoPorEtapa(task)) return { estado: 'completado', stepActual: totalHitos, totalHitos }
   if (progresoMap.has(task.id)) return { estado: 'en_proceso', stepActual: progresoMap.get(task.id) || 0, totalHitos }
   return { estado: 'sin_iniciar', stepActual: 0, totalHitos }
 }
@@ -35,7 +52,7 @@ export function ultimoHitoMarcado(
 export function ProgresoBadge({ progreso }: { progreso: ProgresoServicio }) {
   if (progreso.estado === 'completado') {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium bg-green-100 text-green-700" title="El conductor marcó todos los hitos">
+      <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium bg-green-100 text-green-700" title="Servicio acabado">
         <Circle className="h-2 w-2 fill-green-500 text-green-500" /> Acabada
       </span>
     )

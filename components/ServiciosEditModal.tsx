@@ -102,6 +102,10 @@ const STAGE_COLORS: Record<string, string> = {
   'pre-operativo': 'bg-amber-100 text-amber-800 border-amber-200',
   'en ruta': 'bg-orange-100 text-orange-800 border-orange-200',
   'en cliente': 'bg-green-100 text-green-800 border-green-200',
+  'cargando': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  'finalizó carga': 'bg-cyan-100 text-cyan-800 border-cyan-200',
+  'finalizo carga': 'bg-cyan-100 text-cyan-800 border-cyan-200',
+  'servicio finalizado': 'bg-emerald-100 text-emerald-800 border-emerald-300',
   'facturac': 'bg-indigo-100 text-indigo-800 border-indigo-200',
   'cerrado': 'bg-gray-200 text-gray-700 border-gray-300',
 }

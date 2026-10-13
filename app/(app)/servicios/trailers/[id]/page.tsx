@@ -5,11 +5,29 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import {
-  ChevronRight, RefreshCw, Truck, User, Phone, Mail, Briefcase,
+  ChevronLeft, ChevronRight, RefreshCw, Truck, User, Phone, Mail, Briefcase,
   Calendar, Clock, Building2, Package, Hash, FileText, MapPin,
   IdCard, Globe, MapPinned, Camera, Link2, Copy, ExternalLink, Share2, CheckCircle,
 } from 'lucide-react'
 import { getHitosForTask, tipoServicioLabelFor } from '@/lib/servicios/hitos'
+import { vecinosDe, type ServicioNav } from '@/lib/servicios/navegacion'
+
+// Flecha a otro servicio de la lista filtrada; deshabilitada en los extremos.
+function NavButton({ servicio, label, icon: Icon }: { servicio: ServicioNav | null; label: string; icon: React.ElementType }) {
+  const cls = 'inline-flex items-center justify-center h-8 w-8 rounded-md border transition-colors'
+  if (!servicio) {
+    return (
+      <span className={`${cls} opacity-40 cursor-not-allowed`} title={label} aria-disabled="true">
+        <Icon className="h-4 w-4" />
+      </span>
+    )
+  }
+  return (
+    <Link href={`/servicios/trailers/${servicio.id}`} className={`${cls} hover:bg-muted/50`} title={`${label}: ${servicio.codigo}`} aria-label={label}>
+      <Icon className="h-4 w-4" />
+    </Link>
+  )
+}
 
 interface OdooTaskDetail {
   id: number
@@ -103,6 +121,10 @@ const STAGE_DOT_COLORS: Record<string, string> = {
   'pre-operativo': 'bg-amber-500',
   'en ruta': 'bg-orange-500',
   'en cliente': 'bg-green-500',
+  'cargando': 'bg-yellow-400',
+  'finalizó carga': 'bg-cyan-500',
+  'finalizo carga': 'bg-cyan-500',
+  'servicio finalizado': 'bg-emerald-700',
   'facturación': 'bg-indigo-500',
   'facturacion': 'bg-indigo-500',
   'cerrado': 'bg-gray-400',
@@ -156,6 +178,7 @@ export default function ServicioDetailPage() {
       setTask(data.task)
       setConductor(data.conductor)
       setCliente(data.cliente)
+      setStages(data.stages ?? [])
 
       const supabase = createClient()
       const [{ data: locs }, { data: fotos }] = await Promise.all([
@@ -179,6 +202,33 @@ export default function ServicioDetailPage() {
   }
 
   useEffect(() => { if (id) fetchDetail() }, [id])
+
+  // Cambio manual de etapa, igual que la barra de etapas de Odoo
+  const [stages, setStages] = useState<{ id: number; name: string }[]>([])
+  const [cambiandoEtapa, setCambiandoEtapa] = useState(false)
+  const cambiarEtapa = async (stage: { id: number; name: string }) => {
+    if (!task) return
+    const codigo = task.name.includes(' - ') ? task.name.split(' - ')[0] : task.name
+    if (!window.confirm(`¿Pasar ${codigo} a la etapa "${stage.name}"?`)) return
+    setCambiandoEtapa(true)
+    try {
+      const res = await fetch('/api/servicios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: task.id, fields: { stage_id: stage.id } }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'No se pudo cambiar la etapa')
+      setTask((prev) => prev ? { ...prev, stage_id: [stage.id, stage.name] } : prev)
+    } catch (e: unknown) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    } finally {
+      setCambiandoEtapa(false)
+    }
+  }
+
+  const [vecinos, setVecinos] = useState<ReturnType<typeof vecinosDe>>(null)
+  useEffect(() => { setVecinos(id ? vecinosDe(Number(id)) : null) }, [id])
 
   // Geoenlaces que la automatización vinculó específicamente a ESTE servicio
   // (individual y/o "en conjunto" — ver app/api/automatizacion/geoenlaces-auto).
@@ -251,6 +301,13 @@ export default function ServicioDetailPage() {
             )}
           </div>
         </div>
+        <div className="flex items-center gap-1.5">
+        {vecinos && (
+          <>
+            <NavButton servicio={vecinos.anterior} label="Servicio anterior" icon={ChevronLeft} />
+            <NavButton servicio={vecinos.siguiente} label="Servicio siguiente" icon={ChevronRight} />
+          </>
+        )}
         <button
           onClick={fetchDetail}
           disabled={loading}
@@ -259,7 +316,31 @@ export default function ServicioDetailPage() {
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           Actualizar
         </button>
+        </div>
       </div>
+
+      {task && stages.length > 0 && (
+        <div className="flex overflow-x-auto rounded-lg border bg-card">
+          {stages.map((s, i) => {
+            const actual = task.stage_id && task.stage_id[0] === s.id
+            return (
+              <button
+                key={s.id}
+                type="button"
+                disabled={!!actual || cambiandoEtapa}
+                onClick={() => cambiarEtapa(s)}
+                className={`relative shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${i > 0 ? 'border-l' : ''} ${
+                  actual ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/60 disabled:opacity-50'
+                }`}
+                title={actual ? 'Etapa actual' : `Pasar a "${s.name}"`}
+              >
+                <span className={`w-2 h-2 rounded-full ${stageDotColor(s.name)}`} />
+                {s.name}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {error && (
         <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg p-4">

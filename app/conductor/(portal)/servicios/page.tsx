@@ -603,24 +603,30 @@ export default function ConductorServiciosPage() {
       }
     }
 
-    // Solo cerrar la etapa en Odoo si el flujo realmente termina en
-    // "Servicio finalizado". Cuando la devolución quedó en manos de otro
-    // conductor (cola de cochera), este conductor ya completó lo suyo pero
-    // el servicio como tal sigue abierto hasta que el otro conductor cierre
-    // su propia subtarea — no hay que mover la etapa de Odoo acá.
-    const ultimoHito = stepsArr[stepsLen - 1]
-    if (nextStep >= stepsLen && ultimoHito?.key === 'servicio_finalizado') {
-      fetch('/api/servicios', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: taskId, action: 'finalize' }),
-      }).then(r => r.json()).then(data => {
-        if (data.stageId) {
+    // Acabada en PayBox ⇒ "Servicio Finalizado" en Odoo, siempre — también
+    // cuando la devolución quedó en manos de otro conductor (cola de
+    // cochera): esa devolución sigue abierta en su propia subtarea. Se
+    // reintenta porque si falla nadie se entera y la etapa queda atrasada.
+    if (nextStep >= stepsLen) finalizarEnOdoo(taskId)
+  }
+
+  const finalizarEnOdoo = async (taskId: number, intentos = 3) => {
+    for (let i = 0; i < intentos; i++) {
+      try {
+        const res = await fetch('/api/servicios', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: taskId, action: 'finalize' }),
+        })
+        const data = await res.json()
+        if (res.ok && data.stageId) {
           setTasks(prev => prev.map(t =>
             t.id === taskId ? { ...t, stage_id: [data.stageId, data.stageName] as [number, string] } : t
           ))
+          return
         }
-      }).catch(() => {})
+      } catch {}
+      await new Promise(r => setTimeout(r, 2000 * (i + 1)))
     }
   }
 

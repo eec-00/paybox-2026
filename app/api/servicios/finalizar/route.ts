@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     const stages = await odooCall<{ id: number; name: string }[]>(
       uid, 'project.task.type', 'search_read',
-      [[['name', 'ilike', 'finaliz']]],
+      [[['name', '=ilike', 'servicio finalizado']]],
       { fields: ['id', 'name'], limit: 5 }
     )
     if (!stages.length) return NextResponse.json({ error: 'No se encontró etapa "Servicio Finalizado"' }, { status: 404 })

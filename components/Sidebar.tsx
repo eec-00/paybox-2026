@@ -29,6 +29,7 @@ import {
   Fingerprint,
   PackageSearch,
   Timer,
+  FlaskConical,
 } from 'lucide-react'
 
 interface FlatItem {
@@ -79,6 +80,7 @@ export function Sidebar({
   const isAdmin_ = pathname.startsWith('/administracion')
   const isSunat = pathname.startsWith('/sunat')
   const isRrhh = pathname.startsWith('/rrhh')
+  const isPruebas = pathname.startsWith('/pruebas')
 
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     ...(isFinanzas ? ['finanzas'] : []),
@@ -87,6 +89,7 @@ export function Sidebar({
     ...(isAdmin_ ? ['administracion'] : []),
     ...(isSunat ? ['sunat'] : []),
     ...(isRrhh ? ['rrhh'] : []),
+    ...(isPruebas ? ['pruebas'] : []),
   ])
 
   useEffect(() => {
@@ -97,8 +100,9 @@ export function Sidebar({
     if (isAdmin_) toExpand.push('administracion')
     if (isSunat) toExpand.push('sunat')
     if (isRrhh) toExpand.push('rrhh')
+    if (isPruebas) toExpand.push('pruebas')
     setExpandedGroups((prev) => Array.from(new Set([...prev, ...toExpand])))
-  }, [pathname, isFinanzas, isServicios, isAuto, isAdmin_, isSunat, isRrhh])
+  }, [pathname, isFinanzas, isServicios, isAuto, isAdmin_, isSunat, isRrhh, isPruebas])
 
   const toggleGroup = (id: string) => {
     setExpandedGroups((prev) =>
@@ -335,6 +339,25 @@ export function Sidebar({
           icon: ShieldCheck,
           description: 'Guías de remisión BF',
           adminOnly: false,
+        },
+      ],
+    },
+    {
+      type: 'group',
+      id: 'pruebas',
+      label: 'Pruebas',
+      icon: FlaskConical,
+      description: 'Módulos en prueba',
+      adminOnly: true,
+      children: [
+        {
+          type: 'item',
+          id: 'pruebas-pagos-conductores',
+          href: '/pruebas/pagos-conductores',
+          label: 'Pagos Conductores',
+          icon: Wallet,
+          description: 'Pago por servicio según zona',
+          adminOnly: true,
         },
       ],
     },
