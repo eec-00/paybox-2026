@@ -10,6 +10,7 @@ import {
   IdCard, Globe, MapPinned, Camera, Link2, Copy, ExternalLink, Share2, CheckCircle,
 } from 'lucide-react'
 import { getHitosForTask, tipoServicioLabelFor } from '@/lib/servicios/hitos'
+import { registrosPorStep, tiemposHitos } from '@/lib/servicios/fechasHitos'
 import { vecinosDe, type ServicioNav } from '@/lib/servicios/navegacion'
 
 // Flecha a otro servicio de la lista filtrada; deshabilitada en los extremos.
@@ -161,6 +162,7 @@ export default function ServicioDetailPage() {
   const [conductor, setConductor] = useState<Conductor | null>(null)
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [locations, setLocations] = useState<Record<number, LocationPoint>>({})
+  const [registros, setRegistros] = useState<Record<number, string>>({})
   const [hitoFotos, setHitoFotos] = useState<HitoFoto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -182,16 +184,19 @@ export default function ServicioDetailPage() {
 
       const supabase = createClient()
       const [{ data: locs }, { data: fotos }] = await Promise.all([
-        supabase.from('service_locations').select('step_index, lat, lng').eq('task_id', id),
+        supabase.from('service_locations').select('step_index, lat, lng, created_at').eq('task_id', id),
         supabase.from('conductor_servicio_hito_fotos')
           .select('hito_key, hito_label, foto_url, created_at')
           .eq('servicio_id', id)
           .order('created_at', { ascending: true }),
       ])
       if (locs) {
+        // Ordenadas por fecha: si un hito se marcó más de una vez, queda la última
+        const ordenadas = [...locs].sort((x, y) => x.created_at.localeCompare(y.created_at))
         const map: Record<number, LocationPoint> = {}
-        for (const l of locs) map[l.step_index] = { lat: l.lat, lng: l.lng }
+        for (const l of ordenadas) map[l.step_index] = { lat: l.lat, lng: l.lng }
         setLocations(map)
+        setRegistros(registrosPorStep(locs))
       }
       setHitoFotos(fotos ?? [])
     } catch (e: unknown) {
@@ -491,14 +496,35 @@ export default function ServicioDetailPage() {
               Tiempos Operativos · {tipoServicioLabelFor(task)}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {getHitosForTask(task).map((hito, step) => {
+              {(() => {
+                const hitos = getHitosForTask(task)
+                const fechas = tiemposHitos(
+                  hitos.map(h => task[h.field] as number | false),
+                  task.x_studio_fecha_de_la_programacin,
+                  registros,
+                  step => hitos[step].key === 'servicio_finalizado',
+                )
+                return hitos.map((hito, step) => {
                 const time = formatOdooTime(task[hito.field] as number | false)
                 const loc = locations[step]
+                const f = fechas[step]
                 return (
                   <div key={hito.key} className="border rounded-lg overflow-hidden">
-                    <div className="flex items-center justify-between px-3 py-2 bg-muted/40">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 bg-muted/40">
                       <span className="text-xs font-medium">{hito.label}</span>
-                      <span className="text-xs font-mono font-bold">{time}</span>
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        {f && (
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${f.real ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground italic'}`}
+                            title={f.real
+                              ? 'Fecha real en que el conductor marcó el hito'
+                              : 'Fecha estimada: el hito no tiene ubicación registrada, se calcula desde la fecha de programación'}
+                          >
+                            {f.fecha.slice(8, 10)}/{f.fecha.slice(5, 7)}
+                          </span>
+                        )}
+                        <span className="text-xs font-mono font-bold">{time}</span>
+                      </span>
                     </div>
                     {loc ? (
                       <a
@@ -521,7 +547,8 @@ export default function ServicioDetailPage() {
                     )}
                   </div>
                 )
-              })}
+                })
+              })()}
             </div>
           </div>
 

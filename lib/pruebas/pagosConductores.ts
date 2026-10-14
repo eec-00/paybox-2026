@@ -10,7 +10,8 @@
 //   Zona:               Zona 1..7 | Provincia
 //
 // El pago se calcula por semana de sábado a viernes. El básico mensual
-// (S/ 1300) no entra en este cálculo.
+// (S/ 1300) no entra en este cálculo. Los adicionales (cena, amanecida,
+// bono, etc.) están en adicionalesConductores.ts.
 //
 // Tarifas (tabla de operaciones). Por ahora solo Zona 1 a 4; Zona 5, 6, 7 y
 // Provincia quedan "sin tarifa" hasta definir su equivalencia con las rutas
@@ -35,6 +36,42 @@ export interface ServicioPago {
   conductor: string | null
   placa: string | null
   atributos: AtributosServicio
+  /** Hora de cita en minutos desde la medianoche (null si no tiene) */
+  horaCita: number | null
+  /** Flujo de hitos de la app (importacion, exportacion, despacho, ...) */
+  flujo: string
+  /** Importación cuya devolución de vacío queda a cargo de otro conductor */
+  devolucionOtroConductor: boolean
+  horarios: HorariosServicio
+}
+
+/** Horarios marcados por el conductor, en minutos desde la medianoche del
+ * día de programación (> 1440 si cruzó la medianoche). */
+export interface HorariosServicio {
+  /** Salida de cochera (inicio de ruta) */
+  inicio: number | null
+  /** Último hito operativo marcado (sin contar "Servicio finalizado") */
+  fin: number | null
+  /** Contenedor vacío devuelto */
+  devolucion: number | null
+  /** Todos los hitos del flujo en orden, con su hora (null = sin marcar) */
+  linea: { key: string; label: string; min: number | null; real: boolean }[]
+}
+
+/** Subtarea de devolución de vacío de un servicio de la semana */
+export interface DevolucionPago {
+  id: number
+  name: string
+  etapa: string | null
+  conductorId: number | null
+  conductor: string | null
+  almacen: string | null
+  /** Fecha de programación del servicio padre */
+  fecha: string | false
+  padreId: number
+  padreName: string
+  padreConductorId: number | null
+  padreConductor: string | null
 }
 
 /** Nombre del atributo en Odoo → clave en AtributosServicio */
