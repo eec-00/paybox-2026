@@ -3,14 +3,15 @@
 // mano: tabla principal (ITEM … SOBRECOSTO) y, a la derecha, un recuadro de
 // detalle de horas por cada servicio que pasó las 5 h libres, enlazado con
 // el número verde junto a la fila. Los montos (SOBRECOSTO) quedan en blanco:
-// los completa a mano quien revisa el Excel.
+// los completa a mano quien revisa el Excel. Una hoja por tipo de servicio
+// (Despachos, Recojos, Importaciones, Exportaciones), solo los que hay en la semana.
 // ============================================================================
 
 import ExcelJS from 'exceljs'
 import { caps, m2oLast6, parseTaskNameParts, shortSiteName } from './exportFormats'
 import {
-  calcularSobrecosto, formatDuracion, formatFechaHora, HORAS_LIBRES,
-  type SobrecostoInfo, type SobrecostoTask, type Tramo,
+  calcularSobrecosto, formatDuracion, formatFechaHora, HORAS_LIBRES, tipoCargaSobrecosto, tipoSobrecosto,
+  type SobrecostoInfo, type SobrecostoTask, type TipoSobrecosto, type Tramo,
 } from './sobrecostos'
 
 const C = {
@@ -54,6 +55,7 @@ const MAIN_HEADERS: { header: string; width: number }[] = [
   { header: 'CLIENTE', width: 22 },
   { header: 'REFERENCIA/\nBOOKING', width: 13 },
   { header: 'TIPO DE\nSERVICIO', width: 13 },
+  { header: 'TIPO DE\nCARGA', width: 10 },
   { header: 'N° CNTR', width: 14 },
   { header: 'GUIA DE\nREMISION', width: 16 },
   { header: 'GUIA TRANSP.', width: 15 },
@@ -62,9 +64,19 @@ const MAIN_HEADERS: { header: string; width: number }[] = [
   { header: 'SOBRECOSTO', width: 13 },
 ]
 
-// Columnas del recuadro de detalle: O = número, P..W = contenido
-const COL_NUM = 15 // O
-const COL_BOX = 16 // P
+// Índices (1-based) derivados de la tabla principal: M = SOBRECOSTO,
+// N = número verde, O = separación, P = número del recuadro, Q..X = recuadro
+const COL_SOBRECOSTO = MAIN_HEADERS.length // M
+const COL_MARKER = COL_SOBRECOSTO + 1 // N
+const COL_NUM = COL_SOBRECOSTO + 3 // P
+const COL_BOX = COL_SOBRECOSTO + 4 // Q
+
+const HOJAS: { tipo: TipoSobrecosto; hoja: string; titulo: string }[] = [
+  { tipo: 'importacion', hoja: 'Importaciones', titulo: 'SERVICIOS DE IMPORTACIÓN' },
+  { tipo: 'despacho', hoja: 'Despachos', titulo: 'SERVICIOS DE DESPACHO' },
+  { tipo: 'recojo', hoja: 'Recojos', titulo: 'SERVICIOS DE RECOJO' },
+  { tipo: 'exportacion', hoja: 'Exportaciones', titulo: 'SERVICIOS DE EXPORTACIÓN' },
+]
 
 export async function exportarSobrecostosExcel(
   tasks: SobrecostoTask[],
@@ -72,22 +84,40 @@ export async function exportarSobrecostosExcel(
   logoUrl = '/logo.png',
 ): Promise<Blob> {
   const wb = new ExcelJS.Workbook()
-  const ws = wb.addWorksheet('Sobrecostos', { views: [{ showGridLines: false }] })
+
+  let logoId: number | null = null
+  try {
+    const res = await fetch(logoUrl)
+    if (res.ok) logoId = wb.addImage({ buffer: await res.arrayBuffer(), extension: 'png' })
+  } catch { /* sin logo */ }
+
+  for (const { tipo, hoja, titulo } of HOJAS) {
+    const delTipo = tasks.filter((t) => tipoSobrecosto(t) === tipo)
+    if (delTipo.length > 0) dibujarHoja(wb, hoja, titulo, delTipo, semana, logoId)
+  }
+
+  const buf = await wb.xlsx.writeBuffer()
+  return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+}
+
+function dibujarHoja(
+  wb: ExcelJS.Workbook,
+  nombreHoja: string,
+  tituloHoja: string,
+  tasks: SobrecostoTask[],
+  semana: { start: string; end: string },
+  logoId: number | null,
+) {
+  const ws = wb.addWorksheet(nombreHoja, { views: [{ showGridLines: false }] })
 
   MAIN_HEADERS.forEach((h, i) => { ws.getColumn(i + 1).width = h.width })
-  ws.getColumn(13).width = 5 // M: número verde
-  ws.getColumn(14).width = 6 // N: separación
+  ws.getColumn(COL_MARKER).width = 5 // número verde
+  ws.getColumn(COL_MARKER + 1).width = 6 // separación
   ws.getColumn(COL_NUM).width = 6
   for (let c = COL_BOX; c < COL_BOX + 8; c++) ws.getColumn(c).width = 16
 
   // ── Encabezado: logo + título ─────────────────────────────────────────
-  try {
-    const res = await fetch(logoUrl)
-    if (res.ok) {
-      const img = wb.addImage({ buffer: await res.arrayBuffer(), extension: 'png' })
-      ws.addImage(img, { tl: { col: 0.2, row: 0.1 }, ext: { width: 46, height: 46 } })
-    }
-  } catch { /* sin logo */ }
+  if (logoId !== null) ws.addImage(logoId, { tl: { col: 0.2, row: 0.1 }, ext: { width: 46, height: 46 } })
   ws.mergeCells('B1:C3')
   const marca = ws.getCell('B1')
   marca.value = {
@@ -98,23 +128,23 @@ export async function exportarSobrecostosExcel(
   }
   marca.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true }
 
-  ws.mergeCells('D2:L2')
+  ws.mergeCells('D2:M2')
   const titulo = ws.getCell('D2')
-  titulo.value = 'SERVICIOS DE RECOJO, DESPACHO Y EXPORTACIÓN'
+  titulo.value = tituloHoja
   titulo.font = { bold: true, size: 13, color: { argb: C.blanco } }
   titulo.fill = fill(C.titulo)
   titulo.alignment = { vertical: 'middle', horizontal: 'center' }
   ws.getRow(2).height = 24
   ws.getCell('D3').value = `Semana del ${formatFecha(semana.start)} al ${formatFecha(semana.end)}`
   ws.getCell('D3').font = { italic: true, size: 9, color: { argb: 'FF595959' } }
-  ws.mergeCells('D4:K4')
+  ws.mergeCells('D4:L4')
   const beta = ws.getCell('D4')
   beta.value = 'BETA: tiempos calculados automáticamente con las marcas de los conductores. Revisar antes de cobrar.'
   beta.font = { bold: true, size: 8, color: { argb: 'FF9C5700' } }
   beta.fill = fill('FFFFEB9C')
   beta.alignment = { vertical: 'middle', horizontal: 'center' }
 
-  const costo = ws.getCell('L4')
+  const costo = ws.getCell('M4')
   costo.value = 'COSTO DEL SERVICIO'
   costo.font = { bold: true, size: 7 }
   costo.fill = fill(C.costoServicio)
@@ -127,7 +157,7 @@ export async function exportarSobrecostosExcel(
   MAIN_HEADERS.forEach((h, i) => {
     const cell = hr.getCell(i + 1)
     cell.value = h.header
-    cell.font = { bold: true, size: 8, color: { argb: C.blanco }, italic: i === 11 }
+    cell.font = { bold: true, size: 8, color: { argb: C.blanco }, italic: i === COL_SOBRECOSTO - 1 }
     cell.fill = fill(C.header)
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }
     cell.border = thin
@@ -155,6 +185,7 @@ export async function exportarSobrecostosExcel(
       info?.tipo === 'exportacion' ? '' : destino,
       (task.x_studio_referenciabooking as string | false) || '-',
       tipoTxt,
+      caps(tipoCargaSobrecosto(task)),
       contenedor || (info?.tipo === 'despacho' || info?.tipo === 'recojo' ? 'CARGA SUELTA' : ''),
       '', // guía de remisión: se llena a mano
       '', // guía transportista: se llena a mano
@@ -168,7 +199,7 @@ export async function exportarSobrecostosExcel(
       cell.font = { size: 8, bold: i === 2 }
       cell.alignment = { vertical: 'bottom', horizontal: i === 3 ? 'left' : 'center', wrapText: true }
       cell.border = thin
-      if (i === 11) {
+      if (i === COL_SOBRECOSTO - 1) {
         cell.fill = fill(C.gris)
         cell.numFmt = '"S/." #,##0.00'
       }
@@ -178,7 +209,7 @@ export async function exportarSobrecostosExcel(
 
     // Número verde junto a la fila + recuadro de detalle a la derecha
     numRecuadro++
-    const marker = row.getCell(13)
+    const marker = row.getCell(COL_MARKER)
     marker.value = numRecuadro
     marker.font = { bold: true, size: 8 }
     marker.fill = fill(C.verde)
@@ -188,9 +219,6 @@ export async function exportarSobrecostosExcel(
     const usadas = dibujarRecuadro(ws, start, numRecuadro, task, info)
     nextFreeRow = start + usadas + 1
   })
-
-  const buf = await wb.xlsx.writeBuffer()
-  return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
 }
 
 function headerCell(cell: ExcelJS.Cell, text: string, argb = C.header, italic = false) {

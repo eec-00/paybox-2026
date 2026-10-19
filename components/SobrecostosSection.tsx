@@ -7,7 +7,7 @@ import { RefreshCw, Timer, ChevronLeft, ChevronRight, Download, AlertTriangle, L
 import { toast } from 'sonner'
 import { saveAs } from 'file-saver'
 import {
-  calcularSobrecosto, esQuimtia, formatDuracion, formatHoraMin, lunesDe, rangoSemana, tipoSobrecosto,
+  calcularSobrecosto, esQuimtia, formatDuracion, formatHoraMin, lunesDe, rangoSemana, tipoCargaSobrecosto, tipoSobrecosto,
   HORAS_LIBRES, type SobrecostoInfo, type SobrecostoTask,
 } from '@/lib/servicios/sobrecostos'
 import { exportarSobrecostosExcel } from '@/lib/servicios/sobrecostosExcel'
@@ -204,7 +204,8 @@ export function SobrecostosSection() {
               <TableHead>Servicio</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead>Placa</TableHead>
-              <TableHead>Tipo</TableHead>
+              <TableHead>Tipo de Servicio</TableHead>
+              <TableHead>Tipo de Carga</TableHead>
               <TableHead>Contenedor</TableHead>
               <TableHead>Tiempos</TableHead>
               <TableHead className="text-right">Total</TableHead>
@@ -215,13 +216,13 @@ export function SobrecostosSection() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                 </TableCell>
               </TableRow>
             ) : filas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
                   No hay servicios de QUIMTIA (despacho, recojo, importación o exportación) en esta semana.
                 </TableCell>
               </TableRow>
@@ -232,6 +233,7 @@ export function SobrecostosSection() {
                   <TableCell className="text-xs whitespace-nowrap">{formatFecha(task.x_studio_fecha_de_la_programacin)}</TableCell>
                   <TableCell className="text-xs font-semibold whitespace-nowrap">{m2oLast6(Array.isArray(task.x_studio_placa) ? task.x_studio_placa as [number, string] : false) || '—'}</TableCell>
                   <TableCell className="text-xs whitespace-nowrap">{TIPO_LABEL[info.tipo]}</TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">{tipoCargaSobrecosto(task) || '—'}</TableCell>
                   <TableCell className="font-mono text-xs whitespace-nowrap">{(task.x_studio_nmero_de_contenedor as string) || '—'}</TableCell>
                   <TableCell className="text-xs">
                     <div className="space-y-0.5">

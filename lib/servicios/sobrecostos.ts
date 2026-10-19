@@ -105,6 +105,17 @@ export function tipoSobrecosto(task: TaskTypeFlags & { x_studio_almacen_de_retir
   return tipo === 'importacion' || tipo === 'exportacion' ? tipo : null
 }
 
+/** "S01152 - Servicio de transporte (Importación, Contenedor 20, IMO, Zona 1)"
+ * → "IMO". Las subtareas no lo traen en su nombre: se toma del servicio padre. */
+export function tipoCargaSobrecosto(task: { name: string; parent_id?: unknown }): string {
+  const fromName = (name: string) => {
+    const m = name.match(/\(([^()]*,[^()]*,[^()]*)\)/)
+    return m?.[1].split(',')[2]?.trim() || ''
+  }
+  const parent = task.parent_id
+  return fromName(task.name) || (Array.isArray(parent) && typeof parent[1] === 'string' ? fromName(parent[1]) : '')
+}
+
 function horaMin(task: SobrecostoTask, key: string): number | null {
   const hito = getHitosForTask(task).find(h => h.key === key)
   if (!hito) return null
