@@ -27,7 +27,6 @@ import {
   CalendarClock,
   Briefcase,
   Fingerprint,
-  PackageSearch,
   Timer,
   FlaskConical,
 } from 'lucide-react'
@@ -194,15 +193,6 @@ export function Sidebar({
         },
         {
           type: 'item',
-          id: 'servicios-contenedores',
-          href: '/servicios/contenedores',
-          label: 'Contenedores',
-          icon: PackageSearch,
-          description: 'Devoluciones/retiros con otro conductor',
-          adminOnly: false,
-        },
-        {
-          type: 'item',
           id: 'servicios-sobrecostos',
           href: '/servicios/sobrecostos',
           label: 'Sobrecostos (Beta)',
@@ -213,50 +203,13 @@ export function Sidebar({
       ],
     },
     {
-      type: 'group',
+      type: 'item',
       id: 'automatizacion',
+      href: '/automatizacion/conductores',
       label: 'Automatización',
       icon: Zap,
       description: 'Alertas y vencimientos',
       adminOnly: false,
-      children: [
-        {
-          type: 'item',
-          id: 'auto-conductores',
-          href: '/automatizacion/conductores',
-          label: 'Conductores',
-          icon: UserCog,
-          description: 'Documentos conductores',
-          adminOnly: false,
-        },
-        {
-          type: 'item',
-          id: 'auto-tractos',
-          href: '/automatizacion/tractos',
-          label: 'Tractos',
-          icon: Truck,
-          description: 'Documentos tractos',
-          adminOnly: false,
-        },
-        {
-          type: 'item',
-          id: 'auto-carretas',
-          href: '/automatizacion/carretas',
-          label: 'Carretas',
-          icon: Truck,
-          description: 'Documentos carretas',
-          adminOnly: false,
-        },
-        {
-          type: 'item',
-          id: 'auto-facturas',
-          href: '/automatizacion/facturas',
-          label: 'Facturas',
-          icon: FileText,
-          description: 'Facturas de clientes',
-          adminOnly: false,
-        },
-      ],
     },
     {
       type: 'group',
@@ -418,7 +371,8 @@ export function Sidebar({
 
   const renderFlatItem = (item: FlatItem, isChild = false) => {
     const Icon = item.icon
-    const isActive = pathname === item.href
+    const isActive =
+      pathname === item.href || (item.id === 'automatizacion' && isAuto)
 
     return (
       <Link

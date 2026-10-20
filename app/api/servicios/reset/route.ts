@@ -136,7 +136,20 @@ export async function POST(request: NextRequest) {
       admin.from('conductor_servicios_progreso').delete().eq('servicio_id', taskId),
       admin.from('conductor_servicios_completados').delete().eq('servicio_id', taskId),
       admin.from('service_locations').delete().eq('task_id', taskId),
+      admin.from('conductor_servicio_hito_fotos').delete().eq('servicio_id', taskId),
     ])
+
+    // Borrar también los archivos de las fotos del bucket (hitos-servicio/<id>/).
+    // Si falla no se corta el reinicio: los registros ya se borraron.
+    try {
+      const folder = `hitos-servicio/${taskId}`
+      const { data: files } = await admin.storage.from('comprobantes').list(folder, { limit: 1000 })
+      if (files?.length) {
+        await admin.storage.from('comprobantes').remove(files.map(f => `${folder}/${f.name}`))
+      }
+    } catch (e) {
+      console.error('Error borrando fotos de Storage en reset:', e)
+    }
 
     return NextResponse.json({ ok: true, stageId, stageName })
   } catch (error: unknown) {
