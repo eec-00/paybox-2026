@@ -122,7 +122,17 @@ export function servicioCodigo(t: GeneralExportTask): string {
   return nameSource.includes(' - ') ? nameSource.split(' - ')[0] : nameSource
 }
 
-const PROGRESO_LABEL = { sin_iniciar: 'Sin iniciar', en_proceso: 'En proceso', completado: 'Acabada' } as const
+/** Tipo de carga ("IMO", "General"…): 3er dato entre paréntesis del nombre. Las
+ * subtareas no lo traen — se toma del servicio padre. */
+function tipoCargaDe(t: GeneralExportTask): string {
+  const fromName = (name: string) => {
+    const m = name.match(/\(([^()]*,[^()]*,[^()]*)\)/)
+    return m?.[1].split(',')[2]?.trim() || ''
+  }
+  return fromName(t.name) || (t.parent_id ? fromName(t.parent_id[1]) : '')
+}
+
+const PROGRESO_LABEL ={ sin_iniciar: 'Sin iniciar', en_proceso: 'En proceso', completado: 'Acabada' } as const
 
 /** Hora marcada del primer hito (de la cola de este servicio) cuya key esté
  * en `keys` — así una sola columna cubre "Inicio carga" e "Inicio descarga". */
@@ -149,6 +159,7 @@ export const GENERAL_COLUMNS: GeneralColumn[] = [
   { key: 'horaCita', header: 'HORA CITA', width: 11, section: 'general', value: (t) => formatHora(t.x_studio_hora_de_cita) },
   { key: 'cliente', header: 'CLIENTE', width: 28, section: 'general', value: (t) => m2o(t.partner_id) },
   { key: 'tipo', header: 'TIPO DE SERVICIO', width: 26, section: 'general', value: (t) => tipoServicioLabelFor(t) },
+  { key: 'tipoCarga', header: 'TIPO DE CARGA', width: 14, section: 'general', value: (t) => tipoCargaDe(t) },
   { key: 'etapa', header: 'ETAPA', width: 20, section: 'general', value: (t) => m2o(t.stage_id) },
   { key: 'progreso', header: 'PROGRESO', width: 13, section: 'general', value: (t, ctx) => PROGRESO_LABEL[calcularProgreso(t, ctx.progresoMap, ctx.completadosSet).estado] },
   { key: 'fase', header: 'FASE', width: 30, section: 'general', value: (t, ctx) => ultimoHitoMarcado(t, ctx.progresoMap, ctx.completadosSet) ?? '' },
@@ -174,7 +185,7 @@ export const GENERAL_COLUMNS: GeneralColumn[] = [
 ]
 
 export const DEFAULT_GENERAL_COLUMNS = [
-  'codigo', 'fecha', 'horaCita', 'cliente', 'tipo', 'etapa', 'progreso', 'status',
+  'codigo', 'fecha', 'horaCita', 'cliente', 'tipo', 'tipoCarga', 'etapa', 'progreso', 'status',
   'conductor', 'placa', 'contenedor', 'almacenRetiro', 'almacenDestino',
 ]
 
