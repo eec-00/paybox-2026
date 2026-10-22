@@ -39,7 +39,8 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
 }
 
 export function ModulePermissionsEditor({ value, onChange, disabled }: Props) {
-  const perms: ModulePermissions = value ?? DEFAULT_MODULE_PERMISSIONS
+  // Perfiles guardados antes de que existiera un módulo no tienen su clave
+  const perms: ModulePermissions = { ...DEFAULT_MODULE_PERMISSIONS, ...value }
 
   const updateModule = (id: keyof ModulePermissions, patch: Partial<ModuleAccess>) => {
     onChange({ ...perms, [id]: { ...perms[id], ...patch } })

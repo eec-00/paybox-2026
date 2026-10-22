@@ -19,6 +19,7 @@ const MODULE_LABELS: Record<string, string> = {
   pagos:          'Finanzas',
   servicios:      'Servicios',
   automatizacion: 'Automatización',
+  rrhh:           'Recursos Humanos',
 }
 
 const CRUD_LABELS = [
@@ -37,7 +38,7 @@ function ModulePermsBadges({ user }: { user: UserProfile }) {
     return <span className="text-xs text-muted-foreground">Todos los módulos</span>
   }
 
-  const enabled = (Object.keys(mp) as (keyof typeof mp)[]).filter((k) => mp[k].enabled)
+  const enabled = (Object.keys(mp) as (keyof typeof mp)[]).filter((k) => mp[k]?.enabled)
   if (enabled.length === 0) {
     return <span className="text-xs text-muted-foreground">Sin acceso</span>
   }
@@ -130,7 +131,7 @@ export function UsersList() {
   const handleEditClick = (user: UserProfile) => {
     setSelectedUser(user)
     setEditRole(user.role)
-    setEditModulePerms(user.module_permissions ?? DEFAULT_MODULE_PERMISSIONS)
+    setEditModulePerms({ ...DEFAULT_MODULE_PERMISSIONS, ...user.module_permissions })
     setSaveError(null)
     setSaveSuccess(false)
     setDialogOpen(true)
