@@ -267,6 +267,9 @@ export function CalendarSection() {
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
             const dayPagos = pagos.filter(p => p.fecha === dateStr)
             const isToday = getLocalDateStr() === dateStr
+            // La celda tiene alto fijo: entran 3 filas, o 2 + el botón "+N más"
+            // (antes la 3ra quedaba cortada y el "+N más" escondido debajo).
+            const visibles = dayPagos.length > 3 ? 2 : 3
 
             days.push(
                 <div key={day} className={`h-16 sm:h-32 border border-muted/50 rounded-sm p-0.5 sm:p-1 overflow-hidden flex flex-col ${isToday ? 'bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
@@ -279,33 +282,36 @@ export function CalendarSection() {
                         )}
                     </div>
                     <div className="space-y-0.5 sm:space-y-1 flex-1 hidden sm:block">
-                        {dayPagos.slice(0, 3).map(pago => (
-                            <div
-                                key={pago.id}
-                                className={`text-[10px] p-1 rounded-sm flex flex-col gap-0.5 cursor-pointer hover:opacity-80 ${gastoPagoColor(pago)}`}
-                                onClick={() => {
-                                    if (pago.tipo === 'gasto_conductor' && pago.gasto_conductor) {
-                                        setDetailGasto(pago.gasto_conductor)
-                                    }
-                                }}
-                            >
-                                <div className="font-semibold truncate" title={pago.nombre_pago}>{pago.nombre_pago}</div>
-                                <div className="flex justify-between items-center">
-                                    <span>
+                        {dayPagos.slice(0, visibles).map(pago => {
+                            const esGasto = pago.tipo === 'gasto_conductor'
+                            // "Gasto conductor: Juan Pérez" → "Juan Pérez" (el ícono ya indica que es gasto)
+                            const etiqueta = esGasto ? pago.nombre_pago.replace(/^gasto conductor:\s*/i, '') : pago.nombre_pago
+                            return (
+                                <div
+                                    key={pago.id}
+                                    className={`text-[10px] px-1 py-0.5 rounded-sm flex items-center gap-1 cursor-pointer hover:opacity-80 ${gastoPagoColor(pago)}`}
+                                    title={`${pago.nombre_pago} — ${pago.monto_variable ? 'Variable' : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`}`}
+                                    onClick={() => {
+                                        if (esGasto && pago.gasto_conductor) {
+                                            setDetailGasto(pago.gasto_conductor)
+                                        }
+                                    }}
+                                >
+                                    {esGasto && <Receipt className="w-3 h-3 shrink-0 opacity-70" />}
+                                    <span className="font-semibold truncate flex-1 min-w-0">{etiqueta}</span>
+                                    <span className="shrink-0 font-medium">
                                         {pago.monto_variable ? 'Variable' : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`}
                                     </span>
-                                    <div className="flex gap-1">
-                                        {pago.frecuencia !== 'unica' && <RefreshCw className="w-3 h-3 text-muted-foreground mr-1" />}
-                                        {pago.estado === 'pagado' && <CheckCircle2 className="w-3 h-3" />}
-                                    </div>
+                                    {pago.frecuencia !== 'unica' && <RefreshCw className="w-2.5 h-2.5 shrink-0 text-muted-foreground" />}
+                                    {pago.estado === 'pagado' && <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />}
                                 </div>
-                            </div>
-                        ))}
-                        {dayPagos.length > 3 && (
+                            )
+                        })}
+                        {dayPagos.length > visibles && (
                             <Dialog>
                                 <DialogTrigger asChild>
-                                    <div className="text-[10px] font-bold text-center text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors py-0.5 cursor-pointer rounded-sm mt-0.5">
-                                        + {dayPagos.length - 3} más
+                                    <div className="text-[10px] font-bold text-center text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors py-0.5 cursor-pointer rounded-sm">
+                                        + {dayPagos.length - visibles} más
                                     </div>
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-[425px]">

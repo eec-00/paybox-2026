@@ -1,203 +1,115 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileText, DollarSign, TrendingUp, Calendar, CreditCard, User, PieChart } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { AlertCircle, ArrowDownRight, ArrowUpRight, RefreshCw } from 'lucide-react'
 import { fetchAllRows } from '@/lib/supabase/fetchAll'
 
-interface DashboardStats {
-  totalPayments: number
-  // Soles
-  totalAmountSoles: number
-  monthlyTotalSoles: number
-  userAmountSoles: number
-  // Dólares
-  totalAmountDolares: number
-  monthlyTotalDolares: number
-  userAmountDolares: number
-  // Counts
-  userPayments: number
-  todayPayments: number
+interface Registro {
+  fecha_y_hora_pago: string | null
+  monto: number | null
+  moneda: string | null
+  metodo_pago: string | null
+  categoria_id: string | number | null
+  creado_por: string | null
 }
 
-interface PaymentsByMethod {
-  method: string
-  count: number
-  amountSoles: number
-  amountDolares: number
+/** Registro con su fecha ya pasada a día calendario de Lima (YYYY-MM-DD). */
+interface Pago {
+  dia: string
+  monto: number
+  dolares: boolean
+  metodo: string
+  categoria: string
+  mio: boolean
 }
 
-interface PaymentsByCategory {
-  category: string
-  count: number
-  amountSoles: number
-  amountDolares: number
+type Periodo = 'mes' | 'todo'
+
+// Las fechas se guardan en UTC: sin convertir, un pago de las 8 p. m. en Lima
+// caía en el día (o mes) siguiente.
+const fmtDiaLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' })
+const diaLima = (d: Date) => fmtDiaLima.format(d)
+
+/** Suma/resta días a una fecha calendario (YYYY-MM-DD) sin depender de la zona del navegador. */
+function sumarDias(dia: string, n: number): string {
+  const [y, m, d] = dia.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + n, 12)).toISOString().slice(0, 10)
+}
+const fechaUTC = (dia: string) => new Date(`${dia}T12:00:00Z`)
+
+const soles = (n: number) => `S/ ${n.toLocaleString('es-PE', { maximumFractionDigits: 0 })}`
+const dolares = (n: number) => `$ ${n.toLocaleString('es-PE', { maximumFractionDigits: 0 })}`
+
+interface Totales { soles: number; dolares: number; count: number }
+const vacio = (): Totales => ({ soles: 0, dolares: 0, count: 0 })
+function totalizar(pagos: Pago[]): Totales {
+  const t = vacio()
+  for (const p of pagos) {
+    t.count++
+    if (p.dolares) t.dolares += p.monto
+    else t.soles += p.monto
+  }
+  return t
 }
 
-interface DailyTrend {
-  date: string
-  count: number
-  amountSoles: number
-  amountDolares: number
+/** Agrupa por una clave y ordena por monto en soles (la moneda principal). */
+function agrupar(pagos: Pago[], clave: (p: Pago) => string) {
+  const m = new Map<string, Totales>()
+  for (const p of pagos) {
+    const k = clave(p)
+    const t = m.get(k) ?? vacio()
+    t.count++
+    if (p.dolares) t.dolares += p.monto
+    else t.soles += p.monto
+    m.set(k, t)
+  }
+  return Array.from(m, ([nombre, t]) => ({ nombre, ...t })).sort((a, b) => b.soles - a.soles || b.dolares - a.dolares)
 }
 
 export function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalPayments: 0,
-    totalAmountSoles: 0,
-    monthlyTotalSoles: 0,
-    userAmountSoles: 0,
-    totalAmountDolares: 0,
-    monthlyTotalDolares: 0,
-    userAmountDolares: 0,
-    userPayments: 0,
-    todayPayments: 0
-  })
-  const [paymentsByMethod, setPaymentsByMethod] = useState<PaymentsByMethod[]>([])
-  const [topCategories, setTopCategories] = useState<PaymentsByCategory[]>([])
-  const [weeklyTrend, setWeeklyTrend] = useState<DailyTrend[]>([])
+  const [pagos, setPagos] = useState<Pago[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [periodo, setPeriodo] = useState<Periodo>('mes')
+  const [actualizado, setActualizado] = useState<Date | null>(null)
   const supabase = createClient()
 
   const fetchStats = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
 
-      const today = new Date().toISOString().split('T')[0]
-      const currentMonth = new Date().toISOString().slice(0, 7)
+      const [registros, categoriasRes] = await Promise.all([
+        fetchAllRows<Registro>((from, to) =>
+          supabase
+            .from('registros')
+            .select('fecha_y_hora_pago, monto, moneda, metodo_pago, categoria_id, creado_por')
+            .order('fecha_y_hora_pago', { ascending: false })
+            .range(from, to)
+        ),
+        supabase.from('categorias').select('id, categoria_nombre'),
+      ])
+      if (categoriasRes.error) throw categoriasRes.error
 
-      const payments = await fetchAllRows<any>((from, to) =>
-        supabase
-          .from('registros')
-          .select('*')
-          .order('fecha_y_hora_pago', { ascending: false })
-          .range(from, to)
-      )
+      const categorias = new Map((categoriasRes.data ?? []).map((c) => [c.id, c.categoria_nombre as string]))
 
-      const { data: categories, error: categoriesError } = await supabase
-        .from('categorias')
-        .select('*')
-
-      if (categoriesError) {
-        console.error('Error en consulta de categorías:', categoriesError)
-      }
-
-      const categoriesMap = new Map(
-        categories?.map(c => [c.id, c.categoria_nombre]) || []
-      )
-
-      const enrichedPayments = payments.map(p => ({
-        ...p,
-        categoria_nombre: categoriesMap.get(p.categoria_id) || 'Sin categoría'
-      }))
-
-      // Helper: separar monto por moneda
-      const isSoles = (p: any) => !p.moneda || p.moneda === 'soles'
-      const isDolares = (p: any) => p.moneda === 'dolares'
-
-      // Totales globales
-      const totalAmountSoles = enrichedPayments
-        .filter(isSoles)
-        .reduce((sum, p) => sum + (p.monto || 0), 0)
-      const totalAmountDolares = enrichedPayments
-        .filter(isDolares)
-        .reduce((sum, p) => sum + (p.monto || 0), 0)
-
-      // Totales mensuales
-      const monthlyPayments = enrichedPayments.filter(p =>
-        p.fecha_y_hora_pago?.startsWith(currentMonth)
-      )
-      const monthlyTotalSoles = monthlyPayments
-        .filter(isSoles)
-        .reduce((sum, p) => sum + (p.monto || 0), 0)
-      const monthlyTotalDolares = monthlyPayments
-        .filter(isDolares)
-        .reduce((sum, p) => sum + (p.monto || 0), 0)
-
-      // Estadísticas del usuario actual
-      const userPayments = enrichedPayments.filter(p => p.creado_por === user?.id)
-      const userAmountSoles = userPayments
-        .filter(isSoles)
-        .reduce((sum, p) => sum + (p.monto || 0), 0)
-      const userAmountDolares = userPayments
-        .filter(isDolares)
-        .reduce((sum, p) => sum + (p.monto || 0), 0)
-
-      // Pagos de hoy
-      const todayPaymentsCount = enrichedPayments.filter(p =>
-        p.fecha_y_hora_pago?.startsWith(today)
-      ).length
-
-      setStats({
-        totalPayments: enrichedPayments.length,
-        totalAmountSoles,
-        monthlyTotalSoles,
-        userAmountSoles,
-        totalAmountDolares,
-        monthlyTotalDolares,
-        userAmountDolares,
-        userPayments: userPayments.length,
-        todayPayments: todayPaymentsCount
-      })
-
-      // Agrupar por método de pago (separando monedas)
-      const methodsMap = new Map<string, { count: number; amountSoles: number; amountDolares: number }>()
-      enrichedPayments.forEach(p => {
-        const method = p.metodo_pago || 'Sin especificar'
-        const current = methodsMap.get(method) || { count: 0, amountSoles: 0, amountDolares: 0 }
-        methodsMap.set(method, {
-          count: current.count + 1,
-          amountSoles: current.amountSoles + (isSoles(p) ? (p.monto || 0) : 0),
-          amountDolares: current.amountDolares + (isDolares(p) ? (p.monto || 0) : 0),
-        })
-      })
-      setPaymentsByMethod(
-        Array.from(methodsMap.entries())
-          .map(([method, data]) => ({ method, ...data }))
-          .sort((a, b) => (b.amountSoles + b.amountDolares) - (a.amountSoles + a.amountDolares))
-      )
-
-      // Top 5 categorías (separando monedas)
-      const categoriesAmountMap = new Map<string, { count: number; amountSoles: number; amountDolares: number }>()
-      enrichedPayments.forEach(p => {
-        const category = p.categoria_nombre
-        const current = categoriesAmountMap.get(category) || { count: 0, amountSoles: 0, amountDolares: 0 }
-        categoriesAmountMap.set(category, {
-          count: current.count + 1,
-          amountSoles: current.amountSoles + (isSoles(p) ? (p.monto || 0) : 0),
-          amountDolares: current.amountDolares + (isDolares(p) ? (p.monto || 0) : 0),
-        })
-      })
-      setTopCategories(
-        Array.from(categoriesAmountMap.entries())
-          .map(([category, data]) => ({ category, ...data }))
-          .sort((a, b) => (b.amountSoles + b.amountDolares) - (a.amountSoles + a.amountDolares))
-          .slice(0, 3)
-      )
-
-      // Tendencia de los últimos 7 días
-      const last7Days = Array.from({ length: 7 }, (_, i) => {
-        const date = new Date()
-        date.setDate(date.getDate() - (6 - i))
-        return date.toISOString().split('T')[0]
-      })
-
-      const trends = last7Days.map(date => {
-        const dayPayments = enrichedPayments.filter(p =>
-          p.fecha_y_hora_pago?.startsWith(date)
-        )
-        return {
-          date,
-          count: dayPayments.length,
-          amountSoles: dayPayments.filter(isSoles).reduce((sum, p) => sum + (p.monto || 0), 0),
-          amountDolares: dayPayments.filter(isDolares).reduce((sum, p) => sum + (p.monto || 0), 0),
-        }
-      })
-      setWeeklyTrend(trends)
-
-    } catch (error) {
-      console.error('Error fetching stats:', error)
+      setPagos(registros
+        .filter((r) => r.fecha_y_hora_pago)
+        .map((r) => ({
+          dia: diaLima(new Date(r.fecha_y_hora_pago!)),
+          monto: r.monto || 0,
+          dolares: r.moneda === 'dolares',
+          metodo: r.metodo_pago || 'Sin especificar',
+          categoria: (r.categoria_id != null && categorias.get(r.categoria_id)) || 'Sin categoría',
+          mio: !!user && r.creado_por === user.id,
+        })))
+      setActualizado(new Date())
+    } catch (e) {
+      console.error('Error fetching stats:', e)
+      setError(e instanceof Error ? e.message : 'No se pudieron cargar los datos')
     } finally {
       setLoading(false)
     }
@@ -207,336 +119,301 @@ export function Dashboard() {
     fetchStats()
   }, [fetchStats])
 
-  if (loading) {
+  const hoy = diaLima(new Date())
+  const mes = hoy.slice(0, 7)
+
+  const resumen = useMemo(() => {
+    const delMes = pagos.filter((p) => p.dia.startsWith(mes))
+
+    // Mismo tramo del mes anterior (día 1 al día de hoy) para que la
+    // comparación sea justa a mitad de mes.
+    const [y, m, d] = hoy.split('-').map(Number)
+    const mesAnt = new Date(Date.UTC(y, m - 2, 1, 12))
+    const ultimoDiaAnt = new Date(Date.UTC(mesAnt.getUTCFullYear(), mesAnt.getUTCMonth() + 1, 0, 12)).getUTCDate()
+    const prefAnt = mesAnt.toISOString().slice(0, 7)
+    const corteAnt = `${prefAnt}-${String(Math.min(d, ultimoDiaAnt)).padStart(2, '0')}`
+    const tramoAnt = pagos.filter((p) => p.dia.startsWith(prefAnt) && p.dia <= corteAnt)
+
+    const semana = Array.from({ length: 7 }, (_, i) => sumarDias(hoy, i - 6))
+    const porDia = semana.map((dia) => ({ dia, ...totalizar(pagos.filter((p) => p.dia === dia)) }))
+
+    const base = periodo === 'mes' ? delMes : pagos
+    return {
+      mes: totalizar(delMes),
+      mesAnterior: totalizar(tramoAnt),
+      nombreMesAnt: mesAnt.toLocaleDateString('es-PE', { month: 'long', timeZone: 'UTC' }),
+      hoy: totalizar(pagos.filter((p) => p.dia === hoy)),
+      historico: totalizar(pagos),
+      mios: totalizar(pagos.filter((p) => p.mio)),
+      semana: porDia,
+      totalSemana: totalizar(pagos.filter((p) => p.dia >= semana[0] && p.dia <= hoy)),
+      metodos: agrupar(base, (p) => p.metodo),
+      categorias: agrupar(base, (p) => p.categoria),
+      base: totalizar(base),
+    }
+  }, [pagos, periodo, hoy, mes])
+
+  const nombreMes = fechaUTC(hoy).toLocaleDateString('es-PE', { month: 'long', timeZone: 'UTC' })
+
+  // ─── Encabezado ──────────────────────────────────────────────────────────
+  const header = (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">Resumen de pagos</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {loading && !actualizado
+            ? 'Cargando información…'
+            : actualizado
+              ? `Actualizado a las ${actualizado.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}`
+              : 'Registros de pagos del sistema'}
+        </p>
+      </div>
+      <Button variant="outline" size="sm" onClick={fetchStats} disabled={loading} className="gap-1.5 self-start sm:self-auto">
+        <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+        Actualizar
+      </Button>
+    </div>
+  )
+
+  if (error && !pagos.length) {
     return (
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-3xl font-bold text-primary mb-2">Dashboard</h2>
-          <p className="text-muted-foreground">Cargando información...</p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="pb-2">
-                <div className="h-4 bg-muted rounded w-24"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 bg-muted rounded w-32 mb-2"></div>
-                <div className="h-3 bg-muted rounded w-20"></div>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="space-y-6">
+        {header}
+        <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">No se pudo cargar el resumen.</p>
+            <p className="text-sm text-muted-foreground">{error.replace(/\.$/, '')}. Revisa tu conexión e inténtalo de nuevo.</p>
+            <Button size="sm" variant="outline" onClick={fetchStats}>Reintentar</Button>
+          </div>
         </div>
       </div>
     )
   }
 
-  const hasDolares = stats.totalAmountDolares > 0
+  if (loading && !actualizado) {
+    return (
+      <div className="space-y-6" aria-busy="true">
+        {header}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-px rounded-xl border bg-border overflow-hidden">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="bg-card p-4 sm:p-5 space-y-3">
+              <div className="h-3 w-20 rounded bg-muted animate-pulse" />
+              <div className="h-7 w-28 rounded bg-muted animate-pulse" />
+              <div className="h-3 w-24 rounded bg-muted animate-pulse" />
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          {[0, 1].map((i) => <div key={i} className="h-72 rounded-xl border bg-card animate-pulse" />)}
+        </div>
+        <div className="h-64 rounded-xl border bg-card animate-pulse" />
+      </div>
+    )
+  }
+
+  const r = resumen
+  const variacion = r.mesAnterior.soles > 0 ? ((r.mes.soles - r.mesAnterior.soles) / r.mesAnterior.soles) * 100 : null
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-primary mb-1">Dashboard</h2>
-        <p className="text-sm text-muted-foreground">Resumen general del sistema de gestión de pagos</p>
-      </div>
+    <div className="space-y-6">
+      {header}
 
-      {/* Tarjetas principales — 2 columnas en móvil, 4 en desktop */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {/* Total de Registros */}
-        <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-primary">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 sm:px-4 pt-2 sm:pt-3">
-            <CardTitle className="text-xs sm:text-sm font-medium">Total Registros</CardTitle>
-            <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
-          </CardHeader>
-          <CardContent className="px-3 sm:px-4 pb-2 sm:pb-3">
-            <div className="text-xl sm:text-2xl font-bold">{stats.totalPayments}</div>
-            <p className="text-xs text-muted-foreground mt-1">En el sistema</p>
-          </CardContent>
-        </Card>
+      {/* ─── Indicadores ─────────────────────────────────────────────────── */}
+      <section
+        aria-label="Indicadores principales"
+        className="grid grid-cols-2 lg:grid-cols-4 gap-px rounded-xl border bg-border shadow-sm overflow-hidden"
+      >
+        <Kpi etiqueta={`Este mes · ${nombreMes}`} valor={soles(r.mes.soles)} dolares={r.mes.dolares}>
+          {variacion !== null ? (
+            <span className={`inline-flex items-center gap-0.5 font-medium ${variacion >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}>
+              {variacion >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+              {Math.abs(variacion).toLocaleString('es-PE', { maximumFractionDigits: 0 })}%
+              <span className="font-normal text-muted-foreground">&nbsp;vs. {r.nombreMesAnt} a la fecha</span>
+            </span>
+          ) : (
+            <span>{r.mes.count} pagos</span>
+          )}
+        </Kpi>
+        <Kpi etiqueta="Hoy" valor={soles(r.hoy.soles)} dolares={r.hoy.dolares}>
+          {r.hoy.count === 0 ? 'Sin pagos registrados' : `${r.hoy.count} pago${r.hoy.count !== 1 ? 's' : ''}`}
+        </Kpi>
+        <Kpi etiqueta="Histórico" valor={soles(r.historico.soles)} dolares={r.historico.dolares}>
+          {r.historico.count.toLocaleString('es-PE')} registros
+        </Kpi>
+        <Kpi etiqueta="Mis registros" valor={r.mios.count.toLocaleString('es-PE')}>
+          {soles(r.mios.soles)}{r.mios.dolares > 0 && ` · ${dolares(r.mios.dolares)}`}
+        </Kpi>
+      </section>
 
-        {/* Monto Total en Soles */}
-        <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-green-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 sm:px-4 pt-2 sm:pt-3">
-            <CardTitle className="text-xs sm:text-sm font-medium">Monto Total</CardTitle>
-            <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 shrink-0" />
-          </CardHeader>
-          <CardContent className="px-3 sm:px-4 pb-2 sm:pb-3">
-            <div className="text-base sm:text-2xl font-bold leading-tight">
-              S/ {stats.totalAmountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
-            </div>
-            {hasDolares && (
-              <div className="text-xs sm:text-sm font-semibold text-amber-600 mt-0.5">
-                $ {stats.totalAmountDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">Todos los pagos</p>
-          </CardContent>
-        </Card>
-
-        {/* Mes Actual */}
-        <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-blue-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 sm:px-4 pt-2 sm:pt-3">
-            <CardTitle className="text-xs sm:text-sm font-medium">Mes Actual</CardTitle>
-            <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 shrink-0" />
-          </CardHeader>
-          <CardContent className="px-3 sm:px-4 pb-2 sm:pb-3">
-            <div className="text-base sm:text-2xl font-bold leading-tight">
-              S/ {stats.monthlyTotalSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
-            </div>
-            {hasDolares && stats.monthlyTotalDolares > 0 && (
-              <div className="text-xs sm:text-sm font-semibold text-amber-600 mt-0.5">
-                $ {stats.monthlyTotalDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground mt-1 capitalize">
-              {new Date().toLocaleDateString('es-PE', { month: 'long' })}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Mis Registros */}
-        <Card className="hover:shadow-lg transition-shadow border-l-4 border-l-secondary">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 sm:px-4 pt-2 sm:pt-3">
-            <CardTitle className="text-xs sm:text-sm font-medium">Mis Registros</CardTitle>
-            <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-secondary shrink-0" />
-          </CardHeader>
-          <CardContent className="px-3 sm:px-4 pb-2 sm:pb-3">
-            <div className="text-xl sm:text-2xl font-bold">{stats.userPayments}</div>
-            <p className="text-xs text-muted-foreground mt-1 truncate">
-              S/ {stats.userAmountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
-              {hasDolares && stats.userAmountDolares > 0 && (
-                <span className="text-amber-600 ml-1">
-                  · $ {stats.userAmountDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
-                </span>
-              )}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Grid de información detallada */}
-      <div className="grid gap-3 sm:gap-6 md:grid-cols-2">
-        {/* Distribución por Método de Pago */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-primary" />
-              Por Método de Pago
-            </CardTitle>
-            <CardDescription>
-              Distribución de pagos según el método utilizado
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {paymentsByMethod.slice(0, 5).map((method, index) => {
-                const maxSoles = paymentsByMethod[0]?.amountSoles || 1
-                const maxDolares = Math.max(...paymentsByMethod.map(m => m.amountDolares), 1)
-                const percentageSoles = (method.amountSoles / maxSoles) * 100
-                const percentageDolares = (method.amountDolares / maxDolares) * 100
-
-                const barColors = [
-                  'bg-primary',
-                  'bg-secondary',
-                  'bg-green-500',
-                  'bg-blue-500',
-                  'bg-purple-500',
-                ]
-
-                return (
-                  <div key={index} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{method.method}</span>
-                      <span className="text-muted-foreground">{method.count} pagos</span>
-                    </div>
-                    {/* Barra soles */}
-                    {method.amountSoles > 0 && (
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 bg-muted rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full transition-all ${barColors[index]}`}
-                            style={{ width: `${percentageSoles}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm font-bold min-w-[5rem] text-right">
-                          S/ {method.amountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
-                        </span>
-                      </div>
-                    )}
-                    {/* Barra dólares */}
-                    {method.amountDolares > 0 && (
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 bg-muted rounded-full h-2">
-                          <div
-                            className="h-2 rounded-full transition-all bg-amber-400"
-                            style={{ width: `${percentageDolares}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm font-bold min-w-[5rem] text-right text-amber-600">
-                          $ {method.amountDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-              {paymentsByMethod.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  No hay datos disponibles
-                </p>
-              )}
-            </div>
-
-            {/* Leyenda de monedas */}
-            {hasDolares && (
-              <div className="flex items-center gap-4 mt-4 pt-3 border-t text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 rounded-full bg-primary"></span>
-                  Soles (S/)
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 rounded-full bg-amber-400"></span>
-                  Dólares ($)
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Top Categorías */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PieChart className="h-5 w-5 text-primary" />
-              Top 3 Categorías
-            </CardTitle>
-            <CardDescription>
-              Categorías con mayor gasto acumulado
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {topCategories.map((cat, index) => {
-                const maxSoles = topCategories[0]?.amountSoles || 1
-                const maxDolares = Math.max(...topCategories.map(c => c.amountDolares), 1)
-                const percentageSoles = (cat.amountSoles / maxSoles) * 100
-                const percentageDolares = (cat.amountDolares / maxDolares) * 100
-
-                return (
-                  <div key={index} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="text-xs font-bold text-muted-foreground">#{index + 1}</span>
-                        <span className="font-medium truncate" title={cat.category}>
-                          {cat.category}
-                        </span>
-                      </div>
-                      <span className="text-muted-foreground whitespace-nowrap ml-2">{cat.count} registros</span>
-                    </div>
-                    {/* Barra soles */}
-                    {cat.amountSoles > 0 && (
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 bg-muted rounded-full h-2">
-                          <div
-                            className="bg-linear-to-r from-primary to-secondary h-2 rounded-full transition-all"
-                            style={{ width: `${percentageSoles}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm font-bold min-w-[5rem] text-right">
-                          S/ {cat.amountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
-                        </span>
-                      </div>
-                    )}
-                    {/* Barra dólares */}
-                    {cat.amountDolares > 0 && (
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 bg-muted rounded-full h-2">
-                          <div
-                            className="h-2 rounded-full transition-all bg-amber-400"
-                            style={{ width: `${percentageDolares}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm font-bold min-w-[5rem] text-right text-amber-600">
-                          $ {cat.amountDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-              {topCategories.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  No hay datos disponibles
-                </p>
-              )}
-            </div>
-
-            {/* Leyenda de monedas */}
-            {hasDolares && (
-              <div className="flex items-center gap-4 mt-4 pt-3 border-t text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 rounded-full bg-primary"></span>
-                  Soles (S/)
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block w-3 h-3 rounded-full bg-amber-400"></span>
-                  Dólares ($)
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tendencia Semanal */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-primary" />
-            Tendencia de los Últimos 7 Días
-          </CardTitle>
-          <CardDescription>
-            Actividad de registro en la última semana
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-7 gap-1 sm:gap-2">
-            {weeklyTrend.map((day, index) => {
-              const date = new Date(day.date)
-              const dayName = date.toLocaleDateString('es-PE', { weekday: 'short' })
-              const dayNum = date.getDate()
-              const maxAmount = Math.max(...weeklyTrend.map(d => d.amountSoles + d.amountDolares), 1)
-              const totalDay = day.amountSoles + day.amountDolares
-              const heightPercentage = (totalDay / maxAmount) * 100
-
-              return (
-                <div key={index} className="flex flex-col items-center gap-1 sm:gap-2">
-                  <div className="h-20 sm:h-32 w-full flex items-end justify-center">
-                    <div
-                      className="w-full bg-linear-to-r from-primary to-secondary rounded-t-md transition-all hover:opacity-80 relative group"
-                      style={{ height: `${Math.max(heightPercentage, 8)}%` }}
-                      title={`${day.count} pagos · S/ ${day.amountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}${day.amountDolares > 0 ? ` · $ ${day.amountDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}` : ''}`}
-                    >
-                      <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-                        <div>{day.count} pagos</div>
-                        {day.amountSoles > 0 && <div>S/ {day.amountSoles.toLocaleString('es-PE', { maximumFractionDigits: 0 })}</div>}
-                        {day.amountDolares > 0 && <div className="text-amber-300">$ {day.amountDolares.toLocaleString('es-PE', { maximumFractionDigits: 0 })}</div>}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] sm:text-xs font-medium capitalize">
-                      <span className="sm:hidden">{dayName.charAt(0).toUpperCase()}</span>
-                      <span className="hidden sm:inline">{dayName}</span>
-                    </p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">{dayNum}</p>
-                  </div>
-                </div>
-              )
-            })}
+      {/* ─── Desgloses ───────────────────────────────────────────────────── */}
+      <section aria-labelledby="desglose-titulo" className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 id="desglose-titulo" className="text-base font-semibold text-foreground">
+            Distribución {periodo === 'mes' ? `de ${nombreMes}` : 'histórica'}
+            <span className="ml-2 text-sm font-normal text-muted-foreground tabular-nums">
+              {soles(r.base.soles)}{r.base.dolares > 0 && ` · ${dolares(r.base.dolares)}`}
+            </span>
+          </h3>
+          <div role="radiogroup" aria-label="Período" className="inline-flex rounded-lg border bg-muted/50 p-0.5">
+            {([['mes', 'Este mes'], ['todo', 'Histórico']] as const).map(([k, label]) => (
+              <button
+                key={k}
+                role="radio"
+                aria-checked={periodo === k}
+                onClick={() => setPeriodo(k)}
+                className={`rounded-md px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  periodo === k ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Desglose titulo="Por método de pago" filas={r.metodos} totalSoles={r.base.soles} max={6} />
+          <Desglose titulo="Por categoría" filas={r.categorias} totalSoles={r.base.soles} max={6} />
+        </div>
+      </section>
+
+      {/* ─── Últimos 7 días ──────────────────────────────────────────────── */}
+      <Semana dias={r.semana} hoy={hoy} total={r.totalSemana} />
     </div>
+  )
+}
+
+// ─── Piezas ──────────────────────────────────────────────────────────────
+
+function Kpi({ etiqueta, valor, dolares: usd, children }: { etiqueta: string; valor: string; dolares?: number; children?: React.ReactNode }) {
+  return (
+    <div className="bg-card p-4 sm:p-5 min-w-0">
+      <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{etiqueta}</p>
+      <p className="mt-1.5 text-xl sm:text-[1.75rem] font-semibold tracking-tight text-foreground tabular-nums leading-none">
+        {valor}
+      </p>
+      {!!usd && usd > 0 && (
+        <p className="mt-1 text-sm font-medium text-foreground/80 tabular-nums">+ {dolares(usd)}</p>
+      )}
+      <div className="mt-2 text-xs text-muted-foreground tabular-nums">{children}</div>
+    </div>
+  )
+}
+
+function Desglose({ titulo, filas, totalSoles, max }: {
+  titulo: string
+  filas: ({ nombre: string } & Totales)[]
+  totalSoles: number
+  max: number
+}) {
+  // Lo que no entra en el top se pliega en "Otros" para no perder el total.
+  const visibles = filas.length > max ? filas.slice(0, max - 1) : filas
+  const resto = filas.length > max ? filas.slice(max - 1) : []
+  const lista = resto.length
+    ? [...visibles, { nombre: `Otros (${resto.length})`, ...resto.reduce((a, f) => ({ soles: a.soles + f.soles, dolares: a.dolares + f.dolares, count: a.count + f.count }), vacio()) }]
+    : visibles
+
+  return (
+    <div className="rounded-xl border bg-card p-4 sm:p-5 shadow-sm">
+      <h4 className="text-sm font-semibold text-foreground">{titulo}</h4>
+      {lista.length === 0 ? (
+        <p className="py-10 text-center text-sm text-muted-foreground">No hay pagos en este período.</p>
+      ) : (
+        <ul className="mt-4 space-y-3.5">
+          {lista.map((f) => {
+            const pct = totalSoles > 0 ? (f.soles / totalSoles) * 100 : 0
+            return (
+              <li key={f.nombre}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="truncate font-medium text-foreground" title={f.nombre}>{f.nombre}</span>
+                  <span className="shrink-0 tabular-nums font-semibold text-foreground">{soles(f.soles)}</span>
+                </div>
+                <div className="mt-1.5 flex items-center gap-3">
+                  <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden" aria-hidden>
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(pct, pct > 0 ? 1 : 0)}%` }} />
+                  </div>
+                  <span className="w-28 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                    {pct.toLocaleString('es-PE', { maximumFractionDigits: pct < 10 ? 1 : 0 })}% · {f.count} pago{f.count !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                {f.dolares > 0 && (
+                  <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">además {dolares(f.dolares)}</p>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function Semana({ dias, hoy, total }: { dias: ({ dia: string } & Totales)[]; hoy: string; total: Totales }) {
+  const [activo, setActivo] = useState<string | null>(null)
+  const maxSoles = Math.max(...dias.map((d) => d.soles), 0)
+  const detalle = dias.find((d) => d.dia === activo)
+
+  return (
+    <section aria-labelledby="semana-titulo" className="rounded-xl border bg-card p-4 sm:p-5 shadow-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 id="semana-titulo" className="text-base font-semibold text-foreground">Últimos 7 días</h3>
+        <p className="text-sm tabular-nums text-muted-foreground">
+          <span className="font-semibold text-foreground">{soles(total.soles)}</span>
+          {total.dolares > 0 && ` · ${dolares(total.dolares)}`} · {total.count} pagos
+        </p>
+      </div>
+
+      {/* Detalle del día enfocado (mouse, teclado o toque) */}
+      <p className="mt-1 h-5 text-xs tabular-nums text-muted-foreground" aria-live="polite">
+        {detalle
+          ? `${fechaUTC(detalle.dia).toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}: ${
+              detalle.count === 0 ? 'sin pagos' : `${soles(detalle.soles)}${detalle.dolares > 0 ? ` · ${dolares(detalle.dolares)}` : ''} en ${detalle.count} pago${detalle.count !== 1 ? 's' : ''}`
+            }`
+          : 'Pasa el cursor o toca un día para ver el detalle'}
+      </p>
+
+      <div className="mt-3 grid grid-cols-7 gap-1.5 sm:gap-3" onMouseLeave={() => setActivo(null)}>
+        {dias.map((d) => {
+          const alto = maxSoles > 0 ? (d.soles / maxSoles) * 100 : 0
+          const esHoy = d.dia === hoy
+          const esMax = d.soles > 0 && d.soles === maxSoles
+          const f = fechaUTC(d.dia)
+          const nombre = f.toLocaleDateString('es-PE', { weekday: 'short', timeZone: 'UTC' }).replace('.', '')
+          return (
+            <button
+              key={d.dia}
+              type="button"
+              onMouseEnter={() => setActivo(d.dia)}
+              onFocus={() => setActivo(d.dia)}
+              onBlur={() => setActivo(null)}
+              onClick={() => setActivo((a) => (a === d.dia ? null : d.dia))}
+              aria-label={`${f.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', timeZone: 'UTC' })}: ${soles(d.soles)}, ${d.count} pagos`}
+              className="group flex flex-col items-stretch gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <div className="relative h-32 sm:h-40 flex items-end border-b border-border">
+                {/* Única etiqueta directa: el día con más monto */}
+                {esMax && (
+                  <span className="absolute inset-x-0 text-center text-[10px] sm:text-xs font-semibold tabular-nums text-foreground" style={{ bottom: `calc(${alto}% + 4px)` }}>
+                    {d.soles >= 1000 ? `${(d.soles / 1000).toLocaleString('es-PE', { maximumFractionDigits: 1 })}k` : Math.round(d.soles)}
+                  </span>
+                )}
+                {d.soles > 0 && (
+                  <div
+                    className={`w-full rounded-t-lg transition-opacity bg-primary ${activo && activo !== d.dia ? 'opacity-40' : 'opacity-100'}`}
+                    style={{ height: `${Math.max(alto, 2)}%` }}
+                  />
+                )}
+              </div>
+              <span className={`text-center text-[11px] sm:text-xs capitalize leading-tight ${esHoy ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                {esHoy ? 'Hoy' : nombre}
+                <span className="block tabular-nums">{f.getUTCDate()}</span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">Montos en soles. Los pagos en dólares se muestran en el detalle de cada día.</p>
+    </section>
   )
 }
