@@ -30,6 +30,29 @@ interface ServiciosEditModalProps {
   onSaved: () => void
 }
 
+// Conductores y flota casi no cambian: se piden a Odoo una vez y se reusan en
+// cada apertura del modal por 10 min (antes se bajaban completos cada vez).
+// Si falla, no se guarda — el próximo intento vuelve a pedirlos.
+const CATALOGOS_TTL_MS = 10 * 60_000
+let catalogosCache: { at: number; promise: Promise<[{ empleados?: Conductor[] }, { vehiculos?: Vehiculo[] }]> } | null = null
+
+function cargarCatalogos() {
+  if (catalogosCache && Date.now() - catalogosCache.at < CATALOGOS_TTL_MS) return catalogosCache.promise
+  const post = (action: string) =>
+    fetch('/api/servicios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    }).then(r => {
+      if (!r.ok) throw new Error(`Error al cargar ${action}`)
+      return r.json()
+    })
+  const promise = Promise.all([post('conductores'), post('flota')])
+  catalogosCache = { at: Date.now(), promise }
+  promise.catch(() => { if (catalogosCache?.promise === promise) catalogosCache = null })
+  return promise
+}
+
 function pick(validFields: string[], ...candidates: string[]): string {
   return candidates.find(c => validFields.includes(c)) ?? candidates[0]
 }
@@ -372,16 +395,10 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
     setTiempos(prev => ({ ...prev, [field]: value }))
 
   useEffect(() => {
-    const post = (action: string) =>
-      fetch('/api/servicios', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      }).then(r => r.json())
-
-    Promise.all([post('conductores'), post('flota')])
+    cargarCatalogos()
       .then(([condData, flotaData]) => {
-        const cList: Conductor[] = condData.empleados ?? []
+        // Copia: el array viene del caché compartido y no se debe mutar
+        const cList: Conductor[] = [...(condData.empleados ?? [])]
         const curCond = task[F.conductor]
         if (Array.isArray(curCond) && !cList.find(e => e.id === curCond[0])) {
           cList.unshift({ id: curCond[0] as number, name: curCond[1] as string })

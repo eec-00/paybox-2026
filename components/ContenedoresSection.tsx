@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useMemo, useState } from 'react'
+import { useServiciosLista, useProgresoServicios } from '@/lib/servicios/useServicios'
+import { serviciosUrl } from '@/lib/servicios/rango'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -81,42 +82,20 @@ interface ContenedorRow {
   estado: EstadoContenedor
 }
 
+const EMPTY_TASKS: OdooTask[] = []
+
 export function ContenedoresSection() {
-  const supabase = createClient()
-  const [tasks, setTasks] = useState<OdooTask[]>([])
-  const [progresoMap, setProgresoMap] = useState<Map<number, number>>(new Map())
-  const [completadosSet, setCompletadosSet] = useState<Set<number>>(new Set())
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Siempre el histórico completo: un contenedor que lleva más de
+  // DIAS_RECIENTES días sin devolverse es justo el que más importa ver.
+  const lista = useServiciosLista<OdooTask>(serviciosUrl(true))
+  const progreso = useProgresoServicios()
+  const { progresoMap, completadosSet } = progreso
+  const tasks = lista.data?.tasks ?? EMPTY_TASKS
+  const loading = lista.loading
+  const error = lista.error
+  const refrescando = lista.refreshing
+  const fetchData = () => { lista.refresh(); progreso.refresh() }
   const [estadoFilter, setEstadoFilter] = useState<'activos' | 'todos'>('activos')
-
-  const fetchData = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [res, progresoRes, completadosRes] = await Promise.all([
-        fetch('/api/servicios'),
-        supabase.from('conductor_servicios_progreso').select('servicio_id, step_actual'),
-        supabase.from('conductor_servicios_completados').select('servicio_id'),
-      ])
-      if (!res.ok) {
-        const body = await res.json()
-        throw new Error(body.error || 'Error al cargar servicios')
-      }
-      const data = await res.json()
-      setTasks(data.tasks ?? [])
-      setProgresoMap(new Map(
-        (progresoRes.data ?? []).map((p: { servicio_id: number; step_actual: number }) => [p.servicio_id, p.step_actual])
-      ))
-      setCompletadosSet(new Set((completadosRes.data ?? []).map((c: { servicio_id: number }) => c.servicio_id)))
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { fetchData() }, [])
 
   // Arma un par (servicio principal + subtarea) por cada servicio que haya
   // generado una subtarea de devolución (importación) o retiro (exportación).
@@ -174,8 +153,8 @@ export function ContenedoresSection() {
             </p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="h-8 gap-1.5">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+        <Button variant="outline" size="sm" onClick={fetchData} disabled={refrescando} className="h-8 gap-1.5">
+          <RefreshCw className={`h-3.5 w-3.5 ${refrescando ? 'animate-spin' : ''}`} />
           Actualizar
         </Button>
       </div>

@@ -3,6 +3,55 @@ import {
   ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS, MODALIDAD_DEVOLUCION_FIELD, MODALIDAD_OTRO_CONDUCTOR,
   detectTipoServicio, type TaskTypeFlags,
 } from '@/lib/servicios/hitos'
+import { fechaCorte } from '@/lib/servicios/rango'
+import { createClient } from '@/lib/supabase/server'
+
+type Acceso =
+  | { tipo: 'panel' }
+  | { tipo: 'conductor'; employeeId: number | null; employeeName: string }
+
+/** Quién llama y qué puede hacer. Panel = admin/developer o usuario con el
+ * módulo Servicios (sin module_permissions = acceso a todo, igual que el
+ * Sidebar). Conductor = solo sus propias tareas, y solo marcar hitos /
+ * modalidad / finalizar — nunca leer la lista completa ni editar otros campos. */
+async function getAcceso(): Promise<Acceso | NextResponse> {
+  const supabase = await createClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('role, module_permissions, odoo_employee_id, odoo_employee_name')
+    .eq('id', user.id)
+    .single()
+  if (!profile) return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+
+  if (profile.role === 'conductor') {
+    return { tipo: 'conductor', employeeId: profile.odoo_employee_id || null, employeeName: profile.odoo_employee_name || '' }
+  }
+  const mp = profile.module_permissions as { servicios?: { enabled?: boolean } } | null
+  if (profile.role === 'admin' || profile.role === 'developer' || !mp || mp.servicios?.enabled === true) {
+    return { tipo: 'panel' }
+  }
+  return NextResponse.json({ error: 'Se requiere acceso al módulo de Servicios' }, { status: 403 })
+}
+
+// Lo único que el portal del conductor escribe: la hora de cada hito y la
+// modalidad de devolución.
+const CAMPOS_CONDUCTOR = new Set<string>([...ALL_HITO_FIELDS, MODALIDAD_DEVOLUCION_FIELD])
+
+/** ¿La tarea está asignada a este conductor? Mismo criterio que
+ * /api/conductor/servicios: por id de empleado, o por nombre si no lo tiene. */
+async function esTareaDelConductor(uid: number, taskId: number, acceso: Extract<Acceso, { tipo: 'conductor' }>): Promise<boolean> {
+  const [task] = await odooCall<{ x_studio_conductor: [number, string] | false }[]>(
+    uid, 'project.task', 'read', [[taskId]], { fields: ['x_studio_conductor'] }
+  )
+  const ref = task?.x_studio_conductor
+  if (!Array.isArray(ref)) return false
+  if (acceso.employeeId) return ref[0] === acceso.employeeId
+  const nombre = acceso.employeeName.trim().toLowerCase()
+  return !!nombre && ref[1].toLowerCase().includes(nombre)
+}
 
 const ODOO_URL = (process.env.ODOO_URL || process.env.URL_ODOO || '').trim().replace(/\/$/, '')
 const ODOO_DB = (process.env.ODOO_DB || process.env.DB || '').trim()
@@ -110,6 +159,12 @@ async function getValidFields(uid: number): Promise<string[]> {
 
 export async function GET(request: Request) {
   try {
+    // La lista y el detalle exponen clientes y datos de todos los servicios:
+    // solo para el panel. El conductor lee lo suyo en /api/conductor/servicios.
+    const acceso = await getAcceso()
+    if (acceso instanceof NextResponse) return acceso
+    if (acceso.tipo !== 'panel') return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+
     const { searchParams } = new URL(request.url)
     const idParam = searchParams.get('id')
     const stageFilter = searchParams.get('stage') || ''
@@ -241,6 +296,21 @@ export async function GET(request: Request) {
 
     const domain: unknown[] = [['project_id', '=', projectId]]
     if (stageFilter) domain.push(['stage_id.name', 'ilike', stageFilter])
+
+    // ?dias=N → solo servicios programados en los últimos N días. Entran
+    // también las subtareas cuyo servicio padre cae en el rango (pueden no
+    // traer fecha propia) y los servicios aún sin fecha creados en el rango
+    // (ej. una "Nueva solicitud" que todavía no se programa).
+    const dias = parseInt(searchParams.get('dias') || '')
+    if (dias > 0) {
+      const corte = fechaCorte(dias)
+      domain.push(
+        '|', '|',
+        ['x_studio_fecha_de_la_programacin', '>=', corte],
+        ['parent_id.x_studio_fecha_de_la_programacin', '>=', corte],
+        '&', ['x_studio_fecha_de_la_programacin', '=', false], ['create_date', '>=', `${corte} 00:00:00`],
+      )
+    }
 
     const tasks = await odooCall<any[]>(
       uid,
@@ -375,13 +445,27 @@ async function sincronizarAlmacenDevolucion(uid: number, parentId: number, anter
 
 export async function POST(request: Request) {
   try {
+    const acceso = await getAcceso()
+    if (acceso instanceof NextResponse) return acceso
+    const esConductor = acceso.tipo === 'conductor'
+
     const body = await request.json()
+
+    // El conductor solo finaliza o edita (hitos/modalidad) — los catálogos
+    // (conductores, partners, flota) son del modal de edición del panel.
+    if (esConductor && body.action && body.action !== 'finalize') {
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+    }
 
     // conductores → lista de empleados para el select
     // Finalizar servicio → busca stage "Servicio Finalizado" y lo asigna
     if (body.action === 'finalize') {
-      const { id } = body as { id: number }
+      const id = parseInt(body.id)
+      if (!id) return NextResponse.json({ error: 'id requerido' }, { status: 400 })
       const uid = await odooAuth()
+      if (esConductor && !(await esTareaDelConductor(uid, id, acceso))) {
+        return NextResponse.json({ error: 'Este servicio no está asignado a ti' }, { status: 403 })
+      }
       const stages = await odooCall<{ id: number; name: string }[]>(
         uid, 'project.task.type', 'search_read',
         [[['name', '=ilike', 'servicio finalizado']]],
@@ -445,6 +529,16 @@ export async function POST(request: Request) {
     }
 
     const uid = await odooAuth()
+
+    if (esConductor) {
+      const prohibidos = Object.keys(fields).filter(k => !CAMPOS_CONDUCTOR.has(k))
+      if (prohibidos.length) {
+        return NextResponse.json({ error: `Campos no permitidos: ${prohibidos.join(', ')}` }, { status: 403 })
+      }
+      if (!(await esTareaDelConductor(uid, id, acceso))) {
+        return NextResponse.json({ error: 'Este servicio no está asignado a ti' }, { status: 403 })
+      }
+    }
 
     // Validate fields exist before writing — invalid fields → skip silently
     const fieldNames = Object.keys(fields)

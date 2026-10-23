@@ -12,6 +12,8 @@ import {
 } from '@/lib/servicios/sobrecostos'
 import { exportarSobrecostosExcel } from '@/lib/servicios/sobrecostosExcel'
 import { m2oLast6 } from '@/lib/servicios/exportFormats'
+import { fechaCorte, serviciosUrl } from '@/lib/servicios/rango'
+import { useServiciosLista } from '@/lib/servicios/useServicios'
 
 const TIPO_LABEL: Record<SobrecostoInfo['tipo'], string> = {
   despacho: 'Despacho',
@@ -47,31 +49,12 @@ function EstadoBadge({ info }: { info: SobrecostoInfo }) {
   return <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">Sin horas</span>
 }
 
+const EMPTY_TASKS: SobrecostoTask[] = []
+
 export function SobrecostosSection() {
-  const [tasks, setTasks] = useState<SobrecostoTask[]>([])
-  const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [lunes, setLunes] = useState(() => lunesDe(new Date()))
   const [now, setNow] = useState(() => new Date())
-
-  const fetchData = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/servicios')
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al cargar servicios')
-      setTasks(data.tasks ?? [])
-      setNow(new Date())
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { fetchData() }, [])
 
   // Recalcula los servicios en curso cada minuto (el tiempo sigue corriendo)
   useEffect(() => {
@@ -80,6 +63,20 @@ export function SobrecostosSection() {
   }, [])
 
   const semana = useMemo(() => rangoSemana(lunes), [lunes])
+
+  // Se bajan solo los últimos DIAS_RECIENTES días, salvo que se navegue a una
+  // semana más antigua: ahí se carga el histórico completo.
+  const historico = semana.start < fechaCorte()
+
+  const lista = useServiciosLista<SobrecostoTask>(serviciosUrl(historico))
+  const tasks = lista.data?.tasks ?? EMPTY_TASKS
+  const loading = lista.loading
+  const error = lista.error
+  const refrescando = lista.refreshing
+  const fetchData = () => lista.refresh()
+
+  // Al llegar datos nuevos se recalcula "ahora" (tiempos en curso)
+  useEffect(() => { setNow(new Date()) }, [lista.data])
 
   const filas = useMemo(() => {
     return tasks
@@ -136,8 +133,8 @@ export function SobrecostosSection() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="h-8 gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={refrescando} className="h-8 gap-1.5">
+            <RefreshCw className={`h-3.5 w-3.5 ${refrescando ? 'animate-spin' : ''}`} />
             Actualizar
           </Button>
           <Button size="sm" onClick={exportar} disabled={loading || exporting} className="h-8 gap-1.5">

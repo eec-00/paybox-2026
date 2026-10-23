@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   RefreshCw, Search, XCircle, Truck, Pencil, Info, CornerDownRight, RotateCcw, Loader2, CheckCircle2,
-  Columns, Filter, ArrowUp, ArrowDown, ArrowUpDown, Download, FileSpreadsheet, CalendarRange, SlidersHorizontal, AlertTriangle, FileText,
+  Columns, Filter, ArrowUp, ArrowDown, ArrowUpDown, Download, FileSpreadsheet, CalendarRange, SlidersHorizontal, AlertTriangle, FileText, History,
 } from 'lucide-react'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -27,11 +27,12 @@ import { ServiciosResumenDialog } from '@/components/ServiciosResumenDialog'
 import { tipoServicioLabelFor, TIPOS_SERVICIO } from '@/lib/servicios/hitos'
 import { calcularProgreso, ProgresoBadge, ultimoHitoMarcado } from '@/lib/servicios/progreso'
 import { guardarListaNavegacion } from '@/lib/servicios/navegacion'
+import { DIAS_RECIENTES, serviciosUrl } from '@/lib/servicios/rango'
 import {
   EXPORT_FORMATS, buildQuimtiaRow, buildEyMRow, buildCroslandRow,
   QUIMTIA_COLUMNS, EYM_COLUMNS, CROSLAND_COLUMNS, type ExportClientFormat,
 } from '@/lib/servicios/exportFormats'
-import { createClient } from '@/lib/supabase/client'
+import { useServiciosLista, useProgresoServicios } from '@/lib/servicios/useServicios'
 import { toast } from 'sonner'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
@@ -172,6 +173,9 @@ function tipoCargaFor(t: OdooTask): string {
 }
 
 const PAGE_SIZE = 50
+// Referencias estables mientras no hay datos (evita recalcular memos en cada render)
+const EMPTY_STAGES: OdooStage[] = []
+const EMPTY_FIELDS: string[] = []
 const PROGRESO_RANK: Record<string, number> = { sin_iniciar: 0, en_proceso: 1, completado: 2 }
 const HIDDEN_COLUMNS_STORAGE_KEY = 'paybox_servicios_columnas_ocultas'
 
@@ -292,14 +296,29 @@ const COLUMNS: ColumnDef[] = [
 ]
 
 export function ServiciosSection() {
-  const supabase = createClient()
-  const [tasks, setTasks] = useState<OdooTask[]>([])
-  const [stages, setStages] = useState<OdooStage[]>([])
-  const [validFields, setValidFields] = useState<string[]>([])
-  const [progresoMap, setProgresoMap] = useState<Map<number, number>>(new Map())
-  const [completadosSet, setCompletadosSet] = useState<Set<number>>(new Set())
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Por defecto solo los últimos DIAS_RECIENTES días; "Ver histórico" baja todo.
+  const [historico, setHistorico] = useState(false)
+
+  const lista = useServiciosLista<OdooTask>(serviciosUrl(historico))
+  const progreso = useProgresoServicios()
+  const { progresoMap, completadosSet } = progreso
+  const stages: OdooStage[] = lista.data?.stages ?? EMPTY_STAGES
+  const validFields = lista.data?.validFields ?? EMPTY_FIELDS
+  const loading = lista.loading
+  const error = lista.error
+  const refrescando = lista.refreshing
+  const fetchData = () => { lista.refresh(); progreso.refresh() }
+
+  // Orden por código de servicio, no alfabético por nombre completo: una
+  // subtarea no trae el "S0XXXX" en su propio nombre, así que ordenar por
+  // nombre la manda siempre al final de la lista, lejos de su servicio.
+  // Este es el orden por defecto; el usuario puede cambiarlo tocando los
+  // encabezados de la tabla.
+  const tasks = useMemo(
+    () => [...(lista.data?.tasks ?? [])].sort((a, b) => servicioCodigo(b).localeCompare(servicioCodigo(a), undefined, { numeric: true })),
+    [lista.data]
+  )
+
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState('all')
   const [tipoFilter, setTipoFilter] = useState('all')
@@ -357,43 +376,6 @@ export function ServiciosSection() {
     })
   }
   const visibleColumns = useMemo(() => COLUMNS.filter((c) => !hiddenColumns.has(c.key)), [hiddenColumns])
-
-  const fetchData = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [res, progresoRes, completadosRes] = await Promise.all([
-        fetch('/api/servicios'),
-        supabase.from('conductor_servicios_progreso').select('servicio_id, step_actual'),
-        supabase.from('conductor_servicios_completados').select('servicio_id'),
-      ])
-      if (!res.ok) {
-        const body = await res.json()
-        throw new Error(body.error || 'Error al cargar servicios')
-      }
-      const data = await res.json()
-      const loadedTasks: OdooTask[] = data.tasks ?? []
-      // Orden por código de servicio, no alfabético por nombre completo: una
-      // subtarea no trae el "S0XXXX" en su propio nombre, así que ordenar por
-      // nombre la manda siempre al final de la lista, lejos de su servicio.
-      // Este es el orden por defecto; el usuario puede cambiarlo tocando los
-      // encabezados de la tabla.
-      loadedTasks.sort((a, b) => servicioCodigo(b).localeCompare(servicioCodigo(a), undefined, { numeric: true }))
-      setTasks(loadedTasks)
-      setStages(data.stages ?? [])
-      setValidFields(data.validFields ?? [])
-      setProgresoMap(new Map(
-        (progresoRes.data ?? []).map((p: { servicio_id: number; step_actual: number }) => [p.servicio_id, p.step_actual])
-      ))
-      setCompletadosSet(new Set((completadosRes.data ?? []).map((c: { servicio_id: number }) => c.servicio_id)))
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { fetchData() }, [])
 
   const handleConfirmReset = async () => {
     if (!resetTask || resetConfirmCode.trim().toUpperCase() !== servicioCodigo(resetTask).toUpperCase()) return
@@ -837,7 +819,7 @@ export function ServiciosSection() {
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Servicios de Transporte</h2>
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              Proyecto Odoo · {loading ? '...' : `${sorted.length} de ${tasks.length} registros`}
+              Proyecto Odoo · {historico ? 'Histórico completo' : `Últimos ${DIAS_RECIENTES} días`} · {loading ? '...' : `${sorted.length} de ${tasks.length} registros`}
             </p>
           </div>
         </div>
@@ -928,8 +910,20 @@ export function ServiciosSection() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="h-8 gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <Button
+            variant={historico ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => { setHistorico((v) => !v); setPage(1) }}
+            disabled={loading}
+            className="h-8 gap-1.5"
+            title={historico ? `Volver a mostrar solo los últimos ${DIAS_RECIENTES} días` : 'Cargar también los servicios más antiguos (tarda más)'}
+          >
+            <History className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{historico ? `Últimos ${DIAS_RECIENTES} días` : 'Ver histórico'}</span>
+          </Button>
+
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={refrescando} className="h-8 gap-1.5">
+            <RefreshCw className={`h-3.5 w-3.5 ${refrescando ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Actualizar</span>
           </Button>
         </div>
