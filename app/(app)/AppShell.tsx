@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { isAdmin, getUserPermissions, getCurrentUserProfile } from '@/lib/utils/auth'
 import { Sidebar } from '@/components/Sidebar'
@@ -9,7 +10,7 @@ import { ProfileSettingsModal } from '@/components/ProfileSettingsModal'
 import { UpdatesNotification } from '@/components/UpdatesNotification'
 import { Button } from '@/components/ui/button'
 import { AppContext } from '@/lib/context/app-context'
-import { LogOut } from 'lucide-react'
+import { LogOut, Megaphone } from 'lucide-react'
 import Image from 'next/image'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -24,6 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
 
   useEffect(() => {
@@ -137,6 +139,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Actualizaciones: botón en la barra (antes era un ítem del menú lateral) */}
+            <Link href="/updates" title="Actualizaciones del sistema">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`hover:bg-white/20 text-white transition-all ${pathname === '/updates' ? 'bg-white/20' : ''}`}
+              >
+                <Megaphone className="h-5 w-5" />
+              </Button>
+            </Link>
             <UpdatesNotification />
             <Button
               variant="secondary"

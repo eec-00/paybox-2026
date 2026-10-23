@@ -10,7 +10,6 @@ import {
   UserCog,
   Link2,
   Home,
-  Megaphone,
   Calendar,
   Zap,
   ChevronDown,
@@ -21,7 +20,6 @@ import {
   Settings,
   Users,
   Receipt,
-  PlayCircle,
   BarChart2,
   ShieldCheck,
   Landmark,
@@ -333,24 +331,6 @@ export function Sidebar({
       description: 'Conciliación con Banco de la Nación',
       adminOnly: false,
     },
-    {
-      type: 'item',
-      id: 'updates',
-      href: '/updates',
-      label: 'Actualizaciones',
-      icon: Megaphone,
-      description: 'Novedades del sistema',
-      adminOnly: false,
-    },
-    {
-      type: 'item',
-      id: 'tutoriales',
-      href: '/tutoriales',
-      label: 'Tutoriales',
-      icon: PlayCircle,
-      description: 'Videos guía de uso',
-      adminOnly: false,
-    },
   ]
 
   const canSeeModule = (id: string): boolean => {
@@ -361,7 +341,7 @@ export function Sidebar({
   const visibleItems = menuItems
     .filter((item) => {
       if (item.adminOnly && !isAdmin) return false
-      if (item.id === 'bienvenida' || item.id === 'updates' || item.id === 'tutoriales' || item.id === 'sunat' || item.id === 'detracciones') return true
+      if (item.id === 'bienvenida' || item.id === 'sunat' || item.id === 'detracciones') return true
       if (item.type === 'group') {
         return canSeeModule(item.id) || item.children.some((c) => canSeeModule(c.id))
       }

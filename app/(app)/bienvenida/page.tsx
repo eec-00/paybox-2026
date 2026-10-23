@@ -3,7 +3,7 @@
 import { useApp } from '@/lib/context/app-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
-import { Wallet, Layers, Zap, Shield, Megaphone, PlayCircle, BarChart2 } from 'lucide-react'
+import { Wallet, Layers, Zap, Shield, Megaphone, BarChart2 } from 'lucide-react'
 
 export default function BienvenidaPage() {
   const { profileName, isAdminUser, allowedModules } = useApp()
@@ -50,14 +50,6 @@ export default function BienvenidaPage() {
       icon: Megaphone,
       color: 'text-orange-600',
       bg: 'bg-orange-50 group-hover:bg-orange-100',
-    },
-    {
-      label: 'Tutoriales',
-      description: 'Videos guía para aprender a usar PayBox',
-      href: '/tutoriales',
-      icon: PlayCircle,
-      color: 'text-pink-600',
-      bg: 'bg-pink-50 group-hover:bg-pink-100',
     },
   ]
 
