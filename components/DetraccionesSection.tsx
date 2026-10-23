@@ -2,7 +2,8 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
-import ExcelJS from 'exceljs'
+// Solo tipos: la librería (~900 KB) se carga recién al exportar
+import type ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -214,6 +215,7 @@ export function DetraccionesSection() {
     async (target: ExportTarget) => {
       setExporting(target)
       try {
+        const ExcelJS = (await import('exceljs')).default
         const workbook = new ExcelJS.Workbook()
         let sheetName: string
         let cols: [string, string][]

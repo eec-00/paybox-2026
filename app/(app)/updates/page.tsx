@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useApp } from '@/lib/context/app-context'
 import { UpdatesList } from '@/components/UpdatesList'
 import { UpdatesManagement } from '@/components/UpdatesManagement'
@@ -31,7 +32,10 @@ export default function UpdatesPage() {
       </div>
 
       {isDeveloper && <UpdatesManagement />}
-      <UpdatesList />
+      {/* UpdatesList lee ?id= con useSearchParams, que requiere Suspense */}
+      <Suspense fallback={null}>
+        <UpdatesList />
+      </Suspense>
     </div>
   )
 }

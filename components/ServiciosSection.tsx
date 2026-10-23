@@ -34,7 +34,8 @@ import {
 } from '@/lib/servicios/exportFormats'
 import { useServiciosLista, useProgresoServicios } from '@/lib/servicios/useServicios'
 import { toast } from 'sonner'
-import ExcelJS from 'exceljs'
+// Solo tipos: la librería (~900 KB) se carga recién al exportar
+import type ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 
 interface OdooTask {
@@ -463,6 +464,7 @@ export function ServiciosSection() {
       }
 
       const ctx: ProgresoCtx = { progresoMap, completadosSet }
+      const ExcelJS = (await import('exceljs')).default
       const workbook = new ExcelJS.Workbook()
       const worksheet = workbook.addWorksheet(format.label)
 

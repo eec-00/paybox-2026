@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Bell } from 'lucide-react'
+import { parseUpdateDescription, updateSummary, UPDATES_VIEWED_EVENT } from '@/lib/updates/parse'
 import { createClient } from '@/lib/supabase/client'
 import {
   DropdownMenu,
@@ -17,23 +19,29 @@ import { SystemUpdate } from '@/lib/types/updates.types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-interface UpdatesNotificationProps {
-  onViewAll?: () => void
-}
-
-export function UpdatesNotification({ onViewAll }: UpdatesNotificationProps) {
-  const [unreadCount, setUnreadCount] = useState(0)
+export function UpdatesNotification() {
+  const router = useRouter()
+  const [unreadIds, setUnreadIds] = useState<Set<string>>(new Set())
+  const unreadCount = unreadIds.size
   const [recentUpdates, setRecentUpdates] = useState<SystemUpdate[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
+  // No leídas = publicadas desde que se creó la cuenta y sin vista registrada.
+  // Las anteriores a la cuenta no cuentan: un usuario nuevo no arranca con "9+"
+  // por novedades de antes de que existiera.
   const loadUnreadCount = async () => {
     try {
-      const { data, error } = await supabase.rpc('get_unread_updates_count')
-      
-      if (error) throw error
-      
-      setUnreadCount(data || 0)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const [updatesRes, viewsRes] = await Promise.all([
+        supabase.from('system_updates').select('id').gte('created_at', user.created_at),
+        supabase.from('user_update_views').select('update_id').eq('user_id', user.id),
+      ])
+      if (updatesRes.error) throw updatesRes.error
+      if (viewsRes.error) throw viewsRes.error
+      const vistas = new Set((viewsRes.data ?? []).map((v) => v.update_id))
+      setUnreadIds(new Set((updatesRes.data ?? []).map((u) => u.id).filter((id) => !vistas.has(id))))
     } catch (error) {
       console.error('Error loading unread count:', error)
     }
@@ -74,8 +82,7 @@ export function UpdatesNotification({ onViewAll }: UpdatesNotificationProps) {
           onConflict: 'user_id,update_id'
         })
 
-      // Recargar contador
-      await loadUnreadCount()
+      window.dispatchEvent(new Event(UPDATES_VIEWED_EVENT))
     } catch (error) {
       console.error('Error marking update as viewed:', error)
     }
@@ -122,8 +129,13 @@ export function UpdatesNotification({ onViewAll }: UpdatesNotificationProps) {
       )
       .subscribe()
 
+    // Leídas desde la página /updates (u otra pestaña de este componente)
+    const onViewed = () => { loadUnreadCount() }
+    window.addEventListener(UPDATES_VIEWED_EVENT, onViewed)
+
     return () => {
       supabase.removeChannel(channel)
+      window.removeEventListener(UPDATES_VIEWED_EVENT, onViewed)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -167,20 +179,30 @@ export function UpdatesNotification({ onViewAll }: UpdatesNotificationProps) {
           </div>
         ) : (
           <>
-            {recentUpdates.map((update) => (
+            {recentUpdates.map((update) => {
+              const modulo = parseUpdateDescription(update.description)?.modulo
+              const noLeida = unreadIds.has(update.id)
+              return (
               <DropdownMenuItem
                 key={update.id}
                 className="flex flex-col items-start p-4 cursor-pointer hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 dark:hover:from-blue-950/30 dark:hover:to-purple-950/30 transition-all border-b last:border-b-0"
                 onClick={() => {
                   markAsViewed(update.id)
-                  if (onViewAll) onViewAll()
+                  router.push(`/updates?id=${update.id}`)
                 }}
               >
                 <div className="flex items-start gap-3 w-full">
-                  <div className="flex-1">
-                    <div className="font-semibold text-sm text-gray-800 dark:text-gray-100">{update.title}</div>
+                  <span
+                    className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${noLeida ? 'bg-orange-500' : 'bg-transparent'}`}
+                    title={noLeida ? 'Nueva' : undefined}
+                  />
+                  <div className="flex-1 min-w-0">
+                    {modulo && (
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-primary/80 truncate">{modulo}</div>
+                    )}
+                    <div className={`text-sm text-gray-800 dark:text-gray-100 ${noLeida ? 'font-bold' : 'font-semibold'}`}>{update.title}</div>
                     <div className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mt-1.5 leading-relaxed">
-                      {update.description}
+                      {updateSummary(update.description)}
                     </div>
                     <div className="flex items-center gap-2 mt-3">
                       <Badge className={`text-xs px-2.5 py-0.5 font-medium shadow-sm ${getCategoryColor(update.category)}`}>
@@ -198,11 +220,12 @@ export function UpdatesNotification({ onViewAll }: UpdatesNotificationProps) {
                   </div>
                 </div>
               </DropdownMenuItem>
-            ))}
+              )
+            })}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-center justify-center font-semibold text-primary hover:text-primary/80 cursor-pointer py-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 hover:from-blue-100 hover:to-purple-100 dark:hover:from-blue-900/40 dark:hover:to-purple-900/40 transition-all"
-              onClick={onViewAll}
+              onClick={() => router.push('/updates')}
             >
               Ver todas las actualizaciones →
             </DropdownMenuItem>

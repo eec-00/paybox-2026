@@ -8,7 +8,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FileSpreadsheet, Loader2, Calendar as CalendarIcon, Users, Truck, Filter } from 'lucide-react'
-import ExcelJS from 'exceljs'
+// Solo tipos: la librería (~900 KB) se carga recién al exportar
+import type ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { addDays, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek, subMonths, subWeeks } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -129,6 +130,7 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
     const handleExport = async () => {
         setExporting(true)
         try {
+            const ExcelJS = (await import('exceljs')).default
             const workbook = new ExcelJS.Workbook()
 
             // ── Hoja 1: detalle ──────────────────────────────────────────────

@@ -4,7 +4,7 @@ import useSWR from 'swr'
 import { useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-// Cache en el cliente de la lista de servicios (Trailers, Contenedores,
+// Cache en el cliente de la lista de servicios (Trailers y
 // Sobrecostos). Al volver a una pantalla ya visitada la tabla aparece al
 // instante con lo último cargado y se refresca sola en segundo plano — nunca
 // se muestra solo lo cacheado: los conductores marcan horas todo el tiempo.

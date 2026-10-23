@@ -1,7 +1,8 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import Link, { useLinkStatus } from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import {
@@ -63,6 +64,14 @@ interface SidebarProps {
   onProfileClick?: () => void
 }
 
+/** Spinner en el ítem tocado mientras carga el módulo — feedback inmediato
+ * del clic. Debe ir dentro del <Link> (useLinkStatus lee su estado). */
+function LinkPendingSpinner() {
+  const { pending } = useLinkStatus()
+  if (!pending) return null
+  return <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin opacity-80" />
+}
+
 export function Sidebar({
   isAdmin = false,
   collapsed = false,
@@ -72,6 +81,7 @@ export function Sidebar({
   onProfileClick,
 }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
 
   const isFinanzas = pathname.startsWith('/finanzas')
   const isServicios = pathname.startsWith('/servicios')
@@ -414,6 +424,8 @@ export function Sidebar({
             <div className="text-xs text-white/70">{item.description}</div>
           </div>
         )}
+
+        <LinkPendingSpinner />
       </Link>
     )
   }
@@ -429,8 +441,9 @@ export function Sidebar({
           onClick={() => {
             if (!collapsed) toggleGroup(item.id)
             else {
-              // In collapsed mode click goes to first child
-              window.location.href = item.children[0].href
+              // In collapsed mode click goes to first child (navegación del
+              // cliente: window.location recargaba la app entera)
+              router.push(item.children[0].href)
             }
           }}
           title={collapsed ? item.label : undefined}

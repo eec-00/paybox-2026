@@ -8,13 +8,19 @@ import { Button } from '@/components/ui/button'
 import { SystemUpdate } from '@/lib/types/updates.types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { AlertCircle, ArrowLeft } from 'lucide-react'
+import { AlertCircle, ArrowLeft, LayoutGrid, Users, Sparkles } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { parseUpdateDescription, UPDATES_VIEWED_EVENT } from '@/lib/updates/parse'
 
 export function UpdatesList() {
   const [updates, setUpdates] = useState<SystemUpdate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedUpdate, setSelectedUpdate] = useState<SystemUpdate | null>(null)
+  const [viewedIds, setViewedIds] = useState<Set<string>>(new Set())
+  const router = useRouter()
+  // ?id=... llega desde la campanita: abre esa actualización directamente
+  const idParam = useSearchParams().get('id')
 
   const supabase = createClient()
 
@@ -31,6 +37,15 @@ export function UpdatesList() {
       if (fetchError) throw fetchError
 
       setUpdates(data || [])
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: views } = await supabase.from('user_update_views').select('update_id').eq('user_id', user.id)
+        // Las publicadas antes de que existiera la cuenta no se marcan como
+        // nuevas (mismo criterio que el contador de la campanita).
+        const anteriores = (data || []).filter((u) => new Date(u.created_at) < new Date(user.created_at)).map((u) => u.id)
+        setViewedIds(new Set([...(views ?? []).map((v) => v.update_id), ...anteriores]))
+      }
     } catch (err) {
       console.error('Error loading updates:', err)
       setError(err instanceof Error ? err.message : 'Error al cargar actualizaciones')
@@ -53,6 +68,8 @@ export function UpdatesList() {
         }, {
           onConflict: 'user_id,update_id'
         })
+      setViewedIds((prev) => new Set(prev).add(updateId))
+      window.dispatchEvent(new Event(UPDATES_VIEWED_EVENT))
     } catch (err) {
       console.error('Error marking update as viewed:', err)
     }
@@ -65,7 +82,15 @@ export function UpdatesList() {
 
   const handleBack = () => {
     setSelectedUpdate(null)
+    if (idParam) router.replace('/updates')
   }
+
+  useEffect(() => {
+    if (!idParam || !updates.length) return
+    const found = updates.find((u) => u.id === idParam)
+    if (found) handleUpdateClick(found)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idParam, updates])
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
@@ -153,15 +178,56 @@ export function UpdatesList() {
             </div>
           </div>
           
-          <Card>
-            <CardContent className="pt-6">
-              <div className="prose prose-lg dark:prose-invert max-w-none">
-                <p className="text-foreground whitespace-pre-wrap leading-relaxed">
-                  {selectedUpdate.description}
-                </p>
+          {(() => {
+            const secciones = parseUpdateDescription(selectedUpdate.description)
+            if (!secciones) {
+              return (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="prose prose-lg dark:prose-invert max-w-none">
+                      <p className="text-foreground whitespace-pre-wrap leading-relaxed">
+                        {selectedUpdate.description}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            }
+            return (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {secciones.modulo && (
+                    <Card>
+                      <CardContent className="pt-5">
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                          <LayoutGrid className="h-3.5 w-3.5" /> Módulo
+                        </div>
+                        <p className="text-foreground font-medium">{secciones.modulo}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {secciones.usuarios && (
+                    <Card>
+                      <CardContent className="pt-5">
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                          <Users className="h-3.5 w-3.5" /> A quién afecta
+                        </div>
+                        <p className="text-foreground font-medium">{secciones.usuarios}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+                <Card className="border-primary/30">
+                  <CardContent className="pt-5">
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary mb-2">
+                      <Sparkles className="h-3.5 w-3.5" /> Qué cambió
+                    </div>
+                    <p className="text-foreground whitespace-pre-wrap leading-relaxed text-base">{secciones.cosasNuevas}</p>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
+            )
+          })()}
         </div>
       </div>
     )
@@ -192,7 +258,10 @@ export function UpdatesList() {
           >
             <CardHeader className="py-4">
               <div className="flex items-center justify-between gap-4">
-                <CardTitle className="text-lg font-semibold text-foreground">
+                <CardTitle className={`text-lg text-foreground flex items-center gap-2 ${viewedIds.has(update.id) ? 'font-semibold' : 'font-bold'}`}>
+                  {!viewedIds.has(update.id) && (
+                    <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" title="No leída" />
+                  )}
                   {update.title}
                 </CardTitle>
                 <div className="flex items-center gap-2 flex-shrink-0">

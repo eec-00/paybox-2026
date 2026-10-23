@@ -1,6 +1,6 @@
 // Ventana por defecto de servicios que se bajan de Odoo. El proyecto ya pasa
-// las 2500 tareas y crece cada día: bajar todo en cada carga de Trailers,
-// Contenedores y Sobrecostos es lento. Lo más antiguo queda a un clic con
+// las 2500 tareas y crece cada día: bajar todo en cada carga de Trailers y
+// Sobrecostos es lento. Lo más antiguo queda a un clic con
 // "Ver histórico".
 export const DIAS_RECIENTES = 45
 

@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { BarChart3, Download, Loader2, Clock, Utensils } from 'lucide-react'
 import { toast } from 'sonner'
-import ExcelJS from 'exceljs'
+// Solo tipos: la librería (~900 KB) se carga recién al exportar
+import type ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { format, startOfMonth, endOfMonth, subMonths, differenceInCalendarDays } from 'date-fns'
 
@@ -169,6 +170,7 @@ export function AsistenciaEstadisticas({ conductores }: { conductores: Conductor
         return
       }
 
+      const ExcelJS = (await import('exceljs')).default
       const workbook = new ExcelJS.Workbook()
 
       // ── Hoja 1: Resumen por conductor ──────────────────────────────────

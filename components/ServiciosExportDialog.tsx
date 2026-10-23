@@ -9,7 +9,8 @@ import {
 } from '@/components/ui/dialog'
 import { Download, Loader2, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
-import ExcelJS from 'exceljs'
+// Solo tipos: la librería (~900 KB) se carga recién al exportar
+import type ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { TIPOS_SERVICIO, tipoServicioLabelFor } from '@/lib/servicios/hitos'
 import { calcularProgreso } from '@/lib/servicios/progreso'
@@ -140,6 +141,7 @@ export function ServiciosExportDialog({ open, onOpenChange, tasks, stages, progr
       try { localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(cols.map((c) => c.key))) } catch { /* ignorar */ }
 
       const ctx = { progresoMap, completadosSet }
+      const ExcelJS = (await import('exceljs')).default
       const workbook = new ExcelJS.Workbook()
       const usedNames = new Set<string>()
 

@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label'
 import { Download, FileSpreadsheet, AlertTriangle, Loader2, Calendar as CalendarIcon, Users, Settings2, Columns, Tags, Info, ImageIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fetchAllRows } from '@/lib/supabase/fetchAll'
-import ExcelJS from 'exceljs'
+// Solo tipos: la librería (~900 KB) se carga recién al exportar
+import type ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 
@@ -169,6 +170,7 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
             const userMap = new Map(users.map(u => [u.id, u.full_name]))
 
             // Crear libro de Excel con ExcelJS
+            const ExcelJS = (await import('exceljs')).default
             const workbook = new ExcelJS.Workbook()
             const worksheet = workbook.addWorksheet('Pagos')
 

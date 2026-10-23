@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Loader2, CheckCircle2, XCircle, Search, Cookie, FileText, Download, FileSpreadsheet } from 'lucide-react'
 import { toast } from 'sonner'
-import ExcelJS from 'exceljs'
+// Solo tipos: la librería (~900 KB) se carga recién al exportar
+import type ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
 
 interface SessionStatus { active: boolean; minutes_left?: number }
@@ -264,6 +265,7 @@ export function SunatGREBFSection() {
       }
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, rows.length) }, worker))
 
+      const ExcelJS = (await import('exceljs')).default
       const workbook = new ExcelJS.Workbook()
       const worksheet = workbook.addWorksheet('GRE BF')
 

@@ -10,7 +10,6 @@ import {
   calcularSobrecosto, esQuimtia, formatDuracion, formatHoraMin, lunesDe, rangoSemana, tipoCargaSobrecosto, tipoSobrecosto,
   HORAS_LIBRES, type SobrecostoInfo, type SobrecostoTask,
 } from '@/lib/servicios/sobrecostos'
-import { exportarSobrecostosExcel } from '@/lib/servicios/sobrecostosExcel'
 import { m2oLast6 } from '@/lib/servicios/exportFormats'
 import { fechaCorte, serviciosUrl } from '@/lib/servicios/rango'
 import { useServiciosLista } from '@/lib/servicios/useServicios'
@@ -106,6 +105,8 @@ export function SobrecostosSection() {
     }
     setExporting(true)
     try {
+      // Se carga al exportar: arrastra ExcelJS (~900 KB)
+      const { exportarSobrecostosExcel } = await import('@/lib/servicios/sobrecostosExcel')
       const blob = await exportarSobrecostosExcel(filas.map((f) => f.task), semana)
       saveAs(blob, `Sobrecostos QUIMTIA ${formatFecha(semana.start).replace(/\//g, '-')} al ${formatFecha(semana.end).replace(/\//g, '-')}.xlsx`)
     } catch (e: unknown) {
