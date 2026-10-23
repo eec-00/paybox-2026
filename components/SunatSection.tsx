@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Loader2, CheckCircle2, XCircle, Search, ChevronLeft, ChevronRight, Key, Eye, Download, FileText, FileSpreadsheet } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { hoyLima } from '@/lib/fechas'
 
 interface TokenStatus { active: boolean; minutes_left?: number; updated_at?: string }
 interface QueryResult { ok: boolean; status: number; data: unknown }
@@ -20,7 +21,8 @@ interface GreDetalle {
   vehiculo: string; carreta: string; conductor: string; conductorDni: string; pagador: string
 }
 
-function today() { return new Date().toISOString().slice(0, 10) }
+// Fecha de hoy en Lima (toISOString daba "mañana" después de las 7 p. m.)
+const today = hoyLima
 
 export function SunatSection() {
   const [tokenStatus, setTokenStatus] = useState<TokenStatus | null>(null)

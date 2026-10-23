@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { hoyLima, sumarDias } from '@/lib/fechas'
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,9 +50,8 @@ export async function POST(req: NextRequest) {
     if (gastoError) throw gastoError
 
     // Create calendario_pagos entry — due date = today + 7 days
-    const due = new Date()
-    due.setDate(due.getDate() + 7)
-    const fechaStr = due.toISOString().split('T')[0]
+    // En hora de Lima: el servidor corre en UTC y de noche contaba desde mañana
+    const fechaStr = sumarDias(hoyLima(), 7)
 
     await supabase.from('calendario_pagos').insert({
       fecha: fechaStr,

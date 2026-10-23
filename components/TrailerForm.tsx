@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { hoyLima } from "@/lib/fechas"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Plus, X, Satellite, Link2, RefreshCw, CheckCircle, AlertCircle, Copy, ExternalLink } from "lucide-react"
 
@@ -103,7 +104,7 @@ export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: (
     const form = useForm<TrailerFormValues>({
         resolver: zodResolver(trailerSchema),
         defaultValues: {
-            fecha: new Date().toISOString().split('T')[0],
+            fecha: hoyLima(),
             guia_remision: '',
             guia_transportista: '',
             placa: '',
@@ -152,7 +153,7 @@ export function TrailerForm({ onSuccess, initialData, onCancel }: { onSuccess: (
             form.reset({
                 ...form.getValues(),
                 ...initialData,
-                fecha: initialData.fecha ? new Date(initialData.fecha).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                fecha: initialData.fecha ? new Date(initialData.fecha).toISOString().split('T')[0] : hoyLima(),
                 linea_amarilla: initialData.linea_amarilla?.toString() || '',
                 peajes: initialData.peajes?.toString() || '',
                 adicionales: initialData.adicionales?.toString() || '',

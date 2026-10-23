@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 // Solo tipos: la librería (~900 KB) se carga recién al exportar
 import type ExcelJS from 'exceljs'
+import { hoyLima } from '@/lib/fechas'
 import { saveAs } from 'file-saver'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -301,7 +302,7 @@ export function DetraccionesSection() {
         })
 
         const buffer = await workbook.xlsx.writeBuffer()
-        const today = new Date().toISOString().slice(0, 10)
+        const today = hoyLima()
         saveAs(new Blob([buffer]), `detracciones-${target}-${today}.xlsx`)
       } finally {
         setExporting(null)

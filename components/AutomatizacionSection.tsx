@@ -49,6 +49,7 @@ import {
   diasANombre,
 } from '@/lib/automatizacion/campos'
 import { VencimientosFlyer, type FlyerRow } from '@/components/VencimientosFlyer'
+import { hoyLima } from '@/lib/fechas'
 
 interface Props {
   tipo: 'conductores' | 'tractos' | 'carretas'
@@ -322,7 +323,7 @@ export function AutomatizacionSection({ tipo }: Props) {
       const { toPng } = await import('html-to-image')
       const dataUrl = await toPng(flyerRef.current, { pixelRatio: 2 })
       const link = document.createElement('a')
-      link.download = `vencimientos-${tipo}-${new Date().toISOString().slice(0, 10)}.png`
+      link.download = `vencimientos-${tipo}-${hoyLima()}.png`
       link.href = dataUrl
       link.click()
     } catch (err) {

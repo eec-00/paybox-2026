@@ -5,6 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { AlertCircle, ArrowDownRight, ArrowUpRight, RefreshCw } from 'lucide-react'
 import { fetchAllRows } from '@/lib/supabase/fetchAll'
+// Las fechas se guardan en UTC: sin pasarlas a Lima, un pago de las 8 p. m.
+// caía en el día (o mes) siguiente.
+import { diaLima, fechaUTC, hoyLima, sumarDias } from '@/lib/fechas'
 
 interface Registro {
   fecha_y_hora_pago: string | null
@@ -27,17 +30,6 @@ interface Pago {
 
 type Periodo = 'mes' | 'todo'
 
-// Las fechas se guardan en UTC: sin convertir, un pago de las 8 p. m. en Lima
-// caía en el día (o mes) siguiente.
-const fmtDiaLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' })
-const diaLima = (d: Date) => fmtDiaLima.format(d)
-
-/** Suma/resta días a una fecha calendario (YYYY-MM-DD) sin depender de la zona del navegador. */
-function sumarDias(dia: string, n: number): string {
-  const [y, m, d] = dia.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d + n, 12)).toISOString().slice(0, 10)
-}
-const fechaUTC = (dia: string) => new Date(`${dia}T12:00:00Z`)
 
 const soles = (n: number) => `S/ ${n.toLocaleString('es-PE', { maximumFractionDigits: 0 })}`
 const dolares = (n: number) => `$ ${n.toLocaleString('es-PE', { maximumFractionDigits: 0 })}`
@@ -119,7 +111,7 @@ export function Dashboard() {
     fetchStats()
   }, [fetchStats])
 
-  const hoy = diaLima(new Date())
+  const hoy = hoyLima()
   const mes = hoy.slice(0, 7)
 
   const resumen = useMemo(() => {
