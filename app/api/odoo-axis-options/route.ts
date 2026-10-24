@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const ODOO_URL = (process.env.ODOO_URL || process.env.URL_ODOO || '').trim().replace(/\/$/, '')
-const ODOO_DB = (process.env.ODOO_DB || process.env.DB || '').trim()
-const ODOO_EMAIL = (process.env.ODOO_EMAIL || process.env.EMAIL || '').trim()
-const ODOO_API_KEY = (process.env.ODOO_API_KEY || process.env.API_KEY || '').trim()
-
+import { odooAuth, odooCall, ODOO_URL, ODOO_DB, ODOO_EMAIL, ODOO_API_KEY } from '@/lib/odoo'
 type AxisKey = 'servicio' | 'placa' | 'conductor'
 
 type AxisConfig = {
@@ -23,11 +19,8 @@ type OptionsCacheEntry = {
   options: Option[]
 }
 
-const AUTH_CACHE_TTL_MS = 15 * 60 * 1000
 const OPTIONS_CACHE_TTL_MS = 60 * 1000
 
-let authCache: { uid: number; expiresAt: number } | null = null
-let authInFlight: Promise<number> | null = null
 const optionsCache = new Map<string, OptionsCacheEntry>()
 const optionsInFlight = new Map<string, Promise<Option[]>>()
 
@@ -72,90 +65,6 @@ function buildOrDomain(fields: string[], q: string): unknown[] {
   for (let i = 0; i < fields.length - 1; i++) parts.push('|')
   for (const field of fields) parts.push([field, 'ilike', q])
   return parts
-}
-
-async function odooAuth(): Promise<number> {
-  const now = Date.now()
-
-  if (authCache && authCache.expiresAt > now) {
-    return authCache.uid
-  }
-
-  if (authInFlight) {
-    return authInFlight
-  }
-
-  authInFlight = (async () => {
-  const res = await fetch(`${ODOO_URL}/jsonrpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'call',
-      id: 1,
-      params: {
-        service: 'common',
-        method: 'authenticate',
-        args: [ODOO_DB, ODOO_EMAIL, ODOO_API_KEY, {}],
-      },
-    }),
-  })
-
-  const data = await res.json()
-
-  if (data.error) {
-    const msg = data.error.data?.message ?? data.error.message
-    throw new Error(`Autenticacion Odoo fallida: ${msg}`)
-  }
-
-  const uid = data.result
-  if (!uid) throw new Error('Autenticacion Odoo fallida: credenciales incorrectas')
-
-    const parsedUid = uid as number
-    authCache = {
-      uid: parsedUid,
-      expiresAt: now + AUTH_CACHE_TTL_MS,
-    }
-
-    return parsedUid
-  })()
-
-  try {
-    return await authInFlight
-  } finally {
-    authInFlight = null
-  }
-}
-
-async function odooCall<T = unknown>(
-  uid: number,
-  model: string,
-  method: string,
-  args: unknown[],
-  kwargs: Record<string, unknown> = {}
-): Promise<T> {
-  const res = await fetch(`${ODOO_URL}/jsonrpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'call',
-      id: Date.now(),
-      params: {
-        service: 'object',
-        method: 'execute_kw',
-        args: [ODOO_DB, uid, ODOO_API_KEY, model, method, args, kwargs],
-      },
-    }),
-  })
-
-  const data = await res.json()
-  if (data.error) {
-    const msg = data.error.data?.message ?? data.error.message
-    throw new Error(`Odoo ${model}.${method}: ${msg}`)
-  }
-
-  return data.result as T
 }
 
 function buildOption(axis: AxisKey, row: Record<string, unknown>) {

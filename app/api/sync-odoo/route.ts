@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-
+import { odooAuth, odooCall } from '@/lib/odoo'
 // Evitar conflicto con la clase global URL de Node — usar nombres más específicos
-const ODOO_URL = (process.env.ODOO_URL || process.env.URL_ODOO || '').trim().replace(/\/$/, '')
-const ODOO_DB = (process.env.ODOO_DB || process.env.DB || '').trim()
-const ODOO_EMAIL = (process.env.ODOO_EMAIL || process.env.EMAIL || '').trim()
-const ODOO_API_KEY = (process.env.ODOO_API_KEY || process.env.API_KEY || '').trim()
 const ODOO_EXPENSE_AREA_FIELD = (process.env.ODOO_EXPENSE_AREA_FIELD || '').trim()
 
 const supabase = createClient(
@@ -62,72 +58,6 @@ function getAxisValue(
 
   const value = datosDinamicos[matchedKey]
   return typeof value === 'string' ? value.trim() : ''
-}
-
-// ── Odoo autenticación via /jsonrpc (soporta API keys) ───────────────────────
-// Este endpoint es el estándar de Odoo para integraciones externas
-async function odooAuth(): Promise<number> {
-  const res = await fetch(`${ODOO_URL}/jsonrpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'call',
-      id: 1,
-      params: {
-        service: 'common',
-        method: 'authenticate',
-        args: [ODOO_DB, ODOO_EMAIL, ODOO_API_KEY, {}],
-      },
-    }),
-  })
-
-  const data = await res.json()
-
-  if (data.error) {
-    const msg = data.error.data?.message ?? data.error.message
-    throw new Error(`Autenticación Odoo fallida: ${msg}`)
-  }
-
-  const uid = data.result
-  if (!uid) {
-    throw new Error(
-      `Autenticación Odoo fallida: credenciales incorrectas. DB="${ODOO_DB}" Email="${ODOO_EMAIL}"`
-    )
-  }
-
-  return uid as number
-}
-
-// ── Odoo llamada via /jsonrpc (no necesita cookies, usa uid + api_key) ────────
-async function odooCall<T = unknown>(
-  uid: number,
-  model: string,
-  method: string,
-  args: unknown[],
-  kwargs: Record<string, unknown> = {}
-): Promise<T> {
-  const res = await fetch(`${ODOO_URL}/jsonrpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'call',
-      id: Date.now(),
-      params: {
-        service: 'object',
-        method: 'execute_kw',
-        args: [ODOO_DB, uid, ODOO_API_KEY, model, method, args, kwargs],
-      },
-    }),
-  })
-
-  const data = await res.json()
-  if (data.error) {
-    const msg = data.error.data?.message ?? data.error.message
-    throw new Error(`Odoo ${model}.${method}: ${msg}`)
-  }
-  return data.result as T
 }
 
 // ── Name → ID cache ──────────────────────────────────────────────────────────

@@ -3,69 +3,14 @@ import nodemailer from 'nodemailer'
 import { createClient } from '@supabase/supabase-js'
 import { CAMPOS_VENCIMIENTO, getCamposForTipo, isVehicleTipo, getDaysUntil, normalizeAlertas, getAlertasEfectivas } from '@/lib/automatizacion/campos'
 import { generateFlyerPng, type FlyerRow } from '@/lib/automatizacion/generateFlyer'
-
+import { odooAuth, odooCall } from '@/lib/odoo'
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const ODOO_URL = (process.env.ODOO_URL || process.env.URL_ODOO || '').trim().replace(/\/$/, '')
-const ODOO_DB = (process.env.ODOO_DB || process.env.DB || '').trim()
-const ODOO_EMAIL = (process.env.ODOO_EMAIL || process.env.EMAIL || '').trim()
-const ODOO_API_KEY = (process.env.ODOO_API_KEY || process.env.API_KEY || '').trim()
 
-async function odooAuth(): Promise<number> {
-  const res = await fetch(`${ODOO_URL}/jsonrpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'call',
-      id: 1,
-      params: {
-        service: 'common',
-        method: 'authenticate',
-        args: [ODOO_DB, ODOO_EMAIL, ODOO_API_KEY, {}],
-      },
-    }),
-  })
-  const data = await res.json()
-  if (data.error) {
-    const msg = data.error.data?.message ?? data.error.message
-    throw new Error(`Autenticación Odoo fallida: ${msg}`)
-  }
-  if (!data.result) throw new Error('Autenticación Odoo fallida: credenciales incorrectas')
-  return data.result as number
-}
 
-async function odooCall<T>(
-  uid: number,
-  model: string,
-  method: string,
-  args: unknown[],
-  kwargs: Record<string, unknown> = {}
-): Promise<T> {
-  const res = await fetch(`${ODOO_URL}/jsonrpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'call',
-      id: Date.now(),
-      params: {
-        service: 'object',
-        method: 'execute_kw',
-        args: [ODOO_DB, uid, ODOO_API_KEY, model, method, args, kwargs],
-      },
-    }),
-  })
-  const data = await res.json()
-  if (data.error) {
-    const msg = data.error.data?.message ?? data.error.message
-    throw new Error(`Odoo ${model}.${method}: ${msg}`)
-  }
-  return data.result as T
-}
 
 function buildEmailHtml(nombre: string, items: { label: string; fecha: string; dias: number }[], hasFlyerImage = false): string {
   const flyerBlock = hasFlyerImage

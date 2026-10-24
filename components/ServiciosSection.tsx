@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useDeferredValue } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -22,12 +23,14 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { ServiciosEditModal } from '@/components/ServiciosEditModal'
+import { FiltroBuscable } from '@/components/FiltroBuscable'
 import { ServiciosExportDialog } from '@/components/ServiciosExportDialog'
 import { ServiciosResumenDialog } from '@/components/ServiciosResumenDialog'
 import { tipoServicioLabelFor, TIPOS_SERVICIO } from '@/lib/servicios/hitos'
-import { calcularProgreso, ProgresoBadge, ultimoHitoMarcado } from '@/lib/servicios/progreso'
-import { guardarListaNavegacion } from '@/lib/servicios/navegacion'
+import { calcularProgreso, ProgresoBadge, ultimoHitoMarcado, type ProgresoServicio } from '@/lib/servicios/progreso'
+import { guardarListaNavegacion, guardarUrlLista } from '@/lib/servicios/navegacion'
 import { DIAS_RECIENTES, serviciosUrl } from '@/lib/servicios/rango'
+import { usePuedeEditarServicios } from '@/lib/servicios/usePuedeEditar'
 import {
   EXPORT_FORMATS, buildQuimtiaRow, buildEyMRow, buildCroslandRow,
   QUIMTIA_COLUMNS, EYM_COLUMNS, CROSLAND_COLUMNS, type ExportClientFormat,
@@ -180,7 +183,23 @@ const EMPTY_FIELDS: string[] = []
 const PROGRESO_RANK: Record<string, number> = { sin_iniciar: 0, en_proceso: 1, completado: 2 }
 const HIDDEN_COLUMNS_STORAGE_KEY = 'paybox_servicios_columnas_ocultas'
 
-type ProgresoCtx = { progresoMap: Map<number, number>; completadosSet: Set<number> }
+type ProgresoCtx = {
+  progresoMap: Map<number, number>
+  completadosSet: Set<number>
+  /** Progreso ya calculado por id de tarea (se arma una vez por carga de datos) */
+  cache?: Map<number, ProgresoServicio>
+}
+
+/** Progreso de la tarea: del caché si está, si no se calcula. Evita
+ * recalcularlo por cada fila en cada filtro, orden y render. */
+function progresoDe(t: OdooTask, ctx: ProgresoCtx): ProgresoServicio {
+  return ctx.cache?.get(t.id) ?? calcularProgreso(t, ctx.progresoMap, ctx.completadosSet)
+}
+
+function SortIcon({ activo, dir }: { activo: boolean; dir: 'asc' | 'desc' }) {
+  if (!activo) return <ArrowUpDown className="h-3 w-3 opacity-30" />
+  return dir === 'asc' ? <ArrowUp className="h-3 w-3 text-primary" /> : <ArrowDown className="h-3 w-3 text-primary" />
+}
 
 // Columnas "de datos" — ordenables y ocultables. El Código y las 3 acciones
 // (editar/ver/reiniciar) quedan fijas fuera de esta lista: son la forma de
@@ -216,14 +235,14 @@ const COLUMNS: ColumnDef[] = [
   {
     key: 'progreso', label: 'Progreso', headClass: 'min-w-[130px]',
     sortValue: (t, ctx) => {
-      const p = calcularProgreso(t, ctx.progresoMap, ctx.completadosSet)
+      const p = progresoDe(t, ctx)
       return PROGRESO_RANK[p.estado] * 1000 + (p.totalHitos > 0 ? p.stepActual / p.totalHitos : 0)
     },
-    render: (t, ctx) => <ProgresoBadge progreso={calcularProgreso(t, ctx.progresoMap, ctx.completadosSet)} />,
+    render: (t, ctx) => <ProgresoBadge progreso={progresoDe(t, ctx)} />,
   },
   {
     key: 'fase', label: 'Fase', headClass: 'min-w-[160px]',
-    sortValue: (t, ctx) => calcularProgreso(t, ctx.progresoMap, ctx.completadosSet).stepActual,
+    sortValue: (t, ctx) => progresoDe(t, ctx).stepActual,
     render: (t, ctx) => ultimoHitoMarcado(t, ctx.progresoMap, ctx.completadosSet) ?? '-',
   },
   {
@@ -298,9 +317,14 @@ const COLUMNS: ColumnDef[] = [
 
 export function ServiciosSection() {
   // Por defecto solo los últimos DIAS_RECIENTES días; "Ver histórico" baja todo.
-  const [historico, setHistorico] = useState(false)
+  // Filtros, orden y página viven en la URL (?cliente=…&etapa=…): sobreviven
+  // al ir al detalle y volver, y el link se puede compartir con los filtros.
+  const sp = useSearchParams()
+  const [historico, setHistorico] = useState(sp.get('historico') === '1')
 
   const lista = useServiciosLista<OdooTask>(serviciosUrl(historico))
+  // Solo lectura (rol viewer o sin "editar" en Servicios): sin editar/reiniciar/finalizar
+  const puedeEditar = usePuedeEditarServicios()
   const progreso = useProgresoServicios()
   const { progresoMap, completadosSet } = progreso
   const stages: OdooStage[] = lista.data?.stages ?? EMPTY_STAGES
@@ -320,17 +344,17 @@ export function ServiciosSection() {
     [lista.data]
   )
 
-  const [search, setSearch] = useState('')
-  const [stageFilter, setStageFilter] = useState('all')
-  const [tipoFilter, setTipoFilter] = useState('all')
-  const [progresoFilter, setProgresoFilter] = useState('all')
-  const [conductorFilter, setConductorFilter] = useState('all')
-  const [clienteFilter, setClienteFilter] = useState('all')
-  const [fechaFilter, setFechaFilter] = useState('')
-  const [almacenDestinoFilter, setAlmacenDestinoFilter] = useState('all')
-  const [almacenRetiroFilter, setAlmacenRetiroFilter] = useState('all')
-  const [soloSinConductor, setSoloSinConductor] = useState(false)
-  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState(sp.get('q') ?? '')
+  const [stageFilter, setStageFilter] = useState(sp.get('etapa') ?? 'all')
+  const [tipoFilter, setTipoFilter] = useState(sp.get('tipo') ?? 'all')
+  const [progresoFilter, setProgresoFilter] = useState(sp.get('progreso') ?? 'all')
+  const [conductorFilter, setConductorFilter] = useState(sp.get('conductor') ?? 'all')
+  const [clienteFilter, setClienteFilter] = useState(sp.get('cliente') ?? 'all')
+  const [fechaFilter, setFechaFilter] = useState(sp.get('fecha') ?? '')
+  const [almacenDestinoFilter, setAlmacenDestinoFilter] = useState(sp.get('destino') ?? 'all')
+  const [almacenRetiroFilter, setAlmacenRetiroFilter] = useState(sp.get('retiro') ?? 'all')
+  const [soloSinConductor, setSoloSinConductor] = useState(sp.get('sinconductor') === '1')
+  const [page, setPage] = useState(() => Math.max(1, parseInt(sp.get('pag') ?? '1') || 1))
   const [editingTask, setEditingTask] = useState<OdooTask | null>(null)
   const [resetTask, setResetTask] = useState<OdooTask | null>(null)
   const [resetting, setResetting] = useState(false)
@@ -346,8 +370,31 @@ export function ServiciosSection() {
   // Ordenar por columna (clic en el encabezado) — no se persiste, es por sesión.
   // Por defecto ordenado por fecha de programación, de más reciente a más
   // antigua — el usuario puede cambiarlo tocando cualquier encabezado.
-  const [sortKey, setSortKey] = useState<string | null>('fecha')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [sortKey, setSortKey] = useState<string | null>(sp.get('orden') ?? 'fecha')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(sp.get('dir') === 'asc' ? 'asc' : 'desc')
+
+  useEffect(() => {
+    const p = new URLSearchParams()
+    const set = (k: string, v: string, def: string) => { if (v && v !== def) p.set(k, v) }
+    set('q', search.trim(), '')
+    set('etapa', stageFilter, 'all')
+    set('tipo', tipoFilter, 'all')
+    set('progreso', progresoFilter, 'all')
+    set('conductor', conductorFilter, 'all')
+    set('cliente', clienteFilter, 'all')
+    set('fecha', fechaFilter, '')
+    set('retiro', almacenRetiroFilter, 'all')
+    set('destino', almacenDestinoFilter, 'all')
+    if (soloSinConductor) p.set('sinconductor', '1')
+    if (historico) p.set('historico', '1')
+    set('orden', sortKey ?? '', 'fecha')
+    set('dir', sortDir, 'desc')
+    set('pag', String(page), '1')
+    const qs = p.toString()
+    window.history.replaceState(window.history.state, '', qs ? `?${qs}` : window.location.pathname)
+    guardarUrlLista(qs)
+  }, [search, stageFilter, tipoFilter, progresoFilter, conductorFilter, clienteFilter, fechaFilter,
+      almacenRetiroFilter, almacenDestinoFilter, soloSinConductor, historico, sortKey, sortDir, page])
 
   // Columnas ocultas — se guardan en localStorage por dispositivo, para que
   // cada quien vea la tabla como prefiere sin afectar a los demás.
@@ -463,7 +510,6 @@ export function ServiciosSection() {
         return
       }
 
-      const ctx: ProgresoCtx = { progresoMap, completadosSet }
       const ExcelJS = (await import('exceljs')).default
       const workbook = new ExcelJS.Workbook()
       const worksheet = workbook.addWorksheet(format.label)
@@ -527,8 +573,31 @@ export function ServiciosSection() {
     return Array.from(names).sort()
   }, [tasks])
 
+  // Calculados una vez por carga de datos (no por fila en cada tecla/orden)
+  const progresoCache = useMemo(
+    () => new Map(tasks.map((t) => [t.id, calcularProgreso(t, progresoMap, completadosSet)])),
+    [tasks, progresoMap, completadosSet]
+  )
+  const ctx = useMemo<ProgresoCtx>(
+    () => ({ progresoMap, completadosSet, cache: progresoCache }),
+    [progresoMap, completadosSet, progresoCache]
+  )
+  const textoBuscable = useMemo(() => new Map(tasks.map((t) => [t.id, [
+    t.name,
+    servicioCodigo(t),
+    m2oName(t.partner_id),
+    m2oName(t.x_studio_conductor),
+    t.x_studio_nmero_de_contenedor || '',
+    t.x_studio_referenciabooking || '',
+    Array.isArray(t.x_studio_placa) ? t.x_studio_placa[1] : '',
+    t.x_studio_agencia || '',
+  ].join(' ').toLowerCase()])), [tasks])
+  // El input se actualiza al instante; el filtrado de ~1000 filas va detrás
+  // sin trabar la escritura en equipos lentos.
+  const searchDiferido = useDeferredValue(search)
+
   const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim()
+    const q = searchDiferido.toLowerCase().trim()
     return tasks.filter((t) => {
       if (soloSinConductor && !faltaConductor(t)) return false
       if (stageFilter !== 'all') {
@@ -536,33 +605,22 @@ export function ServiciosSection() {
         if (stageName !== stageFilter) return false
       }
       if (tipoFilter !== 'all' && tipoServicioLabelFor(t) !== tipoFilter) return false
-      if (progresoFilter !== 'all' && calcularProgreso(t, progresoMap, completadosSet).estado !== progresoFilter) return false
+      if (progresoFilter !== 'all' && progresoDe(t, ctx).estado !== progresoFilter) return false
       if (conductorFilter !== 'all' && m2oName(t.x_studio_conductor) !== conductorFilter) return false
       if (clienteFilter !== 'all' && m2oName(t.partner_id) !== clienteFilter) return false
       if (almacenDestinoFilter !== 'all' && m2oName(t.x_studio_almacen_de_destino) !== almacenDestinoFilter) return false
       if (almacenRetiroFilter !== 'all' && m2oName(t.x_studio_almacen_de_retiro) !== almacenRetiroFilter) return false
       if (fechaFilter && t.x_studio_fecha_de_la_programacin !== fechaFilter) return false
       if (!q) return true
-      const searchable = [
-        t.name,
-        servicioCodigo(t),
-        m2oName(t.partner_id),
-        m2oName(t.x_studio_conductor),
-        t.x_studio_nmero_de_contenedor || '',
-        t.x_studio_referenciabooking || '',
-        Array.isArray(t.x_studio_placa) ? t.x_studio_placa[1] : '',
-        t.x_studio_agencia || '',
-      ].join(' ').toLowerCase()
-      return searchable.includes(q)
+      return (textoBuscable.get(t.id) ?? '').includes(q)
     })
-  }, [tasks, search, stageFilter, tipoFilter, progresoFilter, progresoMap, completadosSet, conductorFilter, clienteFilter, almacenDestinoFilter, almacenRetiroFilter, fechaFilter, soloSinConductor])
+  }, [tasks, searchDiferido, textoBuscable, stageFilter, tipoFilter, progresoFilter, ctx, conductorFilter, clienteFilter, almacenDestinoFilter, almacenRetiroFilter, fechaFilter, soloSinConductor])
 
   // Orden elegido por el usuario tocando un encabezado. "Código" se ordena
   // con el mismo criterio numérico que el orden por defecto de fetchData.
   const sorted = useMemo(() => {
     if (!sortKey) return filtered
     const dirMul = sortDir === 'asc' ? 1 : -1
-    const ctx: ProgresoCtx = { progresoMap, completadosSet }
     if (sortKey === 'codigo') {
       return [...filtered].sort((a, b) => servicioCodigo(a).localeCompare(servicioCodigo(b), undefined, { numeric: true }) * dirMul)
     }
@@ -574,7 +632,7 @@ export function ServiciosSection() {
       if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dirMul
       return String(va).localeCompare(String(vb), undefined, { numeric: true }) * dirMul
     })
-  }, [filtered, sortKey, sortDir, progresoMap, completadosSet])
+  }, [filtered, sortKey, sortDir, ctx])
 
   const exportPreviewCount = useMemo(() => {
     if (!exportDialogFormat) return 0
@@ -586,6 +644,8 @@ export function ServiciosSection() {
   }, [exportDialogFormat, exportRangeMode, exportStart, exportEnd, sorted])
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  // Página fuera de rango (ej. link viejo con ?pag=9 y ahora hay 3): a la última
+  useEffect(() => { if (!loading && page > totalPages) setPage(totalPages) }, [loading, page, totalPages])
   const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const handleSort = (key: string) => {
@@ -596,11 +656,6 @@ export function ServiciosSection() {
       setSortDir('asc')
     }
     setPage(1)
-  }
-
-  function SortIcon({ colKey }: { colKey: string }) {
-    if (sortKey !== colKey) return <ArrowUpDown className="h-3 w-3 opacity-30" />
-    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3 text-primary" /> : <ArrowDown className="h-3 w-3 text-primary" />
   }
 
   const handleSearch = (val: string) => { setSearch(val); setPage(1) }
@@ -981,29 +1036,9 @@ export function ServiciosSection() {
           </SelectContent>
         </Select>
 
-        <Select value={conductorFilter} onValueChange={handleConductor}>
-          <SelectTrigger className="h-9 text-xs w-full sm:w-40">
-            <SelectValue placeholder="Por Conductor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los conductores</SelectItem>
-            {conductorOptions.map((n) => (
-              <SelectItem key={n} value={n}>{n}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <FiltroBuscable value={conductorFilter} onChange={handleConductor} options={conductorOptions} allLabel="Todos los conductores" className="w-full sm:w-40" />
 
-        <Select value={clienteFilter} onValueChange={handleCliente}>
-          <SelectTrigger className="h-9 text-xs w-full sm:w-40">
-            <SelectValue placeholder="Por Cliente" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los clientes</SelectItem>
-            {clienteOptions.map((n) => (
-              <SelectItem key={n} value={n}>{n}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <FiltroBuscable value={clienteFilter} onChange={handleCliente} options={clienteOptions} allLabel="Todos los clientes" className="w-full sm:w-40" />
 
         <input
           type="date"
@@ -1013,29 +1048,9 @@ export function ServiciosSection() {
           title="Por Fecha"
         />
 
-        <Select value={almacenRetiroFilter} onValueChange={handleAlmacenRetiro}>
-          <SelectTrigger className="h-9 text-xs w-full sm:w-[180px]">
-            <SelectValue placeholder="Por Almacén de Retiro" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos (Retiro)</SelectItem>
-            {almacenRetiroOptions.map((n) => (
-              <SelectItem key={n} value={n}>{n}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <FiltroBuscable value={almacenRetiroFilter} onChange={handleAlmacenRetiro} options={almacenRetiroOptions} allLabel="Todos (Retiro)" className="w-full sm:w-[180px]" />
 
-        <Select value={almacenDestinoFilter} onValueChange={handleAlmacenDestino}>
-          <SelectTrigger className="h-9 text-xs w-full sm:w-[180px]">
-            <SelectValue placeholder="Por Almacén de Destino" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos (Destino)</SelectItem>
-            {almacenDestinoOptions.map((n) => (
-              <SelectItem key={n} value={n}>{n}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <FiltroBuscable value={almacenDestinoFilter} onChange={handleAlmacenDestino} options={almacenDestinoOptions} allLabel="Todos (Destino)" className="w-full sm:w-[180px]" />
 
         {hasFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 px-2 text-muted-foreground hover:text-destructive">
@@ -1100,15 +1115,15 @@ export function ServiciosSection() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    {puedeEditar && <TableHead className="w-10" />}
                     <TableHead className="w-10" />
-                    <TableHead className="w-10" />
-                    <TableHead className="w-10" />
-                    <TableHead className="w-10" />
+                    {puedeEditar && <TableHead className="w-10" />}
+                    {puedeEditar && <TableHead className="w-10" />}
                     <TableHead
                       className="whitespace-nowrap font-bold text-xs min-w-[100px] cursor-pointer select-none hover:text-primary transition-colors"
                       onClick={() => handleSort('codigo')}
                     >
-                      <span className="inline-flex items-center gap-1">Código <SortIcon colKey="codigo" /></span>
+                      <span className="inline-flex items-center gap-1">Código <SortIcon activo={sortKey === 'codigo'} dir={sortDir} /></span>
                     </TableHead>
                     {visibleColumns.map((c) => (
                       <TableHead
@@ -1116,7 +1131,7 @@ export function ServiciosSection() {
                         className={`whitespace-nowrap font-bold text-xs cursor-pointer select-none hover:text-primary transition-colors ${c.headClass || ''}`}
                         onClick={() => handleSort(c.key)}
                       >
-                        <span className="inline-flex items-center gap-1">{c.label} <SortIcon colKey={c.key} /></span>
+                        <span className="inline-flex items-center gap-1">{c.label} <SortIcon activo={sortKey === c.key} dir={sortDir} /></span>
                       </TableHead>
                     ))}
                   </TableRow>
@@ -1124,16 +1139,16 @@ export function ServiciosSection() {
                 <TableBody>
                   {paginated.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4 + visibleColumns.length} className="text-center py-12 text-muted-foreground text-sm">
+                      <TableCell colSpan={(puedeEditar ? 4 : 1) + 1 + visibleColumns.length} className="text-center py-12 text-muted-foreground text-sm">
                         No se encontraron servicios con los filtros aplicados
                       </TableCell>
                     </TableRow>
                   ) : (
                     paginated.map((task) => {
                       const code = servicioCodigo(task)
-                      const ctx: ProgresoCtx = { progresoMap, completadosSet }
                       return (
                         <TableRow key={task.id} className="hover:bg-muted/30 text-xs">
+                          {puedeEditar && (
                           <TableCell className="p-1">
                             <Button
                               variant="ghost"
@@ -1145,6 +1160,7 @@ export function ServiciosSection() {
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           </TableCell>
+                          )}
                           <TableCell className="p-1">
                             <Link
                               href={`/servicios/trailers/${task.id}`}
@@ -1160,6 +1176,7 @@ export function ServiciosSection() {
                               </Button>
                             </Link>
                           </TableCell>
+                          {puedeEditar && (<>
                           <TableCell className="p-1">
                             <Button
                               variant="ghost"
@@ -1182,6 +1199,7 @@ export function ServiciosSection() {
                               <CheckCircle2 className="h-3.5 w-3.5" />
                             </Button>
                           </TableCell>
+                          </>)}
                           <TableCell className="font-medium whitespace-nowrap" title={task.name}>
                             {code}
                             {task.parent_id && (

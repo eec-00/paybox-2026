@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useMemo, useRef, useState } from 'react'
-import * as XLSX from 'xlsx'
 // Solo tipos: la librería (~900 KB) se carga recién al exportar
 import type ExcelJS from 'exceljs'
 import { hoyLima } from '@/lib/fechas'
@@ -48,6 +47,8 @@ function fmtMoney(n: number): string {
 
 async function readWorkbookRows(file: File): Promise<SheetRow[]> {
   const buffer = await file.arrayBuffer()
+  // SheetJS (~300 KB) se carga recién al subir un archivo, no al abrir la página
+  const XLSX = await import('xlsx')
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
   return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null }) as SheetRow[]

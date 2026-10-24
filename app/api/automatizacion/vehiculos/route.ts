@@ -1,39 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCamposForTipo } from '@/lib/automatizacion/campos'
 
-const ODOO_URL = (process.env.ODOO_URL || process.env.URL_ODOO || '').trim().replace(/\/$/, '')
-const ODOO_DB = (process.env.ODOO_DB || process.env.DB || '').trim()
-const ODOO_EMAIL = (process.env.ODOO_EMAIL || process.env.EMAIL || '').trim()
-const ODOO_API_KEY = (process.env.ODOO_API_KEY || process.env.API_KEY || '').trim()
 
-async function odooAuth(): Promise<number> {
-  const res = await fetch(`${ODOO_URL}/jsonrpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0', method: 'call', id: 1,
-      params: { service: 'common', method: 'authenticate', args: [ODOO_DB, ODOO_EMAIL, ODOO_API_KEY, {}] },
-    }),
-  })
-  const data = await res.json()
-  if (data.error || !data.result) throw new Error('Autenticación Odoo fallida')
-  return data.result as number
-}
 
-async function odooCall<T>(uid: number, model: string, method: string, args: unknown[], kwargs: Record<string, unknown> = {}): Promise<T> {
-  const res = await fetch(`${ODOO_URL}/jsonrpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0', method: 'call', id: Date.now(),
-      params: { service: 'object', method: 'execute_kw', args: [ODOO_DB, uid, ODOO_API_KEY, model, method, args, kwargs] },
-    }),
-  })
-  const data = await res.json()
-  if (data.error) throw new Error(`Odoo ${model}.${method}: ${data.error.data?.message ?? data.error.message}`)
-  return data.result as T
-}
-
+import { odooAuth, odooCall } from '@/lib/odoo'
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const tipo = searchParams.get('tipo') || 'tractos'

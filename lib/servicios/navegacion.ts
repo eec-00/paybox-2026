@@ -22,3 +22,16 @@ export function vecinosDe(id: number): { anterior: ServicioNav | null; siguiente
     return null
   }
 }
+
+// Dirección de la lista de Trailers con sus filtros (?cliente=…&etapa=…), para
+// que "Servicios" en el detalle vuelva a la tabla tal como se dejó.
+const KEY_URL = 'servicios:lista-url'
+const BASE_TRAILERS = '/servicios/trailers'
+
+export function guardarUrlLista(query: string): void {
+  try { sessionStorage.setItem(KEY_URL, query ? `${BASE_TRAILERS}?${query}` : BASE_TRAILERS) } catch {}
+}
+
+export function urlListaTrailers(): string {
+  try { return sessionStorage.getItem(KEY_URL) || BASE_TRAILERS } catch { return BASE_TRAILERS }
+}

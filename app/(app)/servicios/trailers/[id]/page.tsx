@@ -11,7 +11,8 @@ import {
 } from 'lucide-react'
 import { getHitosForTask, tipoServicioLabelFor } from '@/lib/servicios/hitos'
 import { registrosPorStep, tiemposHitos } from '@/lib/servicios/fechasHitos'
-import { vecinosDe, type ServicioNav } from '@/lib/servicios/navegacion'
+import { vecinosDe, urlListaTrailers, type ServicioNav } from '@/lib/servicios/navegacion'
+import { usePuedeEditarServicios } from '@/lib/servicios/usePuedeEditar'
 
 // Flecha a otro servicio de la lista filtrada; deshabilitada en los extremos.
 function NavButton({ servicio, label, icon: Icon }: { servicio: ServicioNav | null; label: string; icon: React.ElementType }) {
@@ -211,6 +212,11 @@ export default function ServicioDetailPage() {
   // Cambio manual de etapa, igual que la barra de etapas de Odoo
   const [stages, setStages] = useState<{ id: number; name: string }[]>([])
   const [cambiandoEtapa, setCambiandoEtapa] = useState(false)
+  const puedeEditar = usePuedeEditarServicios()
+  // Volver a la tabla con los mismos filtros con que se dejó (sessionStorage:
+  // se lee después de montar para no desalinear el render del servidor)
+  const [volverHref, setVolverHref] = useState('/servicios/trailers')
+  useEffect(() => { setVolverHref(urlListaTrailers()) }, [])
   const cambiarEtapa = async (stage: { id: number; name: string }) => {
     if (!task) return
     const codigo = task.name.includes(' - ') ? task.name.split(' - ')[0] : task.name
@@ -275,7 +281,7 @@ export default function ServicioDetailPage() {
     <div className="space-y-4">
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm flex-wrap">
-        <Link href="/servicios/trailers" className="text-primary hover:underline font-medium">
+        <Link href={volverHref} className="text-primary hover:underline font-medium">
           Servicios
         </Link>
         <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
@@ -332,12 +338,12 @@ export default function ServicioDetailPage() {
               <button
                 key={s.id}
                 type="button"
-                disabled={!!actual || cambiandoEtapa}
+                disabled={!!actual || cambiandoEtapa || !puedeEditar}
                 onClick={() => cambiarEtapa(s)}
                 className={`relative shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${i > 0 ? 'border-l' : ''} ${
-                  actual ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/60 disabled:opacity-50'
+                  actual ? 'bg-primary text-primary-foreground' : puedeEditar ? 'hover:bg-muted/60 disabled:opacity-50' : 'cursor-default'
                 }`}
-                title={actual ? 'Etapa actual' : `Pasar a "${s.name}"`}
+                title={actual ? 'Etapa actual' : puedeEditar ? `Pasar a "${s.name}"` : s.name}
               >
                 <span className={`w-2 h-2 rounded-full ${stageDotColor(s.name)}`} />
                 {s.name}

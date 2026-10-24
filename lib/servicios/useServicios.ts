@@ -3,6 +3,7 @@
 import useSWR from 'swr'
 import { useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { fetchAllRows } from '@/lib/supabase/fetchAll'
 
 // Cache en el cliente de la lista de servicios (Trailers y
 // Sobrecostos). Al volver a una pantalla ya visitada la tabla aparece al
@@ -40,16 +41,21 @@ export function useServiciosLista<T>(url: string) {
 
 async function fetchProgreso() {
   const supabase = createClient()
-  const [progresoRes, completadosRes] = await Promise.all([
-    supabase.from('conductor_servicios_progreso').select('servicio_id, step_actual'),
-    supabase.from('conductor_servicios_completados').select('servicio_id'),
+  // Paginado: Supabase corta cada consulta en 1000 filas sin avisar, y
+  // "completados" crece con cada servicio terminado — pasado ese tope, servicios
+  // ya terminados aparecerían como "Sin iniciar". Orden fijo para que las
+  // páginas no se pisen.
+  const [progreso, completados] = await Promise.all([
+    fetchAllRows<{ servicio_id: number; step_actual: number }>((from, to) =>
+      supabase.from('conductor_servicios_progreso').select('servicio_id, step_actual')
+        .order('servicio_id').order('conductor_id').range(from, to)
+    ),
+    fetchAllRows<{ servicio_id: number }>((from, to) =>
+      supabase.from('conductor_servicios_completados').select('servicio_id')
+        .order('servicio_id').order('conductor_id').range(from, to)
+    ),
   ])
-  if (progresoRes.error) throw new Error(progresoRes.error.message)
-  if (completadosRes.error) throw new Error(completadosRes.error.message)
-  return {
-    progreso: (progresoRes.data ?? []) as { servicio_id: number; step_actual: number }[],
-    completados: (completadosRes.data ?? []) as { servicio_id: number }[],
-  }
+  return { progreso, completados }
 }
 
 /** Avance de cada servicio marcado por los conductores en PayBox (Supabase). */

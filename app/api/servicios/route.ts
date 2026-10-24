@@ -5,9 +5,12 @@ import {
 } from '@/lib/servicios/hitos'
 import { fechaCorte } from '@/lib/servicios/rango'
 import { createClient } from '@/lib/supabase/server'
+import { odooAuth, odooCall } from '@/lib/odoo'
+import { etapaFinalizadoDe } from '@/lib/servicios/etapas'
+import { puedeEditarServicios, puedeVerServicios, SIN_PERMISO_EDITAR } from '@/lib/servicios/permisos'
 
 type Acceso =
-  | { tipo: 'panel' }
+  | { tipo: 'panel'; puedeEditar: boolean }
   | { tipo: 'conductor'; employeeId: number | null; employeeName: string }
 
 /** Quién llama y qué puede hacer. Panel = admin/developer o usuario con el
@@ -21,7 +24,7 @@ async function getAcceso(): Promise<Acceso | NextResponse> {
 
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('role, module_permissions, odoo_employee_id, odoo_employee_name')
+    .select('role, can_edit, module_permissions, odoo_employee_id, odoo_employee_name')
     .eq('id', user.id)
     .single()
   if (!profile) return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
@@ -29,9 +32,8 @@ async function getAcceso(): Promise<Acceso | NextResponse> {
   if (profile.role === 'conductor') {
     return { tipo: 'conductor', employeeId: profile.odoo_employee_id || null, employeeName: profile.odoo_employee_name || '' }
   }
-  const mp = profile.module_permissions as { servicios?: { enabled?: boolean } } | null
-  if (profile.role === 'admin' || profile.role === 'developer' || !mp || mp.servicios?.enabled === true) {
-    return { tipo: 'panel' }
+  if (puedeVerServicios(profile)) {
+    return { tipo: 'panel', puedeEditar: puedeEditarServicios(profile) }
   }
   return NextResponse.json({ error: 'Se requiere acceso al módulo de Servicios' }, { status: 403 })
 }
@@ -51,58 +53,6 @@ async function esTareaDelConductor(uid: number, taskId: number, acceso: Extract<
   if (acceso.employeeId) return ref[0] === acceso.employeeId
   const nombre = acceso.employeeName.trim().toLowerCase()
   return !!nombre && ref[1].toLowerCase().includes(nombre)
-}
-
-const ODOO_URL = (process.env.ODOO_URL || process.env.URL_ODOO || '').trim().replace(/\/$/, '')
-const ODOO_DB = (process.env.ODOO_DB || process.env.DB || '').trim()
-const ODOO_EMAIL = (process.env.ODOO_EMAIL || process.env.EMAIL || '').trim()
-const ODOO_API_KEY = (process.env.ODOO_API_KEY || process.env.API_KEY || '').trim()
-
-async function odooAuth(): Promise<number> {
-  const res = await fetch(`${ODOO_URL}/jsonrpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'call',
-      id: 1,
-      params: {
-        service: 'common',
-        method: 'authenticate',
-        args: [ODOO_DB, ODOO_EMAIL, ODOO_API_KEY, {}],
-      },
-    }),
-  })
-  const data = await res.json()
-  if (data.error) throw new Error(data.error.data?.message ?? data.error.message)
-  if (!data.result) throw new Error('Autenticación Odoo fallida')
-  return data.result as number
-}
-
-async function odooCall<T = unknown>(
-  uid: number,
-  model: string,
-  method: string,
-  args: unknown[],
-  kwargs: Record<string, unknown> = {}
-): Promise<T> {
-  const res = await fetch(`${ODOO_URL}/jsonrpc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      method: 'call',
-      id: Date.now(),
-      params: {
-        service: 'object',
-        method: 'execute_kw',
-        args: [ODOO_DB, uid, ODOO_API_KEY, model, method, args, kwargs],
-      },
-    }),
-  })
-  const data = await res.json()
-  if (data.error) throw new Error(data.error.data?.message ?? data.error.message)
-  return data.result as T
 }
 
 // Base fields always present on project.task
@@ -457,6 +407,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
+    // Panel de solo lectura: puede ver y usar los catálogos (son lecturas),
+    // pero no finalizar ni editar.
+    const escribe = body.action === 'finalize' || !body.action
+    if (acceso.tipo === 'panel' && escribe && !acceso.puedeEditar) {
+      return NextResponse.json({ error: SIN_PERMISO_EDITAR }, { status: 403 })
+    }
+
     // conductores → lista de empleados para el select
     // Finalizar servicio → busca stage "Servicio Finalizado" y lo asigna
     if (body.action === 'finalize') {
@@ -466,15 +423,10 @@ export async function POST(request: Request) {
       if (esConductor && !(await esTareaDelConductor(uid, id, acceso))) {
         return NextResponse.json({ error: 'Este servicio no está asignado a ti' }, { status: 403 })
       }
-      const stages = await odooCall<{ id: number; name: string }[]>(
-        uid, 'project.task.type', 'search_read',
-        [[['name', '=ilike', 'servicio finalizado']]],
-        { fields: ['id', 'name'], limit: 5 }
-      )
-      if (!stages.length) {
+      const stage = await etapaFinalizadoDe(uid, id)
+      if (!stage) {
         return NextResponse.json({ error: 'No se encontró etapa "Servicio Finalizado"' }, { status: 404 })
       }
-      const stage = stages[0]
       await odooCall(uid, 'project.task', 'write', [[id], { stage_id: stage.id }])
       return NextResponse.json({ ok: true, stageId: stage.id, stageName: stage.name })
     }
