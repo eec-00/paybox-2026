@@ -85,6 +85,11 @@ export async function updateSession(request: NextRequest) {
     url.pathname = request.nextUrl.pathname.startsWith('/conductor')
       ? '/conductor/login'
       : '/login'
+    // El link del sticker de asistencia trae el toque en la URL: tras iniciar
+    // sesión hay que volver a él, si no el toque se pierde.
+    if (request.nextUrl.pathname.startsWith('/oficina')) {
+      url.search = `?next=${encodeURIComponent(request.nextUrl.pathname + request.nextUrl.search)}`
+    }
     return NextResponse.redirect(url)
   }
 

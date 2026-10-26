@@ -28,6 +28,7 @@ import {
   Fingerprint,
   Timer,
   FlaskConical,
+  Building2,
 } from 'lucide-react'
 
 interface FlatItem {
@@ -240,9 +241,18 @@ export function Sidebar({
           type: 'item',
           id: 'rrhh-asistencia',
           href: '/rrhh/asistencia',
-          label: 'Asistencia',
+          label: 'Asistencia conductores',
           icon: Fingerprint,
           description: 'Marcas de ubicación de conductores',
+          adminOnly: false,
+        },
+        {
+          type: 'item',
+          id: 'rrhh-oficina',
+          href: '/rrhh/oficina',
+          label: 'Asistencia oficina',
+          icon: Building2,
+          description: 'Marcas del personal de oficina',
           adminOnly: false,
         },
       ],

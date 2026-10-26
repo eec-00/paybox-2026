@@ -48,7 +48,9 @@ export default function LoginPage() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      window.location.href = '/dashboard'
+      // Vuelve a la página que pidió el login (ej. el link del sticker de asistencia); solo rutas internas.
+      const next = new URLSearchParams(window.location.search).get('next')
+      window.location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard'
     } catch (error: any) {
       toast.error(getErrorMessage(error.message || ''))
     } finally {
