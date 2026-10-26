@@ -17,7 +17,7 @@ import { Copy, Loader2, Nfc, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
-  ALMUERZO_REFERENCIA_MIN, DIAS_SEMANA, fmtDuracion, hhmmAMin,
+  ALMUERZO_REFERENCIA_MIN, DIAS_SEMANA, LABEL_MARCA, TIPOS_MARCA, fmtDuracion, hhmmAMin,
   type Horario, type OficinaConfig, type Trabajador,
 } from '@/lib/oficina/calculos'
 import type { PermisosOficina } from '@/components/OficinaAsistenciaSection'
@@ -53,7 +53,7 @@ function Parametros({ config, puedeEditar, onCambio }: { config: OficinaConfig; 
   const [guardando, setGuardando] = useState(false)
   useEffect(() => setForm(config), [config])
 
-  const campo = (k: Exclude<keyof OficinaConfig, 'selfie_obligatoria'>, label: string, ayuda: string, type: 'number' | 'time' = 'number') => (
+  const campo = (k: Exclude<keyof OficinaConfig, 'selfie_tipos'>, label: string, ayuda: string, type: 'number' | 'time' = 'number') => (
     <div className="space-y-1">
       <Label htmlFor={k}>{label}</Label>
       <Input
@@ -92,21 +92,28 @@ function Parametros({ config, puedeEditar, onCambio }: { config: OficinaConfig; 
           {campo('almuerzo_max', 'Almuerzo máximo (minutos)', 'Más que esto genera aviso.')}
           {campo('hora_limite', 'Hora límite', 'Marcas desde esta hora se avisan como horario nocturno. No se bloquean.', 'time')}
         </div>
-        <label className="flex items-start gap-2 text-sm">
-          <Checkbox
-            className="mt-0.5"
-            checked={form.selfie_obligatoria}
-            disabled={!puedeEditar}
-            onCheckedChange={(c) => setForm({ ...form, selfie_obligatoria: !!c })}
-          />
-          <span>
-            <span className="font-medium">Selfie obligatoria al marcar</span>
-            <span className="block text-xs text-muted-foreground">
-              Apagada, el personal marca solo con el sticker, sin foto. El link de un solo uso y la detección de
-              marcas sospechosas siguen funcionando, pero se pierde la prueba de que la persona estaba en la oficina.
-            </span>
-          </span>
-        </label>
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Selfie obligatoria en</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {TIPOS_MARCA.map((t) => (
+              <label key={t} className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={form.selfie_tipos.includes(t)}
+                  disabled={!puedeEditar}
+                  onCheckedChange={(c) => setForm({
+                    ...form,
+                    selfie_tipos: c ? TIPOS_MARCA.filter((x) => x === t || form.selfie_tipos.includes(x)) : form.selfie_tipos.filter((x) => x !== t),
+                  })}
+                />
+                {LABEL_MARCA[t]}
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            En las marcas sin selfie, el personal marca solo con el sticker. El link de un solo uso y la detección de
+            marcas sospechosas siguen funcionando, pero en esas marcas no queda prueba de que la persona estaba en la oficina.
+          </p>
+        </div>
         {puedeEditar && (
           <Button onClick={guardar} disabled={guardando} size="sm">
             {guardando && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Guardar parámetros

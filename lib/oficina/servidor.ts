@@ -2,13 +2,14 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { hoyLima } from '@/lib/fechas'
-import { horaLima, siguienteMarca, type TipoMarca } from '@/lib/oficina/calculos'
+import { TIPOS_MARCA, horaLima, siguienteMarca, type TipoMarca } from '@/lib/oficina/calculos'
 
 export interface EstadoHoy {
   nombre: string
   marcasHoy: { tipo: TipoMarca; hora: string }[]
   siguiente: TipoMarca | null
-  selfieObligatoria: boolean
+  /** Marcas en las que RRHH pide selfie. */
+  selfieTipos: TipoMarca[]
 }
 
 /** Nombre del trabajador, sus marcas de hoy y la que le toca. null si no está habilitado. */
@@ -22,7 +23,7 @@ export async function estadoHoy(admin: SupabaseClient, userId: string): Promise<
 
   const { data: config } = await admin
     .from('oficina_config')
-    .select('selfie_obligatoria')
+    .select('selfie_tipos')
     .eq('id', 1)
     .single()
 
@@ -38,6 +39,6 @@ export async function estadoHoy(admin: SupabaseClient, userId: string): Promise<
     nombre: trabajador.nombre,
     marcasHoy,
     siguiente: siguienteMarca(marcasHoy.map((m) => m.tipo)),
-    selfieObligatoria: config?.selfie_obligatoria ?? true,
+    selfieTipos: (config?.selfie_tipos as TipoMarca[] | undefined) ?? [...TIPOS_MARCA],
   }
 }

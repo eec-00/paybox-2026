@@ -44,7 +44,7 @@ export function OficinaAsistenciaSection() {
   const cargarBase = useCallback(async () => {
     const supabase = createClient()
     const [cfg, trab] = await Promise.all([
-      supabase.from('oficina_config').select('meta_semanal_horas, tolerancia_min, almuerzo_min, almuerzo_max, hora_limite, selfie_obligatoria').eq('id', 1).single(),
+      supabase.from('oficina_config').select('meta_semanal_horas, tolerancia_min, almuerzo_min, almuerzo_max, hora_limite, selfie_tipos').eq('id', 1).single(),
       supabase.from('oficina_trabajadores').select('user_id, nombre, activo, horario, meta_semanal_horas').order('nombre'),
     ])
     if (cfg.error || trab.error) {

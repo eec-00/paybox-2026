@@ -23,7 +23,8 @@ export interface OficinaConfig {
   almuerzo_min: number
   almuerzo_max: number
   hora_limite: string
-  selfie_obligatoria: boolean
+  /** Marcas en las que se pide selfie. */
+  selfie_tipos: TipoMarca[]
 }
 
 export interface HorarioDia { entrada: string; salida: string }

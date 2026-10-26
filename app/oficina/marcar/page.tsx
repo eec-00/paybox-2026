@@ -18,7 +18,7 @@ interface EstadoDia {
   nombre: string
   marcasHoy: { tipo: TipoMarca; hora: string }[]
   siguiente: TipoMarca | null
-  selfieObligatoria: boolean
+  selfieTipos: TipoMarca[]
 }
 
 type Pantalla =
@@ -245,6 +245,8 @@ function Marcar({ ticketId, estado, onHecho, onError }: {
     )
   }
 
+  const pideSelfie = estado.selfieTipos.includes(tipo)
+
   const elegirFoto = async (file: File | undefined) => {
     if (!file) return
     // Selfie liviana (~50–80 KB): alcanza para reconocer la cara y el lugar.
@@ -254,7 +256,7 @@ function Marcar({ ticketId, estado, onHecho, onError }: {
   }
 
   const confirmar = async () => {
-    if (!foto && estado.selfieObligatoria) return
+    if (!foto && pideSelfie) return
     setEnviando(true)
     try {
       const form = new FormData()
@@ -288,20 +290,20 @@ function Marcar({ ticketId, estado, onHecho, onError }: {
 
       {!preview ? (
         <>
-          {/* Sin selfie obligatoria (RRHH la apagó), el botón marca directo. */}
+          {/* Si RRHH no pide selfie en esta marca, el botón marca directo. */}
           <button
-            onClick={() => (estado.selfieObligatoria ? inputRef.current?.click() : confirmar())}
+            onClick={() => (pideSelfie ? inputRef.current?.click() : confirmar())}
             disabled={enviando}
             className="w-full rounded-2xl bg-[#1a2332] text-white py-6 px-4 shadow-lg active:scale-[0.98] transition-transform flex flex-col items-center gap-2 disabled:opacity-60"
           >
             {enviando
               ? <Loader2 className="h-8 w-8 animate-spin text-[#f5a623]" />
-              : estado.selfieObligatoria
+              : pideSelfie
                 ? <Camera className="h-8 w-8 text-[#f5a623]" />
                 : <CheckCircle2 className="h-8 w-8 text-[#f5a623]" />}
             <span className="text-xl font-semibold">{BOTON[tipo]}</span>
             <span className="text-xs text-white/70">
-              {estado.selfieObligatoria ? 'Se abrirá la cámara para tu selfie' : 'Se registra con la hora del servidor'}
+              {pideSelfie ? 'Se abrirá la cámara para tu selfie' : 'Se registra con la hora del servidor'}
             </span>
           </button>
           {estado.siguiente === 'salida_almuerzo' && (

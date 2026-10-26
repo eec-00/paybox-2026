@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient()
   const estado = await estadoHoy(admin, user.id)
   if (!estado) return NextResponse.json({ error: 'Tu usuario no está habilitado para marcar en oficina' }, { status: 403 })
-  // RRHH puede apagar la selfie obligatoria desde Configuración.
-  if (!foto && estado.selfieObligatoria) return NextResponse.json({ error: 'La selfie es obligatoria' }, { status: 400 })
+  // RRHH elige en Configuración en qué marcas se pide selfie.
+  if (!foto && estado.selfieTipos.includes(tipo)) return NextResponse.json({ error: 'La selfie es obligatoria' }, { status: 400 })
 
   // Solo la marca que le toca, o "salida" directa si se va sin almuerzo.
   const permitido = tipo === estado.siguiente || (tipo === 'salida' && estado.siguiente === 'salida_almuerzo')

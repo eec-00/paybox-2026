@@ -288,7 +288,7 @@ function MarcaDialog({ celda, fecha, permisos, onClose, onGuardado }: {
                 : <div className="h-64 rounded-lg bg-muted flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                {marca.manual ? 'Sin selfie (marca registrada a mano por RRHH).' : 'Sin selfie (la selfie obligatoria estaba apagada).'}
+                {marca.manual ? 'Sin selfie (marca registrada a mano por RRHH).' : 'Sin selfie (no se pedía en esta marca).'}
               </p>
             )}
             <p className="text-sm">
