@@ -59,10 +59,8 @@ export async function updateSession(request: NextRequest) {
 
   let user = null
   try {
-    const {
-      data: { claims },
-      error,
-    } = await supabase.auth.getClaims()
+    const { data, error } = await supabase.auth.getClaims()
+    const claims = data?.claims ?? null
     
     // If there's a refresh token error, clear the cookies
     if (error?.code === 'refresh_token_not_found' || /invalid refresh token|refresh token not found/i.test(error?.message ?? '')) {
