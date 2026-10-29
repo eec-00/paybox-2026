@@ -1,7 +1,30 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+function clearAuthCookies(response: NextResponse) {
+  response.cookies.delete('sb-ensmgozpmqcnkhthqgit-auth-token')
+  response.cookies.delete('sb-ensmgozpmqcnkhthqgit-auth-token.0')
+  response.cookies.delete('sb-ensmgozpmqcnkhthqgit-auth-token.1')
+}
+
+function unavailableResponse() {
+  return NextResponse.json(
+    { error: 'Servicio temporalmente no disponible. Inténtalo de nuevo.' },
+    { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '5' } }
+  )
+}
+
 export async function updateSession(request: NextRequest) {
+  const isPublicPath =
+    request.nextUrl.pathname.startsWith('/login') ||
+    request.nextUrl.pathname.startsWith('/conductor/login') ||
+    request.nextUrl.pathname.startsWith('/register') ||
+    request.nextUrl.pathname.startsWith('/auth')
+
+  // The sign-in pages need no remote Auth check; avoiding that check also
+  // keeps them available when the upstream Auth service is temporarily slow.
+  if (isPublicPath) return NextResponse.next({ request })
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -30,27 +53,22 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // IMPORTANT: Avoid writing any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
+  // Verify JWT locally using Supabase's cached signing keys when possible.
+  // This avoids a remote Auth user lookup on every Edge request.
+  // Downstream sensitive routes still perform their own access checks.
 
   let user = null
   try {
-    const {
-      data: { user: authUser },
-      error,
-    } = await supabase.auth.getUser()
+    const { data, error } = await supabase.auth.getClaims()
+    const claims = data?.claims ?? null
     
     // If there's a refresh token error, clear the cookies
-    if (error?.message?.includes('refresh_token_not_found')) {
+    if (error?.code === 'refresh_token_not_found' || /invalid refresh token|refresh token not found/i.test(error?.message ?? '')) {
       // Clear invalid auth cookies
-      const response = NextResponse.next({ request })
-      response.cookies.delete('sb-ensmgozpmqcnkhthqgit-auth-token')
-      response.cookies.delete('sb-ensmgozpmqcnkhthqgit-auth-token.0')
-      response.cookies.delete('sb-ensmgozpmqcnkhthqgit-auth-token.1')
-
       if (request.nextUrl.pathname.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Sesión expirada' }, { status: 401 })
+        const response = NextResponse.json({ error: 'Sesión expirada' }, { status: 401 })
+        clearAuthCookies(response)
+        return response
       }
 
       // Redirect to login if not already on auth pages
@@ -60,22 +78,28 @@ export async function updateSession(request: NextRequest) {
         !request.nextUrl.pathname.startsWith('/auth')
       ) {
         const url = request.nextUrl.clone()
-        url.pathname = '/login'
-        return NextResponse.redirect(url)
+        url.pathname = request.nextUrl.pathname.startsWith('/conductor') ? '/conductor/login' : '/login'
+        const response = NextResponse.redirect(url)
+        clearAuthCookies(response)
+        return response
       }
+      const response = NextResponse.next({ request })
+      clearAuthCookies(response)
       return response
     }
-    
-    user = authUser
+
+    // Missing/invalid credentials remain unauthenticated; infrastructure
+    // failures must not destroy a valid browser session.
+    if (error && error.name !== 'AuthSessionMissingError' && ![400, 401, 403].includes(error.status ?? 0)) {
+      console.error('Temporary Supabase JWT verification failure:', error.code || error.name)
+      return unavailableResponse()
+    }
+
+    user = claims
   } catch (error) {
     console.error('Auth error in middleware:', error)
+    return unavailableResponse()
   }
-
-  const isPublicPath =
-    request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/conductor/login') ||
-    request.nextUrl.pathname.startsWith('/register') ||
-    request.nextUrl.pathname.startsWith('/auth')
 
   if (!user && !isPublicPath) {
     if (request.nextUrl.pathname.startsWith('/api/')) {
