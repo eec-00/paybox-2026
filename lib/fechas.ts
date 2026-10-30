@@ -28,3 +28,10 @@ export function sumarDias(fecha: string, n: number): string {
 export function fechaUTC(fecha: string): Date {
   return new Date(`${fecha}T12:00:00Z`)
 }
+
+/** Último día para pagar un gasto de conductor registrado en `fecha`:
+ * lunes a viernes, el sábado de esa semana; sábado y domingo, el de la siguiente. */
+export function sabadoDePago(fecha: string): string {
+  const dia = fechaUTC(fecha).getUTCDay()
+  return sumarDias(fecha, dia === 6 ? 7 : 6 - dia)
+}
