@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { hoyLima, sabadoDePago } from '@/lib/fechas'
+import { odooAuth, odooCall } from '@/lib/odoo'
+
+// Busca el servicio solo si está asignado al conductor, con el mismo criterio
+// que su lista en /api/conductor/servicios. Devuelve el nombre real en Odoo.
+async function nombreServicioAsignado(
+  servicioId: number,
+  employeeId: number | null,
+  employeeName: string,
+): Promise<string | null> {
+  const uid = await odooAuth()
+  const fieldsMeta = await odooCall<Record<string, { type: string }>>(
+    uid, 'project.task', 'fields_get', [['x_studio_conductor']], { attributes: ['type'] }
+  )
+  const conductorFilter =
+    fieldsMeta['x_studio_conductor']?.type === 'many2one' && employeeId
+      ? ['x_studio_conductor', '=', employeeId]
+      : ['x_studio_conductor', 'ilike', employeeName]
+
+  const tasks = await odooCall<{ name: string }[]>(
+    uid, 'project.task', 'search_read',
+    [[['id', '=', servicioId], conductorFilter]],
+    { fields: ['name'], limit: 1 }
+  )
+  return tasks[0]?.name ?? null
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('role, full_name, odoo_employee_name')
+      .select('role, full_name, odoo_employee_id, odoo_employee_name')
       .eq('id', user.id)
       .single()
 
@@ -19,16 +44,30 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { servicioId, servicioNombre, descripcion, monto, moneda = 'soles', fotos = [] } = body
+    const { servicioId, descripcion, monto, moneda = 'soles', fotos = [] } = body
 
-    if (!servicioId || !servicioNombre || !descripcion || !monto) {
+    if (!servicioId || !descripcion || !monto) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+    }
+
+    if (!Number.isInteger(servicioId) || servicioId <= 0) {
+      return NextResponse.json({ error: 'Servicio inválido' }, { status: 400 })
     }
 
     const conductorNombre = profile.full_name || profile.odoo_employee_name || 'Conductor'
     const montoNum = parseFloat(String(monto))
     if (isNaN(montoNum) || montoNum <= 0) {
       return NextResponse.json({ error: 'Monto inválido' }, { status: 400 })
+    }
+
+    const employeeName: string = profile.odoo_employee_name || ''
+    const employeeId: number | null = profile.odoo_employee_id || null
+    const servicioNombre = employeeName || employeeId
+      ? await nombreServicioAsignado(servicioId, employeeId, employeeName)
+      : null
+
+    if (!servicioNombre) {
+      return NextResponse.json({ error: 'Este servicio no está asignado a tu usuario' }, { status: 403 })
     }
 
     const { data: gasto, error: gastoError } = await supabase
@@ -69,7 +108,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, gasto })
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err)
+    // Los errores de Supabase no son instancias de Error
+    const msg = (err as { message?: string })?.message || String(err)
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

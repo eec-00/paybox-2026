@@ -927,32 +927,48 @@ export default function ConductorServiciosPage() {
       return
     }
     setGastosSubmitting(true)
+    // Los que fallan se quedan en la lista para reintentar; los guardados no,
+    // o se registrarían dos veces.
+    const fallidos: typeof gastosItems = []
+    let ultimoError = ''
     try {
-      const servicioNombre = task.name
       for (const item of gastosItems) {
-        await fetch('/api/conductor/gastos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            servicioId: gastosForTaskId,
-            servicioNombre,
-            descripcion: item.descripcion,
-            monto: item.monto,
-            moneda: item.moneda,
-            fotos: item.fotos,
-          }),
-        })
+        try {
+          const res = await fetch('/api/conductor/gastos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              servicioId: gastosForTaskId,
+              descripcion: item.descripcion,
+              monto: item.monto,
+              moneda: item.moneda,
+              fotos: item.fotos,
+            }),
+          })
+          if (!res.ok) {
+            const data = await res.json().catch(() => null)
+            throw new Error(data?.error || 'No se pudo guardar')
+          }
+        } catch (err) {
+          fallidos.push(item)
+          ultimoError = err instanceof Error ? err.message : 'No se pudo guardar'
+        }
       }
-      await fetchGastosForService(gastosForTaskId)
-    } catch {
-      alert('Error al guardar gastos. Inténtalo de nuevo.')
+      await fetchGastosForService(gastosForTaskId).catch(() => {})
     } finally {
       setGastosSubmitting(false)
-      const tid = gastosForTaskId
-      setGastosForTaskId(null)
-      setGastosItems([])
-      setActiveServiceId(tid)
     }
+
+    if (fallidos.length > 0) {
+      setGastosItems(fallidos)
+      alert(`No se guardaron ${fallidos.length} de ${gastosItems.length} gastos: ${ultimoError}`)
+      return
+    }
+
+    const tid = gastosForTaskId
+    setGastosForTaskId(null)
+    setGastosItems([])
+    setActiveServiceId(tid)
   }
 
   // id of the task currently in-progress, if any
