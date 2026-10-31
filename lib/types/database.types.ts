@@ -68,10 +68,6 @@ export interface Registro {
   numero_documento?: string
   descripcion?: string
   ruc?: string
-  // Campos de exportación a Odoo
-  exportado_a_odoo?: boolean
-  fecha_exportacion?: string
-  lote_exportacion_id?: number
 }
 
 export interface ReglaImputacion {

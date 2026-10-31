@@ -6,7 +6,6 @@ import { useApp } from '@/lib/context/app-context'
 import { PaymentForm } from '@/components/PaymentForm'
 import { PaymentsTable } from '@/components/PaymentsTable'
 import { ExportExcelModal } from '@/components/ExportExcelModal'
-import { SyncOdooModal } from '@/components/SyncOdooModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -16,7 +15,7 @@ import {
 } from 'lucide-react'
 
 export default function PagosPage() {
-  const { isAdminUser, canCreate } = useApp()
+  const { canCreate } = useApp()
   const supabase = createClient()
 
   const [refresh, setRefresh] = useState(0)
@@ -84,7 +83,6 @@ export default function PagosPage() {
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
             <ExportExcelModal buttonVariant="outline" buttonSize="sm" buttonClass="h-8 sm:h-9 px-2 sm:px-4 bg-emerald-50 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 border-emerald-200 shadow-sm font-semibold text-xs rounded-lg" />
-            {isAdminUser && <SyncOdooModal />}
             {canCreate && !showNewPaymentForm && (
               <Button onClick={() => setShowNewPaymentForm(true)} size="sm" className="h-8 sm:h-9 px-3 sm:px-5 shadow-md hover:shadow-lg transition-all font-bold text-xs rounded-lg bg-[#1a2332] hover:bg-[#2c3a4f]">
                 <PlusCircle className="h-4 w-4 sm:mr-2" />
