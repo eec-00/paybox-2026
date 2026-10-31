@@ -32,6 +32,8 @@ const getLocalDateStr = (date: Date = new Date()) => {
     return `${year}-${month}-${day}`
 }
 
+const fechaCorta = (fecha: string) => new Date(fecha + 'T12:00:00').toLocaleDateString('es-PE')
+
 export function CalendarSection() {
     const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
     const [listTab, setListTab] = useState<'fijos' | 'conductores'>('fijos')
@@ -290,7 +292,7 @@ export function CalendarSection() {
                                 <div
                                     key={pago.id}
                                     className={`text-[10px] px-1 py-0.5 rounded-sm flex items-center gap-1 cursor-pointer hover:opacity-80 ${gastoPagoColor(pago)}`}
-                                    title={`${pago.nombre_pago} — ${pago.monto_variable ? 'Variable' : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`}`}
+                                    title={`${pago.nombre_pago} — ${pago.monto_variable ? 'Variable' : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`}${esGasto && pago.fecha_limite ? ` — Pagar hasta ${fechaCorta(pago.fecha_limite)}` : ''}`}
                                     onClick={() => {
                                         if (esGasto && pago.gasto_conductor) {
                                             setDetailGasto(pago.gasto_conductor)
@@ -330,6 +332,7 @@ export function CalendarSection() {
                                                     <div className="text-xs text-muted-foreground space-y-0.5">
                                                         <p><span className="font-medium">Conductor:</span> {pago.gasto_conductor.conductor_nombre}</p>
                                                         <p><span className="font-medium">Servicio:</span> {pago.gasto_conductor.servicio_nombre}</p>
+                                                        {pago.fecha_limite && <p><span className="font-medium">Pagar hasta:</span> {fechaCorta(pago.fecha_limite)}</p>}
                                                     </div>
                                                 )}
                                                 {pago.descripcion && (
@@ -396,6 +399,8 @@ export function CalendarSection() {
         )
     }
 
+    const limiteDetalle = pagos.find(p => p.gasto_conductor_id === detailGasto?.id)?.fecha_limite
+
     const renderList = () => {
         const fijosPagos = pagos.filter(p => p.tipo !== 'gasto_conductor')
         const conductoresPagos = pagos.filter(p => p.tipo === 'gasto_conductor')
@@ -443,7 +448,7 @@ export function CalendarSection() {
                             ) : (
                                 visiblePagos.map(pago => (
                                     <TableRow key={pago.id} className={pago.tipo === 'gasto_conductor' ? 'bg-primary/5 hover:bg-primary/10' : ''}>
-                                        <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">{new Date(pago.fecha + 'T12:00:00').toLocaleDateString('es-PE')}</TableCell>
+                                        <TableCell className="font-medium text-xs sm:text-sm whitespace-nowrap">{fechaCorta(pago.tipo === 'gasto_conductor' && pago.fecha_limite ? pago.fecha_limite : pago.fecha)}</TableCell>
                                         <TableCell>
                                             {pago.tipo === 'gasto_conductor' && pago.gasto_conductor ? (
                                                 <div>
@@ -762,6 +767,7 @@ export function CalendarSection() {
                                 <div className="col-span-2"><p className="text-xs text-muted-foreground uppercase tracking-wide">Descripción</p><p className="font-medium">{detailGasto.descripcion}</p></div>
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Monto</p><p className="font-bold text-xl text-primary">{detailGasto.moneda === 'soles' ? 'S/' : '$'} {detailGasto.monto}</p></div>
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Fecha</p><p className="font-semibold">{new Date(detailGasto.created_at).toLocaleDateString('es-PE')}</p></div>
+                                {limiteDetalle && <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Pagar hasta</p><p className="font-semibold">{fechaCorta(limiteDetalle)}</p></div>}
                             </div>
                             {detailGasto.fotos?.length > 0 && (
                                 <div>

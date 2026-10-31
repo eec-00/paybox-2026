@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createClient as createSessionClient } from '@/lib/supabase/server'
 import { odooAuth, odooCall } from '@/lib/odoo'
 // Evitar conflicto con la clase global URL de Node — usar nombres más específicos
 const ODOO_EXPENSE_AREA_FIELD = (process.env.ODOO_EXPENSE_AREA_FIELD || '').trim()
@@ -172,6 +173,22 @@ async function resolveAnalytic(uid: number, name: string): Promise<string | null
 // ── POST /api/sync-odoo ──────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
+    // Solo admin/developer: esta ruta crea gastos en Odoo con credenciales
+    // privilegiadas. Ocultar el botón no basta, el endpoint se puede llamar directo.
+    const sessionClient = await createSessionClient()
+    const { data: { user }, error: authError } = await sessionClient.auth.getUser()
+    if (authError || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+    const { data: profile } = await sessionClient
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.role || !['admin', 'developer'].includes(profile.role)) {
+      return NextResponse.json({ error: 'No tienes permiso para sincronizar con Odoo' }, { status: 403 })
+    }
+
     const { fechaDesde, fechaHasta } = await request.json()
 
     if (!fechaDesde || !fechaHasta) {
