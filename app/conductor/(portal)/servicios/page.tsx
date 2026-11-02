@@ -917,7 +917,7 @@ export default function ConductorServiciosPage() {
   }
 
   const handleSubmitGastos = async () => {
-    if (!gastosForTaskId) return
+    if (!gastosForTaskId || gastosSubmitting) return
     const task = tasks.find(t => t.id === gastosForTaskId)
     if (!task) return
     if (gastosItems.length === 0) {
@@ -938,6 +938,7 @@ export default function ConductorServiciosPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+              id: item.id,
               servicioId: gastosForTaskId,
               descripcion: item.descripcion,
               monto: item.monto,

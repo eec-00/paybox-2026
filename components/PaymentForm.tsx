@@ -358,6 +358,22 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
       // Necesitamos agregarlo para que Supabase lo guarde correctamente
       const fechaConZonaHoraria = fechaYHoraPago ? `${fechaYHoraPago}:00-05:00` : null
 
+      // La lista pudo quedar vieja: no registrar un segundo pago del mismo gasto
+      if (selectedGastoConductor && selectedGastoConductor !== 'none') {
+        const { data: gastoActual, error: gastoError } = await supabase
+          .from('gastos_conductor')
+          .select('estado')
+          .eq('id', selectedGastoConductor)
+          .single()
+
+        if (gastoError) throw gastoError
+        if (gastoActual.estado !== 'pendiente') {
+          loadGastosConductor()
+          setSelectedGastoConductor('none')
+          throw new Error('Este gasto de conductor ya fue pagado')
+        }
+      }
+
       const { data: insertedRegistro, error } = await supabase.from('registros').insert({
         fecha_y_hora_pago: fechaConZonaHoraria,
         beneficiario,
@@ -388,11 +404,19 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
       }
 
       if (selectedGastoConductor && selectedGastoConductor !== 'none') {
-        await fetch('/api/conductor/gastos', {
+        // El pago ya quedó guardado: si esto falla hay que avisar, o el gasto
+        // seguiría pendiente y se podría pagar de nuevo
+        const res = await fetch('/api/conductor/gastos', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: selectedGastoConductor }),
-        }).catch(err => console.error('No se pudo marcar gasto como pagado:', err))
+          body: JSON.stringify({ id: selectedGastoConductor, registroId: insertedRegistro.id }),
+        }).catch(() => null)
+
+        if (!res?.ok) {
+          const data = await res?.json().catch(() => null)
+          console.error('No se pudo marcar gasto como pagado:', data?.error)
+          alert(`El pago se guardó, pero el gasto del conductor no se marcó como pagado: ${data?.error || 'error de conexión'}. Avisa a Sistemas antes de volver a pagarlo.`)
+        }
       }
 
       // Limpiar formulario

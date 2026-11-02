@@ -100,11 +100,14 @@ export function GastosConductorSection() {
         if (!editGasto) return
         setEditSaving(true)
         try {
-            const { error } = await supabase
+            const { data: editados, error } = await supabase
                 .from('gastos_conductor')
                 .update({ descripcion: editDesc.trim(), monto: parseFloat(editMonto) })
                 .eq('id', editGasto.id)
+                .eq('estado', 'pendiente')
+                .select('id')
             if (error) throw error
+            if (!editados?.length) throw new Error('Gasto ya pagado')
             // Also update the linked calendario_pagos monto + descripcion
             await supabase
                 .from('calendario_pagos')
@@ -271,12 +274,16 @@ export function GastosConductorSection() {
                                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => setDetailGasto(gasto)} title="Ver detalle">
                                                         <Eye className="h-3.5 w-3.5" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openEdit(gasto)} title="Editar">
-                                                        <Pencil className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteGasto(gasto)} title="Eliminar">
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
+                                                    {gasto.estado === 'pendiente' && (
+                                                        <>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openEdit(gasto)} title="Editar">
+                                                                <Pencil className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteGasto(gasto)} title="Eliminar">
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                         </TableRow>

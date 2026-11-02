@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { hoyLima, sabadoDePago } from '@/lib/fechas'
 import { odooAuth, odooCall } from '@/lib/odoo'
+import { validarAltaGasto } from '@/lib/gastos/validaciones'
+
+const UNIQUE_VIOLATION = '23505'
 
 // Busca el servicio solo si está asignado al conductor, con el mismo criterio
 // que su lista en /api/conductor/servicios. Devuelve el nombre real en Odoo.
@@ -43,22 +46,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Solo conductores pueden registrar gastos' }, { status: 403 })
     }
 
-    const body = await req.json()
-    const { servicioId, descripcion, monto, moneda = 'soles', fotos = [] } = body
-
-    if (!servicioId || !descripcion || !monto) {
-      return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
-    }
-
-    if (!Number.isInteger(servicioId) || servicioId <= 0) {
-      return NextResponse.json({ error: 'Servicio inválido' }, { status: 400 })
-    }
+    const alta = validarAltaGasto(await req.json().catch(() => null))
+    if (!alta.ok) return NextResponse.json({ error: alta.error }, { status: 400 })
+    const { id, servicioId, descripcion, monto: montoNum, moneda, fotos } = alta.datos
 
     const conductorNombre = profile.full_name || profile.odoo_employee_name || 'Conductor'
-    const montoNum = parseFloat(String(monto))
-    if (isNaN(montoNum) || montoNum <= 0) {
-      return NextResponse.json({ error: 'Monto inválido' }, { status: 400 })
-    }
 
     const employeeName: string = profile.odoo_employee_name || ''
     const employeeId: number | null = profile.odoo_employee_id || null
@@ -70,9 +62,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Este servicio no está asignado a tu usuario' }, { status: 403 })
     }
 
-    const { data: gasto, error: gastoError } = await supabase
+    const { data: insertado, error: gastoError } = await supabase
       .from('gastos_conductor')
       .insert({
+        ...(id ? { id } : {}),
         servicio_id: servicioId,
         servicio_nombre: servicioNombre,
         conductor_id: user.id,
@@ -86,25 +79,57 @@ export async function POST(req: NextRequest) {
       .select()
       .single()
 
-    if (gastoError) throw gastoError
+    let gasto = insertado
+    if (gastoError) {
+      if (gastoError.code !== UNIQUE_VIOLATION || !id) throw gastoError
+      // Reintento o doble clic: el gasto ya entró con este id, no se crea otro
+      const { data: existente } = await supabase
+        .from('gastos_conductor')
+        .select()
+        .eq('id', id)
+        .eq('conductor_id', user.id)
+        .maybeSingle()
+      if (!existente) return NextResponse.json({ error: 'Identificador de gasto inválido' }, { status: 409 })
+      gasto = existente
+    }
 
-    // Create calendario_pagos entry — aparece el día en que se registró
-    // En hora de Lima: el servidor corre en UTC y de noche contaba desde mañana
-    const fechaStr = hoyLima()
+    // Si un intento anterior guardó el gasto y falló acá, el reintento lo completa
+    const { data: yaAgendado, error: agendadoError } = await supabase
+      .from('calendario_pagos')
+      .select('id')
+      .eq('gasto_conductor_id', gasto.id)
+      .limit(1)
+      .maybeSingle()
 
-    await supabase.from('calendario_pagos').insert({
-      fecha: fechaStr,
-      fecha_limite: sabadoDePago(fechaStr),
-      nombre_pago: `Gasto conductor: ${conductorNombre}`,
-      monto: montoNum,
-      moneda,
-      descripcion: `${descripcion} | Servicio: ${servicioNombre}`,
-      frecuencia: 'unica',
-      monto_variable: false,
-      tipo: 'gasto_conductor',
-      gasto_conductor_id: gasto.id,
-      creado_por: user.id,
-    })
+    let calendarioError = agendadoError
+    if (!agendadoError && !yaAgendado) {
+      // Create calendario_pagos entry — aparece el día en que se registró
+      // En hora de Lima: el servidor corre en UTC y de noche contaba desde mañana
+      const fechaStr = hoyLima()
+
+      const { error } = await supabase.from('calendario_pagos').insert({
+        fecha: fechaStr,
+        fecha_limite: sabadoDePago(fechaStr),
+        nombre_pago: `Gasto conductor: ${conductorNombre}`,
+        monto: gasto.monto,
+        moneda: gasto.moneda,
+        descripcion: `${gasto.descripcion} | Servicio: ${gasto.servicio_nombre}`,
+        frecuencia: 'unica',
+        monto_variable: false,
+        tipo: 'gasto_conductor',
+        gasto_conductor_id: gasto.id,
+        creado_por: user.id,
+      })
+      calendarioError = error
+    }
+
+    if (calendarioError) {
+      console.error('Gasto sin calendario de pagos:', gasto.id, calendarioError.message)
+      return NextResponse.json(
+        { error: 'El gasto se guardó pero no entró al calendario de pagos. Vuelve a intentarlo.', gastoId: gasto.id },
+        { status: 500 },
+      )
+    }
 
     return NextResponse.json({ ok: true, gasto })
   } catch (err: unknown) {
@@ -167,10 +192,11 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
-    const { id, fotoPago } = await req.json()
+    const { id, fotoPago, registroId } = await req.json()
     if (!id) return NextResponse.json({ error: 'id requerido' }, { status: 400 })
 
-    const { error: gastoError } = await supabase
+    // Solo pasa de pendiente a pagado una vez: evita un segundo reembolso
+    const { data: pagados, error: gastoError } = await supabase
       .from('gastos_conductor')
       .update({
         estado: 'pagado',
@@ -178,13 +204,20 @@ export async function PATCH(req: NextRequest) {
         foto_pago: fotoPago ?? null,
       })
       .eq('id', id)
+      .eq('estado', 'pendiente')
+      .select('id')
 
     if (gastoError) throw gastoError
+    if (!pagados?.length) {
+      return NextResponse.json({ error: 'Este gasto ya estaba pagado o no existe' }, { status: 409 })
+    }
 
-    await supabase
+    const { error: calendarioError } = await supabase
       .from('calendario_pagos')
-      .update({ estado: 'pagado' })
+      .update({ estado: 'pagado', ...(registroId ? { registro_id: registroId } : {}) })
       .eq('gasto_conductor_id', id)
+
+    if (calendarioError) throw calendarioError
 
     return NextResponse.json({ ok: true })
   } catch (err: unknown) {
