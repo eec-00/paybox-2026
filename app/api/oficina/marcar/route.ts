@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
     .select('id, marcado_at')
     .single()
   if (insErr || !marca) {
+    console.error('[oficina/marcar] insert falló', { tipo, userId: user.id, code: insErr?.code, message: insErr?.message, details: insErr?.details })
     await liberarTicket()
     if (path) await admin.storage.from('asistencia-oficina').remove([path])
     const msg = insErr?.code === '23505' ? 'Esa marca ya estaba registrada hoy' : 'No se pudo registrar la marca'
