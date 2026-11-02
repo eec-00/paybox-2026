@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       .upload(path, foto, { contentType: foto.type, upsert: false })
     if (upErr) {
       await liberarTicket()
-      return NextResponse.json({ error: 'No se pudo subir la selfie, intenta de nuevo' }, { status: 500 })
+      return NextResponse.json({ error: 'No se pudo subir la selfie, intenta de nuevo', detalle: `subida selfie: ${upErr.message}` }, { status: 500 })
     }
   }
 
@@ -82,7 +82,8 @@ export async function POST(request: NextRequest) {
     await liberarTicket()
     if (path) await admin.storage.from('asistencia-oficina').remove([path])
     const msg = insErr?.code === '23505' ? 'Esa marca ya estaba registrada hoy' : 'No se pudo registrar la marca'
-    return NextResponse.json({ error: msg }, { status: 400 })
+    const detalle = insErr ? `${tipo} · ${insErr.code ?? 's/c'} · ${insErr.message}` : `${tipo} · sin respuesta`
+    return NextResponse.json({ error: msg, detalle }, { status: 400 })
   }
 
   await admin.from('oficina_tickets').update({ marca_id: marca.id }).eq('id', ticket.id)

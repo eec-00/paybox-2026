@@ -24,7 +24,7 @@ interface EstadoDia {
 type Pantalla =
   | { tipo: 'cargando' }
   | { tipo: 'sin_toque'; estado: EstadoDia | null }
-  | { tipo: 'error'; mensaje: string; estado?: EstadoDia | null }
+  | { tipo: 'error'; mensaje: string; detalle?: string; estado?: EstadoDia | null }
   | { tipo: 'registrar'; uid: string; contador: number }
   | { tipo: 'registrado' }
   | { tipo: 'listo'; ticketId: string; estado: EstadoDia }
@@ -125,6 +125,11 @@ function MarcarOficina() {
         {pantalla.tipo === 'error' && (
           <Aviso icono={<ShieldAlert className="h-6 w-6" />} titulo="No se pudo marcar" tono="error">
             {pantalla.mensaje}
+            {pantalla.detalle && (
+              <span className="block mt-2 text-xs font-mono break-all opacity-80">
+                Detalle para soporte: {pantalla.detalle} · {new Date().toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
           </Aviso>
         )}
 
@@ -147,7 +152,7 @@ function MarcarOficina() {
               window.history.replaceState(null, '', '/oficina/marcar')
               setPantalla({ tipo: 'hecho', marca, hora, estado })
             }}
-            onError={(mensaje) => setPantalla({ tipo: 'error', mensaje, estado: pantalla.estado })}
+            onError={(mensaje, detalle) => setPantalla({ tipo: 'error', mensaje, detalle, estado: pantalla.estado })}
           />
         )}
 
@@ -223,7 +228,7 @@ function Marcar({ ticketId, estado, onHecho, onError }: {
   ticketId: string
   estado: EstadoDia
   onHecho: (marca: TipoMarca, hora: string, estado: EstadoDia) => void
-  onError: (mensaje: string) => void
+  onError: (mensaje: string, detalle?: string) => void
 }) {
   const [tipo, setTipo] = useState<TipoMarca | null>(estado.siguiente)
   const [foto, setFoto] = useState<File | null>(null)
@@ -265,10 +270,10 @@ function Marcar({ ticketId, estado, onHecho, onError }: {
       if (foto) form.append('selfie', foto)
       const res = await fetch('/api/oficina/marcar', { method: 'POST', body: form })
       const d = await res.json()
-      if (!res.ok) { onError(d.error || 'No se pudo registrar la marca.'); return }
+      if (!res.ok) { onError(d.error || 'No se pudo registrar la marca.', d.detalle ?? `HTTP ${res.status}`); return }
       onHecho(tipo, horaDe(d.marcado_at), d)
-    } catch {
-      onError('Sin conexión. Vuelve a acercar el celular al sticker e intenta de nuevo.')
+    } catch (e) {
+      onError('Sin conexión. Vuelve a acercar el celular al sticker e intenta de nuevo.', `red: ${e instanceof Error ? e.message : 'desconocido'}`)
     } finally {
       setEnviando(false)
     }
