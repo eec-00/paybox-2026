@@ -64,19 +64,32 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { data: marca, error: insErr } = await admin
-    .from('oficina_marcas')
-    .insert({
-      user_id: user.id,
-      nombre: estado.nombre,
-      fecha,
-      tipo,
-      sticker_uid: ticket.sticker_uid,
-      contador: ticket.contador,
-      selfie_path: path,
-    })
-    .select('id, marcado_at')
-    .single()
+  const nuevaMarca = {
+    user_id: user.id,
+    nombre: estado.nombre,
+    fecha,
+    tipo,
+    sticker_uid: ticket.sticker_uid,
+    contador: ticket.contador,
+    selfie_path: path,
+  }
+  const insertar = () => admin.from('oficina_marcas').insert(nuevaMarca).select('id, marcado_at').single()
+
+  let { data: marca, error: insErr } = await insertar()
+  // Fallo de conexión pasajero (sin código de Postgres): un reintento. Si el primer
+  // intento sí llegó a guardarse, el segundo choca (23505) y se toma la marca ya guardada.
+  if (insErr && !insErr.code) {
+    console.error('[oficina/marcar] fallo de conexión, reintentando', { tipo, userId: user.id, message: insErr.message })
+    ;({ data: marca, error: insErr } = await insertar())
+    if (insErr?.code === '23505') {
+      const { data: existente } = await admin
+        .from('oficina_marcas')
+        .select('id, marcado_at')
+        .eq('user_id', user.id).eq('fecha', fecha).eq('tipo', tipo)
+        .maybeSingle()
+      if (existente) { marca = existente; insErr = null }
+    }
+  }
   if (insErr || !marca) {
     console.error('[oficina/marcar] insert falló', { tipo, userId: user.id, code: insErr?.code, message: insErr?.message, details: insErr?.details })
     await liberarTicket()
