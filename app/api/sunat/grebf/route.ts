@@ -1,3 +1,4 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextRequest, NextResponse } from 'next/server'
 import { sunatSolBFFetch } from '@/lib/sunat/client'
 
@@ -65,6 +66,9 @@ async function queryOnePeriodo(
 // GET /api/sunat/grebf?tipConsulta=02&periodoDesde=202601&periodoHasta=202606
 // GET /api/sunat/grebf?tipConsulta=02&periodo=202606  (single month, backwards compat)
 export async function GET(req: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   const { searchParams } = new URL(req.url)
   const tipConsulta = searchParams.get('tipConsulta')
   const ubiPartida = searchParams.get('ubiPartida') ?? ''

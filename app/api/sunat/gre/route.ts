@@ -1,9 +1,13 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSunatToken, sunatFetch } from '@/lib/sunat/client'
 
 // GET /api/sunat/gre?test=1 — test OAuth connection
 // GET /api/sunat/gre?fechaInicio=YYYY-MM-DD&fechaFin=YYYY-MM-DD&numRegistros=0 — query by date range
 export async function GET(req: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   const { searchParams } = new URL(req.url)
 
   if (searchParams.get('test') === '1') {
@@ -73,6 +77,9 @@ export async function GET(req: NextRequest) {
 // body: { action: 'consultar', ruc, tipo, serie, numero }
 //       { action: 'emitir', payload: {...} }
 export async function POST(req: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   try {
     const body = await req.json()
     const { action } = body

@@ -1,9 +1,13 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextResponse } from 'next/server'
 
 
 
 import { odooAuth, odooCall, ODOO_URL, ODOO_DB } from '@/lib/odoo'
 export async function GET() {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   try {
     const uid = await odooAuth()
 

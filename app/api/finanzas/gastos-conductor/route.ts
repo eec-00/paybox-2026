@@ -29,6 +29,28 @@ export async function DELETE(req: NextRequest) {
     if (!id) return NextResponse.json({ error: 'id requerido' }, { status: 400 })
 
     const admin = createAdminClient()
+
+    // Un gasto pagado es evidencia de origen: se corrige con ajuste, no se borra
+    const { data: gasto, error: gastoError } = await admin
+      .from('gastos_conductor')
+      .select('estado')
+      .eq('id', id)
+      .maybeSingle()
+    if (gastoError) throw gastoError
+    if (!gasto) return NextResponse.json({ error: 'El gasto ya no existe' }, { status: 404 })
+
+    const { data: conPago, error: pagoError } = await admin
+      .from('calendario_pagos')
+      .select('id')
+      .eq('gasto_conductor_id', id)
+      .not('registro_id', 'is', null)
+      .limit(1)
+    if (pagoError) throw pagoError
+
+    if (gasto.estado !== 'pendiente' || conPago?.length) {
+      return NextResponse.json({ error: 'No se puede eliminar un gasto que ya tiene pago registrado' }, { status: 409 })
+    }
+
     const { error: calError } = await admin.from('calendario_pagos').delete().eq('gasto_conductor_id', id)
     if (calError) throw calError
 
@@ -36,6 +58,7 @@ export async function DELETE(req: NextRequest) {
       .from('gastos_conductor')
       .delete()
       .eq('id', id)
+      .eq('estado', 'pendiente')
       .select('id')
     if (delError) throw delError
     if (!borrados?.length) return NextResponse.json({ error: 'El gasto ya no existe' }, { status: 404 })

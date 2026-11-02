@@ -1,3 +1,4 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { clearBFSessionCache } from '@/lib/sunat/client'
@@ -6,6 +7,9 @@ const BF_SINGLETON_ID = '00000000-0000-0000-0000-000000000002'
 const SESSION_MINUTES = 25
 
 export async function POST(req: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   try {
     const { session } = await req.json()
     if (!session) return NextResponse.json({ error: 'session requerido' }, { status: 400 })
@@ -32,6 +36,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   try {
     const supabase = createAdminClient()
     const { data } = await supabase

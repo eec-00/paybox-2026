@@ -1,3 +1,4 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextRequest, NextResponse } from 'next/server'
 import { CAMPOS_VENCIMIENTO } from '@/lib/automatizacion/campos'
 
@@ -5,6 +6,9 @@ import { CAMPOS_VENCIMIENTO } from '@/lib/automatizacion/campos'
 
 import { odooAuth, odooCall } from '@/lib/odoo'
 export async function GET(req: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   const { searchParams } = new URL(req.url)
   const jobTitleParam = searchParams.get('job_title') || 'Conductor'
   // Soporta múltiples puestos separados por coma, ej: "Conductor, Director Ejecutivo"

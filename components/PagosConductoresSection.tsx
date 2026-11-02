@@ -12,6 +12,7 @@ import {
 import {
   CONCEPTO_LABEL, calcularAdicionales, esFinalizado, horaLabel, totalAdicionales, type Adicional,
 } from '@/lib/pruebas/adicionalesConductores'
+import { compararCrosland } from '@/lib/pruebas/comparacionMotor'
 
 function formatFecha(value: string | false): string {
   if (!value) return '—'
@@ -45,6 +46,7 @@ export function PagosConductoresSection() {
   const [soloFinalizados, setSoloFinalizados] = useState(true)
   const [abiertos, setAbiertos] = useState<string[]>([])
   const [detalle, setDetalle] = useState<{ adicional: Adicional; conductor: string } | null>(null)
+  const [verComparacion, setVerComparacion] = useState(false)
 
   const semana = useMemo(() => rangoSemanaPago(sabado), [sabado])
 
@@ -108,6 +110,11 @@ export function PagosConductoresSection() {
     }
     return Array.from(porConductor.values()).sort((a, b) => a.conductor.localeCompare(b.conductor))
   }, [servicios, devoluciones, soloFinalizados])
+
+  const comparacion = useMemo(
+    () => compararCrosland(soloFinalizados ? servicios.filter(s => esFinalizado(s.etapa)) : servicios, devoluciones),
+    [servicios, devoluciones, soloFinalizados],
+  )
 
   const totalServicios = resumen.reduce((s, r) => s + r.servicios.length, 0)
   const totalSinTarifa = resumen.reduce((s, r) => s + r.sinTarifa, 0)
@@ -199,6 +206,52 @@ export function PagosConductoresSection() {
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
+      )}
+
+      {comparacion.length > 0 && (
+        <div className="rounded-xl border border-amber-200">
+          <button
+            type="button"
+            onClick={() => setVerComparacion(v => !v)}
+            aria-expanded={verComparacion}
+            className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold"
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform ${verComparacion ? '' : '-rotate-90'}`} />
+            Comparación con el motor nuevo · Crosland ({comparacion.length})
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Simulado</span>
+          </button>
+          {verComparacion && (
+            <div className="overflow-x-auto border-t border-amber-200">
+              <p className="px-4 py-2 text-xs text-muted-foreground">
+                No es monto de pago ni regla aprobada. Usa fechas programadas, no la ejecución real del retorno.
+              </p>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Servicio</TableHead>
+                    <TableHead>Principal</TableHead>
+                    <TableHead>Retorno</TableHead>
+                    <TableHead className="text-right">Cálculo actual</TableHead>
+                    <TableHead className="text-right">Motor nuevo</TableHead>
+                    <TableHead className="text-right">Diferencia</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {comparacion.map(c => (
+                    <TableRow key={c.servicioId}>
+                      <TableCell className="font-medium">{c.servicio}</TableCell>
+                      <TableCell>{c.conductor ?? '—'}</TableCell>
+                      <TableCell>{c.conductorRetorno ?? '—'}</TableCell>
+                      <TableCell className="text-right tabular-nums">{c.anterior === null ? 'Sin tarifa' : soles(c.anterior)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{c.motor === null ? `Revisión: ${c.motivo}` : soles(c.motor)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{c.diferencia === null ? '—' : soles(c.diferencia)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="rounded-xl border overflow-x-auto">

@@ -1,3 +1,4 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextResponse } from 'next/server'
 
 const NAVITEL_API_BASE = process.env.NAVITEL_API_BASE || 'https://control.navitelgps.com/api-v2'
@@ -32,6 +33,9 @@ async function getAuthHash(): Promise<string> {
 
 // GET /api/navitel/zones — Lista todas las geocercas de la cuenta Navitel
 export async function GET() {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   try {
     const hash = await getAuthHash()
 

@@ -116,7 +116,7 @@ function devolucionPendiente(s: ServicioPago): boolean {
   return s.flujo === 'importacion' && !s.devolucionOtroConductor && !esFinalizado(s.etapa)
 }
 
-function esPuerto(almacen: string | null): boolean {
+export function esPuerto(almacen: string | null): boolean {
   const a = (almacen ?? '').toUpperCase()
   return a.includes('DPW') || a.includes('APMT') || a.includes('DP WORLD')
 }

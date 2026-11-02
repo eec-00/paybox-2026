@@ -1,9 +1,13 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const SINGLETON_ID = '00000000-0000-0000-0000-000000000001'
 
 export async function POST(req: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   try {
     const { token } = await req.json()
     if (!token) return NextResponse.json({ error: 'token requerido' }, { status: 400 })
@@ -31,6 +35,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   try {
     const supabase = createAdminClient()
     const { data } = await supabase

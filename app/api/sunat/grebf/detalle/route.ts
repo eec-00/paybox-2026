@@ -1,3 +1,4 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextRequest, NextResponse } from 'next/server'
 import { sunatSolBFFetch } from '@/lib/sunat/client'
 import { extractDetalleFromPdf } from '@/lib/sunat/pdfDetalle'
@@ -5,6 +6,9 @@ import { extractDetalleFromPdf } from '@/lib/sunat/pdfDetalle'
 // GET /api/sunat/grebf/detalle?numeroFile=922051430&numeroRUC=20523380347
 // Descarga el PDF de la guía y extrae placa(s) y conductor del texto.
 export async function GET(req: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   const { searchParams } = new URL(req.url)
   const numeroFile = searchParams.get('numeroFile')
   const numeroRUC = searchParams.get('numeroRUC')

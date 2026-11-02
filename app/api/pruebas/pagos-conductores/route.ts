@@ -8,6 +8,7 @@ import {
 } from '@/lib/servicios/hitos'
 import { registrosPorStep, tiemposHitos } from '@/lib/servicios/fechasHitos'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 
 
 
@@ -80,6 +81,21 @@ function calcularHorarios(task: TaskRow, registros: Record<number, string>): Hor
  */
 export async function GET(request: Request) {
   try {
+    // La pantalla es solo para administradores; el permiso también debe valer acá
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || !['admin', 'developer'].includes(profile.role)) {
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
+    }
+
     const { searchParams } = new URL(request.url)
     const start = searchParams.get('start') || ''
     const end = searchParams.get('end') || ''

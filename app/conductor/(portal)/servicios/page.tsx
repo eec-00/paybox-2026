@@ -1,5 +1,6 @@
 'use client'
 
+import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
@@ -917,7 +918,7 @@ export default function ConductorServiciosPage() {
   }
 
   const handleSubmitGastos = async () => {
-    if (!gastosForTaskId) return
+    if (!gastosForTaskId || gastosSubmitting) return
     const task = tasks.find(t => t.id === gastosForTaskId)
     if (!task) return
     if (gastosItems.length === 0) {
@@ -938,6 +939,7 @@ export default function ConductorServiciosPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+              id: item.id,
               servicioId: gastosForTaskId,
               descripcion: item.descripcion,
               monto: item.monto,
@@ -1015,7 +1017,7 @@ export default function ConductorServiciosPage() {
                 {existing.map(g => (
                   <div key={g.id} className="bg-gray-50 rounded-xl border border-gray-100 px-3.5 py-2.5 flex gap-3 items-start">
                     {g.fotos?.length > 0 && (
-                      <img src={g.fotos[0]} alt="foto" className="w-10 h-10 rounded-lg object-cover border border-gray-100 shrink-0" />
+                      <img src={urlArchivo(g.fotos[0])} alt="foto" className="w-10 h-10 rounded-lg object-cover border border-gray-100 shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-[#1a2332] line-clamp-1">{g.descripcion}</p>
@@ -1036,7 +1038,7 @@ export default function ConductorServiciosPage() {
               {gastosItems.map((item, idx) => (
                 <div key={item.id} className="bg-white rounded-xl border border-gray-100 px-3.5 py-3 flex gap-3 items-start">
                   {item.fotos.length > 0 && (
-                    <img src={item.fotos[0]} alt="foto" className="w-12 h-12 rounded-lg object-cover border border-gray-100 shrink-0" />
+                    <img src={urlArchivo(item.fotos[0])} alt="foto" className="w-12 h-12 rounded-lg object-cover border border-gray-100 shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-[#1a2332] line-clamp-2">{item.descripcion}</p>

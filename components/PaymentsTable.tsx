@@ -1,5 +1,6 @@
 'use client'
 
+import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -464,7 +465,7 @@ export function PaymentsTable({
                                             <div className="relative overflow-hidden rounded-lg border-2 border-secondary/20 shadow-md hover:shadow-xl transition-all hover:border-secondary/40">
                                               <div className="aspect-3/4 relative">
                                                 <img
-                                                  src={url}
+                                                  src={urlArchivo(url)}
                                                   alt={`Comprobante ${index + 1}`}
                                                   className="w-full h-full object-contain bg-gray-50 transition-transform group-hover:scale-105"
                                                   onError={(e) => {
@@ -480,7 +481,7 @@ export function PaymentsTable({
                                               )}
                                             </div>
                                             <a
-                                              href={url}
+                                              href={urlArchivo(url)}
                                               target="_blank"
                                               rel="noopener noreferrer"
                                               className="mt-3 flex items-center justify-center gap-2 text-sm text-secondary hover:text-secondary/80 font-semibold hover:underline transition-colors"

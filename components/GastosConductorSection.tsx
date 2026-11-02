@@ -1,5 +1,6 @@
 'use client'
 
+import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -100,11 +101,14 @@ export function GastosConductorSection() {
         if (!editGasto) return
         setEditSaving(true)
         try {
-            const { error } = await supabase
+            const { data: editados, error } = await supabase
                 .from('gastos_conductor')
                 .update({ descripcion: editDesc.trim(), monto: parseFloat(editMonto) })
                 .eq('id', editGasto.id)
+                .eq('estado', 'pendiente')
+                .select('id')
             if (error) throw error
+            if (!editados?.length) throw new Error('Gasto ya pagado')
             // Also update the linked calendario_pagos monto + descripcion
             await supabase
                 .from('calendario_pagos')
@@ -271,12 +275,16 @@ export function GastosConductorSection() {
                                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => setDetailGasto(gasto)} title="Ver detalle">
                                                         <Eye className="h-3.5 w-3.5" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openEdit(gasto)} title="Editar">
-                                                        <Pencil className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteGasto(gasto)} title="Eliminar">
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
+                                                    {gasto.estado === 'pendiente' && (
+                                                        <>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openEdit(gasto)} title="Editar">
+                                                                <Pencil className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteGasto(gasto)} title="Eliminar">
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -399,8 +407,8 @@ export function GastosConductorSection() {
                                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Comprobantes del gasto</p>
                                     <div className="flex gap-2 flex-wrap">
                                         {detailGasto.fotos.map((url, i) => (
-                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group">
-                                                <img src={url} alt={`comprobante ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-primary/10 group-hover:opacity-80 transition-opacity" />
+                                            <a key={i} href={urlArchivo(url)} target="_blank" rel="noopener noreferrer" className="group">
+                                                <img src={urlArchivo(url)} alt={`comprobante ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-primary/10 group-hover:opacity-80 transition-opacity" />
                                             </a>
                                         ))}
                                     </div>
@@ -409,8 +417,8 @@ export function GastosConductorSection() {
                             {detailGasto.foto_pago && (
                                 <div>
                                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Voucher de pago</p>
-                                    <a href={detailGasto.foto_pago} target="_blank" rel="noopener noreferrer">
-                                        <img src={detailGasto.foto_pago} alt="voucher pago" className="w-24 h-24 object-cover rounded-lg border border-green-200 hover:opacity-80 transition-opacity" />
+                                    <a href={urlArchivo(detailGasto.foto_pago)} target="_blank" rel="noopener noreferrer">
+                                        <img src={urlArchivo(detailGasto.foto_pago)} alt="voucher pago" className="w-24 h-24 object-cover rounded-lg border border-green-200 hover:opacity-80 transition-opacity" />
                                     </a>
                                 </div>
                             )}
