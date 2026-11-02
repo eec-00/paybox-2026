@@ -1,3 +1,4 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextRequest, NextResponse } from 'next/server'
 import { sunatFetch } from '@/lib/sunat/client'
 
@@ -126,6 +127,9 @@ function parseGreXml(xml: string) {
 
 // GET /api/sunat/gre/descarga?rucEmisor=...&codCpe=...&numSerie=...&numCpe=...&tipo=xml|pdf
 export async function GET(req: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   const { searchParams } = new URL(req.url)
   const rucEmisor = searchParams.get('rucEmisor') ?? process.env.SUNAT_RUC!
   const codCpe = searchParams.get('codCpe') ?? '31'

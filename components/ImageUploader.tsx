@@ -1,5 +1,6 @@
 'use client'
 
+import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -323,7 +324,7 @@ export function ImageUploader({ initialImages = [], onImagesChange, onOCRComplet
               <CardContent className="p-0">
                 <div className="aspect-square relative">
                   <img
-                    src={url}
+                    src={urlArchivo(url)}
                     alt={`Comprobante ${index + 1}`}
                     className="w-full h-full object-cover"
                   />

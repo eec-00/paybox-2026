@@ -1,9 +1,13 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextRequest, NextResponse } from 'next/server'
 
 
 
 import { odooAuth, odooCall } from '@/lib/odoo'
 export async function GET(req: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   const { searchParams } = new URL(req.url)
   const limit = parseInt(searchParams.get('limit') || '200')
   const offset = parseInt(searchParams.get('offset') || '0')

@@ -1,8 +1,12 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
 
 export async function GET() {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   const clientId = process.env.SUNAT_CLIENT_ID!
   const appUrl = process.env.NEXT_PUBLIC_APP_URL!
   const redirectUri = `${appUrl}/api/sunat/callback`

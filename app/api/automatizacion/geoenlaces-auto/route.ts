@@ -1,3 +1,4 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS } from '@/lib/servicios/hitos'
@@ -173,6 +174,9 @@ async function guardarFila(row: Record<string, unknown>) {
 }
 
 export async function POST() {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   const resultado = { creados: [] as string[], cerrados: [] as string[], omitidos: [] as string[], errores: [] as string[] }
 
   try {

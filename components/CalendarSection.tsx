@@ -1,5 +1,6 @@
 'use client'
 
+import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -354,8 +355,8 @@ export function CalendarSection() {
                                                 {pago.tipo === 'gasto_conductor' && pago.gasto_conductor?.fotos?.length ? (
                                                     <div className="flex gap-1.5 mt-1 flex-wrap">
                                                         {pago.gasto_conductor.fotos.map((url, i) => (
-                                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                                                                <img src={url} alt={`foto ${i+1}`} className="w-12 h-12 object-cover rounded-md border border-primary/10 hover:opacity-80 transition-opacity" />
+                                                            <a key={i} href={urlArchivo(url)} target="_blank" rel="noopener noreferrer">
+                                                                <img src={urlArchivo(url)} alt={`foto ${i+1}`} className="w-12 h-12 object-cover rounded-md border border-primary/10 hover:opacity-80 transition-opacity" />
                                                             </a>
                                                         ))}
                                                     </div>
@@ -774,8 +775,8 @@ export function CalendarSection() {
                                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Comprobantes del gasto</p>
                                     <div className="flex gap-2 flex-wrap">
                                         {detailGasto.fotos.map((url, i) => (
-                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="group">
-                                                <img src={url} alt={`comprobante ${i+1}`} className="w-20 h-20 object-cover rounded-lg border border-primary/10 group-hover:opacity-80 transition-opacity" />
+                                            <a key={i} href={urlArchivo(url)} target="_blank" rel="noopener noreferrer" className="group">
+                                                <img src={urlArchivo(url)} alt={`comprobante ${i+1}`} className="w-20 h-20 object-cover rounded-lg border border-primary/10 group-hover:opacity-80 transition-opacity" />
                                             </a>
                                         ))}
                                     </div>
@@ -784,8 +785,8 @@ export function CalendarSection() {
                             {detailGasto.foto_pago && (
                                 <div>
                                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Voucher de pago</p>
-                                    <a href={detailGasto.foto_pago} target="_blank" rel="noopener noreferrer">
-                                        <img src={detailGasto.foto_pago} alt="voucher pago" className="w-24 h-24 object-cover rounded-lg border border-green-200 hover:opacity-80 transition-opacity" />
+                                    <a href={urlArchivo(detailGasto.foto_pago)} target="_blank" rel="noopener noreferrer">
+                                        <img src={urlArchivo(detailGasto.foto_pago)} alt="voucher pago" className="w-24 h-24 object-cover rounded-lg border border-green-200 hover:opacity-80 transition-opacity" />
                                     </a>
                                 </div>
                             )}

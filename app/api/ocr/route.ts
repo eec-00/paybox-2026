@@ -1,11 +1,19 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
+import { rutaComprobante } from '@/lib/archivos'
+import { firmarComprobante } from '@/lib/archivosServidor'
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+
+const VIGENCIA_OCR_SEGUNDOS = 300
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
 export async function POST(request: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   try {
     const { imageUrl, imageType } = await request.json()
 
@@ -14,6 +22,13 @@ export async function POST(request: NextRequest) {
         { error: 'Se requiere una URL de imagen' },
         { status: 400 }
       )
+    }
+
+    // OpenAI no tiene sesión: un comprobante del bucket se le pasa con URL temporal
+    const ruta = rutaComprobante(imageUrl)
+    const urlImagen = ruta ? await firmarComprobante(ruta, VIGENCIA_OCR_SEGUNDOS) : imageUrl
+    if (!urlImagen) {
+      return NextResponse.json({ error: 'Archivo no encontrado' }, { status: 404 })
     }
 
     // Prompt especializado mejorado para facturas y comprobantes
@@ -80,7 +95,7 @@ REGLAS:
             {
               type: 'image_url',
               image_url: {
-                url: imageUrl,
+                url: urlImagen,
                 detail: 'high',
               },
             },

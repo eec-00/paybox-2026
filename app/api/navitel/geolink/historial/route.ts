@@ -1,7 +1,11 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   try {
     const supabase = await createClient()
 

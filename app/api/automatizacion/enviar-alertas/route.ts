@@ -1,3 +1,4 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { createClient } from '@supabase/supabase-js'
@@ -140,6 +141,9 @@ async function fetchRegistros(uid: number, tipo: string, filtro: string): Promis
 }
 
 export async function POST(req: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   try {
     const { tipo = 'conductores', soloPreview = false } = await req.json()
 

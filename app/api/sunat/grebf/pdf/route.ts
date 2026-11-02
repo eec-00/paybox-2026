@@ -1,8 +1,12 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextRequest, NextResponse } from 'next/server'
 import { sunatSolBFFetch } from '@/lib/sunat/client'
 
 // GET /api/sunat/grebf/pdf?numeroFile=922051430&numeroRUC=20523380347
 export async function GET(req: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   const { searchParams } = new URL(req.url)
   const numeroFile = searchParams.get('numeroFile')
   const numeroRUC = searchParams.get('numeroRUC')

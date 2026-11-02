@@ -1,5 +1,6 @@
 'use client'
 
+import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -221,7 +222,7 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
 
                 if (includeUploadTime) rowData.fecha_subida = r.created_at ? format(new Date(r.created_at), 'dd/MM/yyyy HH:mm') : ''
                 if (includeUploader) rowData.subido_por = userMap.get(r.creado_por) || 'Usuario desconocido'
-                if (includeImages) rowData.imagenes = (r.comprobantes && r.comprobantes.length > 0) ? r.comprobantes.join(', ') : 'Sin imágenes'
+                if (includeImages) rowData.imagenes = (r.comprobantes && r.comprobantes.length > 0) ? r.comprobantes.map((u: string) => new URL(urlArchivo(u), window.location.origin).href).join(', ') : 'Sin imágenes'
 
                 const row = worksheet.addRow(rowData)
 

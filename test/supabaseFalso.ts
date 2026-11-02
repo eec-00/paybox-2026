@@ -91,5 +91,13 @@ export function clienteFalso(db: DbFalsa) {
       getUser: async () => ({ data: { user: db.user }, error: null }),
     },
     from: (tabla: string) => new Consulta(db, tabla),
+    storage: {
+      from: (bucket: string) => ({
+        createSignedUrl: async (ruta: string, segundos: number) =>
+          ruta.startsWith('no-existe')
+            ? { data: null, error: { message: 'not found' } }
+            : { data: { signedUrl: `https://storage.test/${bucket}/${ruta}?exp=${segundos}` }, error: null },
+      }),
+    },
   }
 }

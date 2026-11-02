@@ -1,3 +1,4 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { odooAuth, odooCall, ODOO_URL, ODOO_DB, ODOO_EMAIL, ODOO_API_KEY } from '@/lib/odoo'
@@ -167,6 +168,9 @@ async function fetchOptions(axis: AxisKey, query: string, limit: number): Promis
 }
 
 export async function GET(request: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   try {
     if (!ODOO_URL || !ODOO_DB || !ODOO_EMAIL || !ODOO_API_KEY) {
       return NextResponse.json({ error: 'Variables de Odoo no configuradas' }, { status: 500 })

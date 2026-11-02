@@ -1,5 +1,6 @@
 'use client'
 
+import { urlArchivo } from '@/lib/archivos'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -569,12 +570,12 @@ export default function ServicioDetailPage() {
                 {hitoFotos.map((f, i) => (
                   <a
                     key={`${f.hito_key}-${i}`}
-                    href={f.foto_url}
+                    href={urlArchivo(f.foto_url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="border rounded-lg overflow-hidden hover:opacity-90 transition-opacity"
                   >
-                    <img src={f.foto_url} alt={f.hito_label} className="w-full h-64 object-contain bg-muted/30" />
+                    <img src={urlArchivo(f.foto_url)} alt={f.hito_label} className="w-full h-64 object-contain bg-muted/30" />
                     <p className="text-[11px] font-medium px-2 py-1.5 bg-muted/40 truncate" title={f.hito_label}>
                       {f.hito_label}
                     </p>

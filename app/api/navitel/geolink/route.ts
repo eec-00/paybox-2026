@@ -1,3 +1,4 @@
+import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
@@ -36,6 +37,9 @@ async function getAuthHash(): Promise<string> {
 
 // POST - Crear geoenlace (uno o varios vehículos)
 export async function POST(request: NextRequest) {
+  const denegado = await exigirPersonal()
+  if (denegado) return denegado
+
   try {
     const body = await request.json()
     const { trackers, end_date, duration_hours } = body
