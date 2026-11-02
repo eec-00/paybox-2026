@@ -20,6 +20,7 @@ export default function PagosPage() {
 
   const [refresh, setRefresh] = useState(0)
   const [showNewPaymentForm, setShowNewPaymentForm] = useState(false)
+  const [gastoAPagar, setGastoAPagar] = useState<string | undefined>()
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [catSearch, setCatSearch] = useState('')
@@ -51,6 +52,21 @@ export default function PagosPage() {
       .order('categoria_nombre')
       .then(({ data }) => { if (data) setCategorias(data) })
   }, [supabase])
+
+  // Llega del botón Pagar de Gastos de conductores. Se lee una vez y se quita de
+  // la URL: al recargar no debe reabrir un pago.
+  useEffect(() => {
+    const gasto = new URLSearchParams(window.location.search).get('gasto')
+    if (!gasto) return
+    setGastoAPagar(gasto)
+    setShowNewPaymentForm(true)
+    window.history.replaceState(null, '', window.location.pathname)
+  }, [])
+
+  const cerrarFormulario = () => {
+    setShowNewPaymentForm(false)
+    setGastoAPagar(undefined)
+  }
 
   const handleApplyFilters = () => {
     setAppliedFilters({ startDate, endDate, catSearch, docSearch, minAmount, maxAmount, selectedCategories, currency, paymentType })
@@ -217,9 +233,9 @@ export default function PagosPage() {
               <h3 className="text-xl font-semibold text-primary">Nuevo Registro de Pago</h3>
               <p className="text-sm text-muted-foreground">Complete el formulario para registrar un nuevo pago</p>
             </div>
-            <Button variant="outline" onClick={() => setShowNewPaymentForm(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={cerrarFormulario}>Cancelar</Button>
           </div>
-          <PaymentForm onSuccess={() => { setRefresh(prev => prev + 1); setShowNewPaymentForm(false) }} />
+          <PaymentForm gastoInicialId={gastoAPagar} onSuccess={() => { setRefresh(prev => prev + 1); cerrarFormulario() }} />
         </div>
       )}
 
