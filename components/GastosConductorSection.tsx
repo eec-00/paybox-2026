@@ -2,12 +2,14 @@
 
 import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useApp } from '@/lib/context/app-context'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Receipt, RefreshCw, CheckCircle2, AlertCircle, Eye, Camera, Search, XCircle, Trash2, Pencil } from 'lucide-react'
+import { Receipt, RefreshCw, CheckCircle2, AlertCircle, Eye, Camera, Search, XCircle, Trash2, Pencil, Banknote } from 'lucide-react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,6 +18,8 @@ import type { GastoConductor } from '@/lib/types/database.types'
 import { GastosConductorExportModal, type DatosServicio } from '@/components/GastosConductorExportModal'
 
 export function GastosConductorSection() {
+    const router = useRouter()
+    const { canCreate } = useApp()
     const [gastos, setGastos] = useState<GastoConductor[]>([])
     // Placa / contenedor / guía viven en Odoo, no en gastos_conductor
     const [datosServicio, setDatosServicio] = useState<Record<number, DatosServicio>>({})
@@ -277,6 +281,12 @@ export function GastosConductorSection() {
                                                     </Button>
                                                     {gasto.estado === 'pendiente' && (
                                                         <>
+                                                            {canCreate && (
+                                                                <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs text-primary" onClick={() => router.push(`/finanzas/pagos?gasto=${gasto.id}`)}>
+                                                                    <Banknote className="h-3.5 w-3.5" />
+                                                                    Pagar
+                                                                </Button>
+                                                            )}
                                                             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openEdit(gasto)} title="Editar">
                                                                 <Pencil className="h-3.5 w-3.5" />
                                                             </Button>

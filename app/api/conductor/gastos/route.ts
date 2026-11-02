@@ -194,6 +194,9 @@ export async function PATCH(req: NextRequest) {
 
     const { id, fotoPago, registroId } = await req.json()
     if (!id) return NextResponse.json({ error: 'id requerido' }, { status: 400 })
+    if (typeof fotoPago !== 'string' || !fotoPago.trim()) {
+      return NextResponse.json({ error: 'La foto del pago es obligatoria' }, { status: 400 })
+    }
 
     // Solo pasa de pendiente a pagado una vez: evita un segundo reembolso
     const { data: pagados, error: gastoError } = await supabase
@@ -201,7 +204,7 @@ export async function PATCH(req: NextRequest) {
       .update({
         estado: 'pagado',
         pagado_at: new Date().toISOString(),
-        foto_pago: fotoPago ?? null,
+        foto_pago: fotoPago,
       })
       .eq('id', id)
       .eq('estado', 'pendiente')

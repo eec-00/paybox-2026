@@ -100,31 +100,39 @@ describe('PATCH /api/conductor/gastos', () => {
     calendario().push({ id: 'c1', gasto_conductor_id: ID, estado: 'pendiente', registro_id: null })
   })
 
-  it('marca pagado y guarda el vínculo al registro', async () => {
-    expect((await PATCH(req('PATCH', { id: ID, registroId: 'r1' }))).status).toBe(200)
-    expect(gastos()[0].estado).toBe('pagado')
+  const fotoPago = 'https://x.supabase.co/storage/v1/object/public/comprobantes/voucher.jpg'
+
+  it('marca pagado, guarda el voucher y el vínculo al registro', async () => {
+    expect((await PATCH(req('PATCH', { id: ID, registroId: 'r1', fotoPago }))).status).toBe(200)
+    expect(gastos()[0]).toMatchObject({ estado: 'pagado', foto_pago: fotoPago })
     expect(calendario()[0]).toMatchObject({ estado: 'pagado', registro_id: 'r1' })
   })
 
+  it.each([[undefined], [''], ['   '], [123]])('sin foto del pago (%j) → 400 y sin cambios', async foto => {
+    expect((await PATCH(req('PATCH', { id: ID, registroId: 'r1', fotoPago: foto }))).status).toBe(400)
+    expect(gastos()[0].estado).toBe('pendiente')
+    expect(calendario()[0]).toMatchObject({ estado: 'pendiente', registro_id: null })
+  })
+
   it('segundo pago del mismo gasto → 409, sin pisar el vínculo', async () => {
-    await PATCH(req('PATCH', { id: ID, registroId: 'r1' }))
-    expect((await PATCH(req('PATCH', { id: ID, registroId: 'r2' }))).status).toBe(409)
+    await PATCH(req('PATCH', { id: ID, registroId: 'r1', fotoPago }))
+    expect((await PATCH(req('PATCH', { id: ID, registroId: 'r2', fotoPago }))).status).toBe(409)
     expect(calendario()[0].registro_id).toBe('r1')
   })
 
   it('sin permiso de Finanzas → 403 y sin cambios', async () => {
     db.profile = { role: 'conductor', module_permissions: {} }
-    expect((await PATCH(req('PATCH', { id: ID }))).status).toBe(403)
+    expect((await PATCH(req('PATCH', { id: ID, fotoPago }))).status).toBe(403)
     expect(gastos()[0].estado).toBe('pendiente')
   })
 
   it('con permiso de módulo pagos pasa', async () => {
     db.profile = { role: 'finanzas', module_permissions: { pagos: { enabled: true } } }
-    expect((await PATCH(req('PATCH', { id: ID }))).status).toBe(200)
+    expect((await PATCH(req('PATCH', { id: ID, fotoPago }))).status).toBe(200)
   })
 
   it('fallo del calendario se informa', async () => {
     db.fallar.add('calendario_pagos')
-    expect((await PATCH(req('PATCH', { id: ID }))).status).toBe(500)
+    expect((await PATCH(req('PATCH', { id: ID, fotoPago }))).status).toBe(500)
   })
 })

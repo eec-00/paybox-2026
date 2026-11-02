@@ -10,11 +10,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ImageUploader, OCRData } from '@/components/ImageUploader'
 import { OdooAxisAutocomplete } from '@/components/OdooAxisAutocomplete'
 import { getUserPermissions } from '@/lib/utils/auth'
+import { diferenciaVoucher, type VoucherLeido } from '@/lib/gastos/voucher'
 import { Shield, CheckCircle2 } from 'lucide-react'
 import type { Categoria, CalendarioPago, GastoConductor } from '@/lib/types/database.types'
 
 interface PaymentFormProps {
   onSuccess?: () => void
+  gastoInicialId?: string
 }
 
 type OdooAxisKey = 'servicio' | 'placa' | 'conductor'
@@ -39,7 +41,7 @@ function isHiddenAxis(axisName: string): boolean {
   return normalizeAxisName(axisName) === 'servicio'
 }
 
-export function PaymentForm({ onSuccess }: PaymentFormProps) {
+export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [selectedCategoria, setSelectedCategoria] = useState<Categoria | null>(null)
   const [selectedNaturaleza, setSelectedNaturaleza] = useState('')
@@ -80,6 +82,13 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
   // Gastos Conductores
   const [gastosConductor, setGastosConductor] = useState<GastoConductor[]>([])
   const [selectedGastoConductor, setSelectedGastoConductor] = useState<string>('none')
+  const [voucherLeido, setVoucherLeido] = useState<VoucherLeido | null>(null)
+
+  const gastoElegido = gastosConductor.find(g => g.id === selectedGastoConductor)
+  const faltaFotoPago = !!gastoElegido && imageUrls.length === 0
+  const avisoVoucher = gastoElegido && voucherLeido && imageUrls.length > 0
+    ? diferenciaVoucher(gastoElegido, voucherLeido)
+    : null
 
   const supabase = createClient()
 
@@ -87,7 +96,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
     checkPermissions()
     loadCategorias()
     loadPagosProgramados()
-    loadGastosConductor()
+    loadGastosConductor(gastoInicialId)
   }, [])
 
   const loadPagosProgramados = async () => {
@@ -97,10 +106,13 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
       const localDate = new Date(d)
       const peruDate = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`
 
+      // Los gastos de conductor se pagan por su propio selector: por acá quedaría
+      // pagado el calendario, pero el gasto seguiría pendiente y sin voucher
       const { data, error } = await supabase
         .from('calendario_pagos')
         .select('*')
         .eq('estado', 'pendiente')
+        .is('gasto_conductor_id', null)
         .lte('fecha', peruDate)
         .order('fecha', { ascending: true })
 
@@ -112,7 +124,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
     }
   }
 
-  const loadGastosConductor = async () => {
+  const loadGastosConductor = async (gastoAElegir?: string) => {
     try {
       const now = new Date()
       const nextWeek = new Date(now)
@@ -126,23 +138,32 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
         .lte('created_at', nextWeekStr)
         .order('created_at', { ascending: true })
 
-      if (!error && data) setGastosConductor(data)
+      if (!error && data) {
+        setGastosConductor(data)
+        if (gastoAElegir) {
+          const gasto = data.find(g => g.id === gastoAElegir)
+          if (gasto) elegirGasto(gasto)
+          else setError('Este gasto de conductor ya no está pendiente de pago')
+        }
+      }
     } catch (err) {
       console.error('Error cargando gastos conductor:', err)
     }
   }
 
+  const elegirGasto = (gasto: GastoConductor) => {
+    setSelectedGastoConductor(gasto.id)
+    setSelectedPagoProgramado('none')
+    setBeneficiario(gasto.conductor_nombre)
+    setMonto(gasto.monto.toString())
+    setMoneda(gasto.moneda as 'soles' | 'dolares')
+    setDescripcion(`${gasto.descripcion} | Servicio: ${gasto.servicio_nombre}`)
+  }
+
   const handleGastoConductorChange = (val: string) => {
-    setSelectedGastoConductor(val)
-    if (val !== 'none') {
-      const gasto = gastosConductor.find(g => g.id === val)
-      if (gasto) {
-        setBeneficiario(gasto.conductor_nombre)
-        setMonto(gasto.monto.toString())
-        setMoneda(gasto.moneda as 'soles' | 'dolares')
-        setDescripcion(`${gasto.descripcion} | Servicio: ${gasto.servicio_nombre}`)
-      }
-    }
+    const gasto = gastosConductor.find(g => g.id === val)
+    if (gasto) elegirGasto(gasto)
+    else setSelectedGastoConductor(val)
   }
 
   const checkPermissions = async () => {
@@ -221,6 +242,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
   const handlePagoProgramadoChange = (val: string) => {
     setSelectedPagoProgramado(val)
     if (val !== 'none') {
+      setSelectedGastoConductor('none')
       const pago = pagosProgramados.find(p => p.id === val)
       if (pago) {
         setBeneficiario(pago.nombre_pago)
@@ -248,7 +270,15 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
     }))
   }
 
-  const handleOCRComplete = (data: OCRData) => {
+  const handleOCRComplete = (ocr: OCRData) => {
+    setVoucherLeido({ monto: ocr.monto, moneda: ocr.moneda })
+
+    // Con un gasto elegido, lo que se debe viene del gasto: una mala lectura del
+    // OCR no puede cambiarlo. El voucher aporta cómo y cuándo se pagó.
+    const data: Partial<OCRData> = selectedGastoConductor !== 'none'
+      ? { ...ocr, beneficiario: null, monto: null, moneda: undefined, descripcion: null }
+      : ocr
+
     if (data.fecha && data.hora) {
       setFechaYHoraPago(`${data.fecha}T${data.hora}`)
     } else if (data.fecha) {
@@ -360,6 +390,10 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
 
       // La lista pudo quedar vieja: no registrar un segundo pago del mismo gasto
       if (selectedGastoConductor && selectedGastoConductor !== 'none') {
+        if (imageUrls.length === 0) {
+          throw new Error('Sube la foto del pago al conductor antes de guardar')
+        }
+
         const { data: gastoActual, error: gastoError } = await supabase
           .from('gastos_conductor')
           .select('estado')
@@ -409,7 +443,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
         const res = await fetch('/api/conductor/gastos', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: selectedGastoConductor, registroId: insertedRegistro.id }),
+          body: JSON.stringify({ id: selectedGastoConductor, registroId: insertedRegistro.id, fotoPago: imageUrls[0] }),
         }).catch(() => null)
 
         if (!res?.ok) {
@@ -435,6 +469,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
       setImageUrls([])
       setSelectedPagoProgramado('none')
       setSelectedGastoConductor('none')
+      setVoucherLeido(null)
 
       if (onSuccess) onSuccess()
     } catch (error: any) {
@@ -490,13 +525,23 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Comprobantes (Imágenes) */}
           <div className="space-y-2 pb-4 border-b">
-            <Label>Comprobantes</Label>
+            <Label>{gastoElegido ? 'Foto del pago al conductor *' : 'Comprobantes'}</Label>
             <ImageUploader
               initialImages={imageUrls}
               onImagesChange={setImageUrls}
               onOCRComplete={handleOCRComplete}
               maxImages={4}
             />
+            {faltaFotoPago && (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-md">
+                Sube primero la foto del pago para continuar con los demás datos.
+              </p>
+            )}
+            {avisoVoucher && (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-md">
+                {avisoVoucher}
+              </p>
+            )}
           </div>
 
           {/* Vinculación con Calendario */}
@@ -555,6 +600,8 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
             </p>
           </div>
 
+          {/* Pagar a un conductor exige la foto antes de seguir: el OCR parte de ella */}
+          <fieldset disabled={faltaFotoPago} className="min-w-0 space-y-4 disabled:opacity-60">
           {/* Datos Fijos */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Fila 1: Fecha y Beneficiario */}
@@ -837,6 +884,7 @@ export function PaymentForm({ onSuccess }: PaymentFormProps) {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Guardando...' : 'Guardar Registro'}
           </Button>
+          </fieldset>
         </form>
       </CardContent>
     </Card>
