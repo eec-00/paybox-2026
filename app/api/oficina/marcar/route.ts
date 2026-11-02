@@ -60,28 +60,43 @@ export async function POST(request: NextRequest) {
       .upload(path, foto, { contentType: foto.type, upsert: false })
     if (upErr) {
       await liberarTicket()
-      return NextResponse.json({ error: 'No se pudo subir la selfie, intenta de nuevo' }, { status: 500 })
+      return NextResponse.json({ error: 'No se pudo subir la selfie, intenta de nuevo', detalle: `subida selfie: ${upErr.message}` }, { status: 500 })
     }
   }
 
-  const { data: marca, error: insErr } = await admin
-    .from('oficina_marcas')
-    .insert({
-      user_id: user.id,
-      nombre: estado.nombre,
-      fecha,
-      tipo,
-      sticker_uid: ticket.sticker_uid,
-      contador: ticket.contador,
-      selfie_path: path,
-    })
-    .select('id, marcado_at')
-    .single()
+  const nuevaMarca = {
+    user_id: user.id,
+    nombre: estado.nombre,
+    fecha,
+    tipo,
+    sticker_uid: ticket.sticker_uid,
+    contador: ticket.contador,
+    selfie_path: path,
+  }
+  const insertar = () => admin.from('oficina_marcas').insert(nuevaMarca).select('id, marcado_at').single()
+
+  let { data: marca, error: insErr } = await insertar()
+  // Fallo de conexión pasajero (sin código de Postgres): un reintento. Si el primer
+  // intento sí llegó a guardarse, el segundo choca (23505) y se toma la marca ya guardada.
+  if (insErr && !insErr.code) {
+    console.error('[oficina/marcar] fallo de conexión, reintentando', { tipo, userId: user.id, message: insErr.message })
+    ;({ data: marca, error: insErr } = await insertar())
+    if (insErr?.code === '23505') {
+      const { data: existente } = await admin
+        .from('oficina_marcas')
+        .select('id, marcado_at')
+        .eq('user_id', user.id).eq('fecha', fecha).eq('tipo', tipo)
+        .maybeSingle()
+      if (existente) { marca = existente; insErr = null }
+    }
+  }
   if (insErr || !marca) {
+    console.error('[oficina/marcar] insert falló', { tipo, userId: user.id, code: insErr?.code, message: insErr?.message, details: insErr?.details })
     await liberarTicket()
     if (path) await admin.storage.from('asistencia-oficina').remove([path])
     const msg = insErr?.code === '23505' ? 'Esa marca ya estaba registrada hoy' : 'No se pudo registrar la marca'
-    return NextResponse.json({ error: msg }, { status: 400 })
+    const detalle = insErr ? `${tipo} · ${insErr.code ?? 's/c'} · ${insErr.message}` : `${tipo} · sin respuesta`
+    return NextResponse.json({ error: msg, detalle }, { status: 400 })
   }
 
   await admin.from('oficina_tickets').update({ marca_id: marca.id }).eq('id', ticket.id)
