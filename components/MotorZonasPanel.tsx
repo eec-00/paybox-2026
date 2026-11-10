@@ -16,7 +16,7 @@ function EstadoBadge({ r }: { r: ResultadoMotor }) {
   if (r.estado === 'requiere_revision') {
     return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-red-800">Requiere revisión</span>
   }
-  return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Simulado · propuesto</span>
+  return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Simulado</span>
 }
 
 interface Fila {
@@ -79,27 +79,28 @@ function TablaResultados({ filas }: { filas: Fila[] }) {
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
                   <TableCell />
                   <TableCell colSpan={6} className="py-3 text-xs space-y-2 whitespace-normal">
-                    {r.lineas.length > 0 && (
-                      <div>
-                        <p className="font-semibold mb-1">Líneas por conductor</p>
-                        <ul className="space-y-0.5">
-                          {r.lineas.map(l => (
-                            <li key={`${l.tramo}-${l.conductorId}`}>
-                              {l.tramo === 'principal' ? 'Principal' : 'Devolución'} · {l.conductor ?? 'sin conductor'} · {l.concepto}
-                              {' · '}{l.monto === null ? 'sin importe' : soles(l.monto)}{l.ruleId ? ` (${l.ruleId})` : ''}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {r.fuente && <p><span className="font-semibold">Fuente:</span> {r.fuente}</p>}
+                    <div>
+                      <p className="font-semibold mb-1">Líneas de liquidación (simuladas)</p>
+                      <ul className="space-y-1">
+                        {r.lineas.map(l => (
+                          <li key={`${l.tramo}-${l.conductorId}`} className="rounded border border-border/50 bg-background/60 px-2 py-1">
+                            <span className="font-medium">{l.servicio} · {l.tramo === 'principal' ? 'Principal' : 'Retorno'} · {l.conductor ?? 'sin conductor'}</span>
+                            {' · '}{l.concepto}{' · '}
+                            <span className="font-semibold">{l.monto === null ? 'sin importe' : soles(l.monto)}</span>
+                            <br />
+                            <span className="text-muted-foreground">
+                              Regla: {l.ruleId ?? '—'} · Hito: {l.hito ? `${l.hito.codigo} ${l.hito.etiqueta} · ${l.hito.momento}` : 'sin hito operativo'}
+                              {' · '}Versión: {l.version}{l.fuente ? ` · Fuente: ${l.fuente}` : ''}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                     {r.candidatos.length > 0 && <p><span className="font-semibold">Reglas candidatas:</span> {r.candidatos.join(', ')}</p>}
-                    {r.motivos.length > 0 && (
-                      <p><span className="font-semibold">Requiere revisión porque:</span> {r.motivos.join(' · ')}</p>
-                    )}
+                    {r.motivos.length > 0 && <p><span className="font-semibold">Requiere revisión porque:</span> {r.motivos.join(' · ')}</p>}
                     {r.alertas.length > 0 && <p><span className="font-semibold">Alertas:</span> {r.alertas.join(' · ')}</p>}
                     <div>
-                      <p className="font-semibold mb-1">Traza del motor</p>
+                      <p className="font-semibold mb-1">Traza del motor (ficha §3, pasos A–D)</p>
                       <ol className="space-y-0.5">
                         {r.traza.map((t, i) => (
                           <li key={i} className={t.ok ? '' : 'text-red-700'}>
@@ -128,15 +129,14 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
   })), [])
 
   const reales: Fila[] = useMemo(() => servicios.map(s => {
-    const r = simularTarifa(entradaDesdeOdoo(s, devoluciones))
     const a = s.atributos
     return {
-      key: `odoo-${s.id}`, etiqueta: null, esperado: null, r,
+      key: `odoo-${s.id}`, etiqueta: null, esperado: null, r: simularTarifa(entradaDesdeOdoo(s, devoluciones)),
       titulo: `${s.cliente ?? 'Sin cliente'} · ${[a.zona, a.tipoServicio, a.modalidad, a.tipoCarga].filter(Boolean).join(' · ') || 'sin variante'}`,
     }
   }), [servicios, devoluciones])
 
-  const propuestos = reales.filter(f => f.r.estado !== 'requiere_revision').length
+  const simulados = reales.filter(f => f.r.estado === 'simulado').length
 
   return (
     <div className="rounded-xl border border-primary/30">
@@ -155,9 +155,9 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
           <div className="mx-4 mt-3 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
             <ShieldAlert className="h-4 w-4 shrink-0" />
             <p>
-              <strong>No es tarifario aprobado ni monto de pago.</strong> Los importes son referencias históricas
-              (tarifario {VERSION_TARIFARIO}) pendientes de validación de Margiory y Rosario. Este motor no paga,
-              no descuenta ni escribe en Odoo. «Requiere revisión» significa que falta un dato o una decisión, no S/ 0.
+              <strong>No es tarifario aprobado ni monto de pago.</strong> Importes históricos del {VERSION_TARIFARIO}, sin
+              vigencia ni aprobación (Margiory valida importes y fechas; Rosario contrasta liquidaciones). No paga, no descuenta
+              ni escribe en Odoo. «Requiere revisión» significa que falta un dato o una decisión, no S/ 0.
             </p>
           </div>
 
@@ -176,13 +176,14 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
               className="flex items-center gap-1.5 px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
             >
               <ChevronDown className={`h-3.5 w-3.5 transition-transform ${verSemana ? '' : '-rotate-90'}`} />
-              Servicios reales de la semana ({reales.length}) · {propuestos} con propuesta
+              Servicios reales de la semana ({reales.length}) · {simulados} simulados
             </button>
             {verSemana && (
               <>
                 <p className="px-4 pb-1 text-xs text-muted-foreground">
-                  El destino físico todavía no es un dato estructurado en Odoo: hasta que Operaciones confirme la fuente,
-                  los servicios ordinarios quedan en revisión. Crosland no depende del distrito.
+                  El destino físico y el itinerario todavía no son datos estructurados en Odoo: hasta que Operaciones confirme
+                  la fuente, los servicios ordinarios quedan en revisión. Los tramos se acreditan con hitos de la app
+                  (I08/I09, I12, D10/D11), nunca con el cierre administrativo.
                 </p>
                 {reales.length > 0
                   ? <TablaResultados filas={reales} />

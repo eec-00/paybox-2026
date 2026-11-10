@@ -70,6 +70,8 @@ export interface DevolucionPago {
   almacen: string | null
   /** Fecha de programación del servicio padre */
   fecha: string | false
+  /** Hora del hito «Contenedor vacío devuelto» (I12) de la subtarea, en minutos; null si no está marcado */
+  devueltoMin: number | null
   padreId: number
   padreName: string
   padreConductorId: number | null

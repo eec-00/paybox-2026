@@ -38,6 +38,9 @@ const ADICIONAL_FIELDS = [
   ...TIPO_SERVICIO_BOOL_FIELDS, ...ALL_HITO_FIELDS,
 ]
 
+/** Hito I12 «Contenedor vacío devuelto»: acredita la devolución de la subtarea (guía v1.0 §3.06) */
+const CAMPO_I12 = 'x_studio_contenedor_vacio_devuelto'
+
 const SUBTAREA_DEVOLUCION_DOMAIN = ['|', ['x_studio_es_tarea_de_devolucion_de_vacio', '=', true], ['name', 'ilike', 'devoluci']]
 
 function m2oName(v: unknown): string | null {
@@ -209,7 +212,7 @@ export async function GET(request: Request) {
       ? await odooCall<TaskRow[]>(
           uid, 'project.task', 'search_read',
           [[['parent_id', 'in', tasks.map(t => t.id)], ...SUBTAREA_DEVOLUCION_DOMAIN]],
-          { fields: ['name', 'stage_id', 'parent_id', 'x_studio_conductor', ...extraFields.filter(f => f === 'x_studio_almacen_de_devolucion')] }
+          { fields: ['name', 'stage_id', 'parent_id', 'x_studio_conductor', ...extraFields.filter(f => f === 'x_studio_almacen_de_devolucion' || f === CAMPO_I12)] }
         )
       : []
     const devoluciones: DevolucionPago[] = subtareas.flatMap(st => {
@@ -223,6 +226,7 @@ export async function GET(request: Request) {
         conductor: st.x_studio_conductor ? st.x_studio_conductor[1] : null,
         almacen: m2oName(st.x_studio_almacen_de_devolucion) ?? m2oName(padre.x_studio_almacen_de_devolucion),
         fecha: padre.x_studio_fecha_de_la_programacin,
+        devueltoMin: typeof st[CAMPO_I12] === 'number' && st[CAMPO_I12] !== 0 ? Math.round((st[CAMPO_I12] as number) * 60) : null,
         padreId: padre.id,
         padreName: padre.name,
         padreConductorId: padre.x_studio_conductor ? padre.x_studio_conductor[0] : null,
