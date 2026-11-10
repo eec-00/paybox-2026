@@ -439,8 +439,8 @@ export function simularTarifa(e: EntradaMotor): ResultadoMotor {
   }
   c.paso('B', true, `Tramo acreditado por ${e.principal.hito.codigo} ${e.principal.hito.momento}`)
 
-  if (regla.alcancePorConfirmar) c.alertas.push(regla.alcancePorConfirmar)
   c.alertas.push(`${regla.estadoFuente}. ${ALERTA_VIGENCIA}`)
+  if (regla.alcancePorConfirmar) c.alertas.push(regla.alcancePorConfirmar)
   return c.cerrar([c.linea('principal', e.principal, `Tarifa ${regla.distrito}`, regla.id, regla.monto, regla.fuente)])
 }
 
@@ -592,7 +592,8 @@ const acreditado = (distrito: string) => ({ distrito, acreditado: true, fuente: 
 const CROSLAND = { clienteId: 9002, cliente: 'CROSLAND (mock)', zona: 'Zona 5' }
 
 export interface CasoDemo {
-  prueba: 'P1' | 'P2' | 'P3' | 'Bloqueo'
+  /** P1–P3: pruebas obligatorias (ficha §4) · Ruta: ruta especial exacta (ficha §3-B) · Bloqueo: controles (ficha §3-D, §5.3) */
+  prueba: 'P1' | 'P2' | 'P3' | 'Ruta' | 'Bloqueo'
   titulo: string
   esperado: string
   entrada: EntradaMotor
@@ -621,14 +622,14 @@ export const CASOS_DEMO: CasoDemo[] = [
     entrada: mock({ servicio: 'S90023', zona: 'Zona 7', fecha: '2026-02-12', destino: acreditado('Lurín') }) },
   { prueba: 'P3', titulo: 'Zona 7 · Pachacamac', esperado: 'REQUIERE REVISIÓN: Lurín no se traslada a toda la Zona 7',
     entrada: mock({ servicio: 'S90024', zona: 'Zona 7', destino: acreditado('Pachacamac') }) },
+  { prueba: 'Ruta', titulo: 'Provincia · ruta exacta CALLAO - MELCHORITA', esperado: 'SIMULADO S/200 (RT08, «match exacto / por aprobar»)',
+    entrada: mock({ servicio: 'S90033', zona: 'Provincia', itinerario: 'CALLAO - MELCHORITA' }) },
+  { prueba: 'Ruta', titulo: 'Provincia · ruta exacta CALLAO - HUACHO', esperado: 'REQUIERE REVISIÓN: el Excel la marca «no activar»',
+    entrada: mock({ servicio: 'S90034', zona: 'Provincia', tipoServicio: 'Despacho', modalidad: 'Carga Suelta', itinerario: 'CALLAO - HUACHO', principal: A(D10) }) },
   { prueba: 'Bloqueo', titulo: 'Tarea en Zona 1 con destino Lurín', esperado: 'REQUIERE REVISIÓN: zona y destino discordantes',
     entrada: mock({ servicio: 'S90031', zona: 'Zona 1', destino: acreditado('Lurín') }) },
   { prueba: 'Bloqueo', titulo: 'Provincia sin itinerario', esperado: 'REQUIERE REVISIÓN: Provincia ≠ Zona 0',
     entrada: mock({ servicio: 'S90032', zona: 'Provincia', tipoServicio: 'Despacho', modalidad: 'Carga Suelta', principal: A(D10) }) },
-  { prueba: 'Bloqueo', titulo: 'Provincia · ruta CALLAO - MELCHORITA', esperado: 'SIMULADO S/200 (RT08, match exacto)',
-    entrada: mock({ servicio: 'S90033', zona: 'Provincia', itinerario: 'CALLAO - MELCHORITA' }) },
-  { prueba: 'Bloqueo', titulo: 'Provincia · ruta CALLAO - HUACHO', esperado: 'REQUIERE REVISIÓN: ruta «no activar»',
-    entrada: mock({ servicio: 'S90034', zona: 'Provincia', tipoServicio: 'Despacho', modalidad: 'Carga Suelta', itinerario: 'CALLAO - HUACHO', principal: A(D10) }) },
   { prueba: 'Bloqueo', titulo: 'Ate sin hito operativo (solo cierre administrativo)', esperado: 'REQUIERE REVISIÓN',
     entrada: mock({ servicio: 'S90035', destino: acreditado('Ate'), principal: A(null) }) },
   { prueba: 'Bloqueo', titulo: 'Servicio sin variante en Odoo', esperado: 'REQUIERE REVISIÓN: campos nulos',

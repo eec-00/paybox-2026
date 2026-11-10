@@ -165,6 +165,11 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
             <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Casos de prueba controlados (datos mock)
             </p>
+            <p className="px-4 pb-2 text-xs text-muted-foreground">
+              <strong>P1–P3:</strong> las tres pruebas obligatorias de la ficha (Ate vs. SJL, Crosland A/B, Lurín General vs. IMO).{' '}
+              <strong>Ruta:</strong> ruta especial con itinerario exacto del Excel.{' '}
+              <strong>Bloqueo:</strong> controles que deben frenar el cálculo cuando falta un dato o una decisión.
+            </p>
             <TablaResultados filas={demo} />
           </div>
 

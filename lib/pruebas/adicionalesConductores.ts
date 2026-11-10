@@ -401,7 +401,9 @@ export function calcularAdicionales(e: EntradaAdicionales): Adicional[] {
     const t = tdcDe(d, e.todos.find(s => s.id === d.padreId)); if (t) out.push(t)
   }
 
-  const m = maquinaDe(e.servicios, e.asistencias.filter(a => a.conductorId === e.conductorId)); if (m) out.push(m)
+  // Máquina: día con servicio realmente asignado, finalizado o no (guía §3.09)
+  const asignados = e.todos.filter(s => s.conductorId === e.conductorId)
+  const m = maquinaDe(asignados, e.asistencias.filter(a => a.conductorId === e.conductorId)); if (m) out.push(m)
   const b = bonoDe(e.servicios); if (b) out.push(b)
   for (const g of e.gastos) if (g.conductorId === e.conductorId) out.push(gastoDe(g, e.todos))
 
