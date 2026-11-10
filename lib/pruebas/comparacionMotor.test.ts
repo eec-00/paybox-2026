@@ -11,7 +11,7 @@ const servicio = (over: Partial<ServicioPago> = {}): ServicioPago => ({
 })
 const devolucion = (over: Partial<DevolucionPago> = {}): DevolucionPago => ({
   id: 2, name: 'Devolución', etapa: 'Servicio Finalizado', conductorId: 2, conductor: 'B', almacen: 'Almacén',
-  fecha: '2026-10-16', padreId: 1, padreName: 'S09001 - Servicio', padreConductorId: 1, padreConductor: 'A',
+  fecha: '2026-10-16', padreId: 1, padreName: 'S09001 - Servicio', padreConductorId: 1, padreConductor: 'A', devueltoMin: null,
   ...over,
 })
 

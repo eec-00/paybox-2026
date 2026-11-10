@@ -328,7 +328,7 @@ describe('Diferencias con el cálculo anterior (RF-040/042)', () => {
   })
   const devolucion = (almacen: string): DevolucionPago => ({
     id: 2, name: 'Devolución', etapa: 'Servicio Finalizado', conductorId: B, conductor: 'B', almacen, fecha: VIERNES,
-    padreId: 1, padreName: 'S09001 - Servicio', padreConductorId: A, padreConductor: 'A',
+    padreId: 1, padreName: 'S09001 - Servicio', padreConductorId: A, padreConductor: 'A', devueltoMin: null,
   })
   const anterior = (almacen: string) =>
     calcularTarifa(servicio().atributos).monto! + totalAdicionales(calcularAdicionales([], [], [devolucion(almacen)]))
