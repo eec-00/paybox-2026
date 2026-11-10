@@ -161,13 +161,14 @@ export type ReglaCrosland = keyof typeof REGLAS_CROSLAND
 
 export interface ClienteEspecial {
   clave: 'crosland'
-  /** partner_id de Odoo; null hasta registrarlo (se identifica por nombre exacto, con alerta) */
+  /** partner_id de Odoo; null hasta registrarlo (mientras tanto se reconoce por nombre, con alerta) */
   odooId: number | null
-  nombreOdoo: string
+  /** Texto que identifica al cliente en el nombre de Odoo («Crosland» en los tres documentos) */
+  nombre: string
 }
 
 export const CLIENTES_ESPECIALES: ClienteEspecial[] = [
-  { clave: 'crosland', odooId: null, nombreOdoo: 'CROSLAND MOTOS S.A.C' },
+  { clave: 'crosland', odooId: null, nombre: 'CROSLAND' },
 ]
 
 // ── Entrada ─────────────────────────────────────────────────────────────
@@ -277,7 +278,7 @@ export function camposNulos(e: EntradaMotor): string[] {
 export function clienteEspecial(e: EntradaMotor): { cliente: ClienteEspecial; porNombre: boolean } | null {
   for (const c of CLIENTES_ESPECIALES) {
     if (c.odooId !== null && e.clienteId === c.odooId) return { cliente: c, porNombre: false }
-    if (c.odooId === null && normalizar(e.cliente) === normalizar(c.nombreOdoo)) return { cliente: c, porNombre: true }
+    if (c.odooId === null && normalizar(e.cliente).includes(normalizar(c.nombre))) return { cliente: c, porNombre: true }
   }
   return null
 }
@@ -376,8 +377,8 @@ export function simularTarifa(e: EntradaMotor): ResultadoMotor {
   // B1 · contrato especial de cliente
   const especial = clienteEspecial(e)
   if (especial) {
-    if (especial.porNombre) c.alertas.push(`Cliente identificado por nombre exacto «${especial.cliente.nombreOdoo}»: falta registrar su partner_id`)
-    c.paso('B', true, `Contrato especial ${especial.cliente.nombreOdoo}: prima sobre la tarifa de zona`)
+    if (especial.porNombre) c.alertas.push(`Cliente reconocido como ${especial.cliente.nombre} por su nombre en Odoo («${e.cliente}»): falta registrar su partner_id`)
+    c.paso('B', true, `Contrato especial ${especial.cliente.nombre}: prima sobre la tarifa de zona`)
     return simularCrosland(c)
   }
 
@@ -588,7 +589,7 @@ const mock = (over: Partial<EntradaMotor> & Pick<EntradaMotor, 'servicio'>): Ent
 })
 
 const acreditado = (distrito: string) => ({ distrito, acreditado: true, fuente: 'Caso de prueba controlado' })
-const CROSLAND = { clienteId: 9002, cliente: 'CROSLAND MOTOS S.A.C', zona: 'Zona 5' }
+const CROSLAND = { clienteId: 9002, cliente: 'CROSLAND (mock)', zona: 'Zona 5' }
 
 export interface CasoDemo {
   prueba: 'P1' | 'P2' | 'P3' | 'Bloqueo'
