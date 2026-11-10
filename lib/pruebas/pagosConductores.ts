@@ -32,6 +32,8 @@ export interface ServicioPago {
   fecha: string | false
   etapa: string | null
   cliente: string | null
+  /** partner_id de Odoo (null si la tarea no tiene cliente) */
+  clienteId: number | null
   conductorId: number | null
   conductor: string | null
   placa: string | null
