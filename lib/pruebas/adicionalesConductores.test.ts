@@ -78,14 +78,13 @@ describe('03/04/05 · Crosland', () => {
   const crosland = (horas: Record<string, number | null>, over: Partial<ServicioPago> = {}) =>
     servicio({ cliente: 'CROSLAND MOTOS', horas: completo(horas), ...over })
 
-  it('I08 22:30 con I07 también tarde → S/30', () => {
-    const [n] = de(calc([crosland({ inicio_descarga: H(22, 10), fin_descarga: H(22, 30) })]), 'crosland_nocturno')
-    expect(n).toMatchObject({ estado: 'simulado', monto: 30 })
+  it('decide I09: descarga antes de las 22:00 pero salida 22:15 → S/30', () => {
+    const [n] = de(calc([crosland({ fin_descarga: H(21, 40), salida_cliente: H(22, 15) })]), 'crosland_nocturno')
+    expect(n).toMatchObject({ estado: 'simulado', monto: 30, hitos: ['I06', 'I09'] })
   })
 
-  it('frontera: I07 antes y I08 después de las 22:00 → revisión', () => {
-    const [n] = de(calc([crosland({ inicio_descarga: H(21, 30), fin_descarga: H(22, 30) })]), 'crosland_nocturno')
-    expect(n.estado).toBe('requiere_revision')
+  it('I09 antes de las 22:00 → no hay nocturno aunque I08 sea tarde', () => {
+    expect(de(calc([crosland({ fin_descarga: H(21, 50), salida_cliente: H(21, 58) })]), 'crosland_nocturno')).toHaveLength(0)
   })
 
   it('caso Margiory: I07 21:50, I08 00:30 → S/50 que sustituye S/30', () => {
@@ -107,7 +106,7 @@ describe('03/04/05 · Crosland', () => {
   })
 
   it('sin I06 → revisión', () => {
-    const [n] = de(calc([crosland({ ingreso_cliente: null, inicio_descarga: H(22, 5), fin_descarga: H(22, 30) })]), 'crosland_nocturno')
+    const [n] = de(calc([crosland({ ingreso_cliente: null, fin_descarga: H(22), salida_cliente: H(22, 30) })]), 'crosland_nocturno')
     expect(n.estado).toBe('requiere_revision')
   })
 })

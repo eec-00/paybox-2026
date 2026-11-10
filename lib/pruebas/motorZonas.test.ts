@@ -63,10 +63,20 @@ describe('P1 · Zona 4: Ate frente a San Juan de Lurigancho', () => {
     expect(simularTarifa(e)).toMatchObject({ estado: 'requiere_revision', total: null })
   })
 
-  it('exportación simula con alerta de alcance por confirmar', () => {
-    const r = simularTarifa({ ...caso('S90001'), tipoServicio: 'Exportación' })
+  it('exportación y 20 pies pagan igual que importación 40 (Margiory, 10/11)', () => {
+    const r = simularTarifa({ ...caso('S90001'), tipoServicio: 'Exportación', modalidad: 'Contenedor 20' })
     expect(r).toMatchObject({ estado: 'simulado', total: 80 })
-    expect(r.alertas.join(' ')).toMatch(/importación\/exportación por confirmar/)
+    expect(r.alertas.join(' ')).not.toMatch(/por confirmar/)
+  })
+
+  it('Ate figura como confirmado por Margiory; Callao no', () => {
+    expect(correr('S90001').alertas.join(' ')).toMatch(/CONFIRMADA POR MARGIORY/)
+    const callao = simularTarifa({ ...caso('S90001'), zona: 'Zona 1', destino: { distrito: 'Callao', acreditado: true, fuente: 'x' } })
+    expect(callao.alertas.join(' ')).toMatch(/NO APROBADA/)
+  })
+
+  it('servicio de marzo 2026 ya está dentro de la vigencia', () => {
+    expect(simularTarifa({ ...caso('S90021'), fecha: '2026-03-02' }).estado).toBe('simulado')
   })
 
   it('«Lima» acreditado coincide con «Lima (Cercado)»', () => {

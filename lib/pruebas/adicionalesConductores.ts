@@ -81,7 +81,7 @@ export interface Adicional {
 export const REGLAS: Record<ConceptoAdicional, string> = {
   cena: 'Guía §3.01 · S/20. Importación: I08 (Fin descarga) después de las 19:00; despacho: D10. Si I08/D10 fue antes de las 19:00 pero el conductor siguió trabajando después (I09/D11, I10–I12), requiere revisión. Nunca I13/D12 ni hora de regreso a cochera.',
   adht: 'Guía §3.02 · S/30 histórico. Hitos I10 → I11 → I12. No existe umbral general homologado: se muestran los horarios y queda en revisión. SSEE del depósito, cita ≥17:00, fin de cita 23:00 y tolerancia de 35 min NO activan el bono.',
-  crosland_nocturno: 'Guía §3.03 · S/30 ref. Crosland, intervalo I06 (Ingreso cliente) → I08 (Fin descarga): si la descarga se prolongó después de las 22:00. Casos frontera (I07 antes y I08 después de las 22:00) requieren revisión. No usar I12 ni I13; no duplicar con ADHT.',
+  crosland_nocturno: 'Guía §3.03 · S/30 ref. Crosland, atención desde I06 (Ingreso cliente). Hito decisivo: I09 (Salida cliente) después de las 22:00, definido por Margiory el 10/11/2026. No usar I12 ni I13; no duplicar con ADHT.',
   crosland_medianoche: 'Guía §3.04 · S/50 ref. Crosland, I06 → I08 con fecha completa: la descarga cruzó las 00:00. Sustituye los S/30 nocturnos; no se suman.',
   crosland_devolucion: 'Guía §3.05 · S/30. Único caso validado por Rosario: I08 = 21:30 y el mismo conductor devuelve hasta aprox. I12 = 23:00. No se extrapola 23:00 como umbral general.',
   tdc: 'Guía §3.06 · S/20 o S/30 según ruta y depósito. Repartos A/B documentados solo para Crosland; no se extrapolan a otros clientes ni a Chancay.',
@@ -192,28 +192,31 @@ function adhtDe(s: ServicioPago): Adicional | null {
   return rev({
     concepto: 'adht', fecha: s.fecha || null, servicio: servicioCodigo(s.name), detalle: txt, regla: REGLAS.adht,
     hitos: ['I10', 'I11', 'I12'], servicioIds: [s.id], claves: ['llegada_devolucion', 'ingreso_devolucion', 'contenedor_devuelto'],
-  }, 'Sin umbral general de pago homologado')
+  }, 'Sin umbral aprobado: Margiory propone I10 + cita ≥17:00 acreditada como SSEE, pero la guía y el piloto prohíben usar SSEE como disparador automático. Decisión pendiente de PMO')
 }
 
 // ── 03/04/05 · Crosland ─────────────────────────────────────────────────
 
 function croslandDe(s: ServicioPago): Adicional | null {
   if (s.flujo !== 'importacion' || !esCrosland(s.cliente)) return null
-  const [i06, i07, i08] = ['ingreso_cliente', 'inicio_descarga', 'fin_descarga'].map(k => hora(s, k))
+  const [i06, i08, i09] = ['ingreso_cliente', 'fin_descarga', 'salida_cliente'].map(k => hora(s, k))
   const base = { fecha: s.fecha || null, servicio: servicioCodigo(s.name), servicioIds: [s.id] }
   const intervalo = [['ingreso_cliente', 'I06'], ['inicio_descarga', 'I07'], ['fin_descarga', 'I08'], ['salida_cliente', 'I09']]
     .map(([k, c]) => marca(s, k, c)).join(' → ')
 
-  if (i08 !== null && i08 >= MIN_22) {
-    const medianoche = i08 >= MIN_24
+  // 04 · medianoche: I08 cruzó las 00:00 (guía §3.04, caso Margiory I08 = 00:30)
+  // 03 · nocturno: decide I09 Salida cliente después de las 22:00 (Margiory, 10/11/2026)
+  const medianoche = i08 !== null && i08 >= MIN_24
+  const nocturno = !medianoche && i09 !== null && i09 >= MIN_22
+  if (medianoche || nocturno) {
     const concepto = medianoche ? 'crosland_medianoche' as const : 'crosland_nocturno' as const
     const linea = {
-      ...base, concepto, detalle: intervalo, regla: REGLAS[concepto], hitos: ['I06', 'I07', 'I08'],
-      claves: ['ingreso_cliente', 'inicio_descarga', 'fin_descarga'],
+      ...base, concepto, detalle: intervalo, regla: REGLAS[concepto],
+      hitos: medianoche ? ['I06', 'I08'] : ['I06', 'I09'],
+      claves: medianoche ? ['ingreso_cliente', 'fin_descarga'] : ['ingreso_cliente', 'salida_cliente'],
       umbral: medianoche ? { min: MIN_24, label: 'Límite 00:00' } : { min: MIN_22, label: 'Límite 22:00' },
     }
-    if (i06 === null) return rev(linea, 'Falta I06 (Ingreso cliente) para reconstruir el intervalo')
-    if (!medianoche && i07 !== null && i07 < MIN_22) return rev(linea, 'Caso frontera: I07 antes y I08 después de las 22:00')
+    if (i06 === null) return rev(linea, 'Falta I06 (Ingreso cliente) para reconstruir la atención en el cliente')
     return sim({ ...linea, monto: medianoche ? 50 : 30 })
   }
 

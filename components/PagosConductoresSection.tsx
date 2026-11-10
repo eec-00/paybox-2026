@@ -176,8 +176,8 @@ export function PagosConductoresSection() {
         <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
         <p>
           <strong>Simulación, no pago.</strong> Tarifa base según la ficha de ejecución y el {VERSION_TARIFARIO};
-          adicionales según las Reglas de liquidación de conductores (guía piloto v1.0). Los importes son referencias
-          históricas sin aprobar. «Requiere revisión» no suma al total: falta un dato o una decisión. Los tramos y
+          adicionales según las Reglas de liquidación de conductores (guía piloto v1.0), con las definiciones de Margiory
+          del 10/11/2026 (vigencia desde enero 2026, I09 en Crosland nocturno). «Requiere revisión» no suma al total: falta un dato o una decisión. Los tramos y
           adicionales se acreditan con los hitos que marca el conductor en la app, nunca con «Servicio finalizado».
           No se pagan, descuentan ni sincronizan con Odoo.
         </p>

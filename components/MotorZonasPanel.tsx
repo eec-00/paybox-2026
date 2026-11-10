@@ -155,8 +155,8 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
           <div className="mx-4 mt-3 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
             <ShieldAlert className="h-4 w-4 shrink-0" />
             <p>
-              <strong>No es tarifario aprobado ni monto de pago.</strong> Importes históricos del {VERSION_TARIFARIO}, sin
-              vigencia ni aprobación (Margiory valida importes y fechas; Rosario contrasta liquidaciones). No paga, no descuenta
+              <strong>No es monto de pago.</strong> Importes históricos del {VERSION_TARIFARIO}, vigentes desde enero 2026
+              según Margiory; se simulan hasta el cierre del piloto (Rosario contrasta liquidaciones). No paga, no descuenta
               ni escribe en Odoo. «Requiere revisión» significa que falta un dato o una decisión, no S/ 0.
             </p>
           </div>

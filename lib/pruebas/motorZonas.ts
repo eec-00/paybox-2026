@@ -28,8 +28,8 @@ import { esPuerto } from './adicionalesConductores'
 import { servicioCodigo, type DevolucionPago, type ServicioPago } from './pagosConductores'
 
 export const VERSION_TARIFARIO = 'Tarifario v0.9 · 07/11/2026'
-/** Fecha de la fuente de los importes (Excel v0.9: Numbers «Tarifario Pago Conductores 2», 13/10/2026) */
-export const FECHA_FUENTE = '2026-10-13'
+/** Inicio de vigencia de las tarifas actuales: enero 2026 (confirmado por Margiory el 10/11/2026) */
+export const FECHA_FUENTE = '2026-01-01'
 
 const EXCEL = 'Excel tarifario v0.9'
 
@@ -76,18 +76,22 @@ const FILAS: [number, string, string, string[], number, number, number][] = [
   [17, 'Zona 7', 'Lurín', [], 100, 110, 110],
 ]
 
-const ALCANCE_CONTENEDOR = 'Alcance 20/40 e importación/exportación por confirmar (Excel v0.9)'
+// 20 y 40 pies, importación y exportación pagan igual (Margiory, 10/11/2026)
+const ALCANCE_CONTENEDOR = null
 
 function claveDistrito(d: string): string {
   return normalizar(d).replace(/\(.*\)/, '').trim().replace(/ /g, '-')
 }
+
+/** Importes que Margiory confirmó el 10/11/2026 como «lo que se viene pagando» */
+const CONFIRMADOS = ['Ate', 'San Juan de Lurigancho', 'Lurín']
 
 export const REGLAS_ORDINARIAS: Regla[] = FILAS.flatMap(([fila, zona, distrito, alias, general, imo, despacho]) => {
   const id = `${zona.replace('Zona ', 'Z')}-${claveDistrito(distrito)}`
   const base = {
     zona, distrito, alias,
     fuente: `${EXCEL} · 00_TARIFARIO_MICHAEL fila ${fila}`,
-    estadoFuente: 'HISTÓRICA · NO APROBADA',
+    estadoFuente: CONFIRMADOS.includes(distrito) ? 'HISTÓRICA · CONFIRMADA POR MARGIORY (10/11/2026)' : 'HISTÓRICA · NO APROBADA',
   }
   return [
     { ...base, id: `${id}-GEN`, operaciones: ['Importación', 'Exportación'], modalidades: CONTENEDOR, cargas: ['General'], monto: general, alcancePorConfirmar: ALCANCE_CONTENEDOR },
@@ -123,16 +127,17 @@ export interface RutaEspecial {
   concepto: ConceptoRuta
   monto: number
   estadoFuente: string
-  /** Solo «MATCH EXACTO / POR APROBAR» se simula; el resto queda en revisión */
+  /** Solo las aprobadas por Margiory se simulan; el resto queda en revisión */
   simulable: boolean
 }
 
 const ruta = (id: string, fila: number, r: string, concepto: ConceptoRuta, monto: number, estadoFuente: string): RutaEspecial =>
-  ({ id, fila, ruta: r, concepto, monto, estadoFuente, simulable: estadoFuente === 'RUTA HISTÓRICA · MATCH EXACTO / POR APROBAR' })
+  ({ id, fila, ruta: r, concepto, monto, estadoFuente, simulable: estadoFuente === APROBADA })
 
 const NO_ACTIVAR = 'RUTA HISTÓRICA · PRUEBA / NO ACTIVAR'
 const MANUAL = 'RUTA HISTÓRICA · MANUAL HASTA DEFINIR'
-const POR_APROBAR = 'RUTA HISTÓRICA · MATCH EXACTO / POR APROBAR'
+/** Rutas aprobadas por Margiory el 10/11/2026 (las tres «match exacto / por aprobar») */
+const APROBADA = 'RUTA APROBADA POR MARGIORY (10/11/2026) · MATCH EXACTO'
 
 export const RUTAS_ESPECIALES: RutaEspecial[] = [
   ruta('RT01', 5, 'CALLAO - CHANCAY - CALLAO', 'Contenedor general', 130, NO_ACTIVAR),
@@ -142,10 +147,10 @@ export const RUTAS_ESPECIALES: RutaEspecial[] = [
   ruta('RT05', 9, 'CALLAO - HUACHO', 'Despacho carga suelta', 150, NO_ACTIVAR),
   ruta('RT06', 10, 'LURÍN - HUACHO', 'Despacho carga suelta', 200, NO_ACTIVAR),
   ruta('RT07', 11, 'CHILCA Y PUNTA HERMOSA', 'Contenedor general', 120, MANUAL),
-  ruta('RT08', 12, 'CALLAO - MELCHORITA', 'Contenedor general', 200, POR_APROBAR),
+  ruta('RT08', 12, 'CALLAO - MELCHORITA', 'Contenedor general', 200, APROBADA),
   ruta('RT09', 13, 'NEXA', 'Traslado isotanque', 110, MANUAL),
-  ruta('RT10', 14, 'CALLAO - CHANCAY - PUCUSANA', 'Despacho carga suelta', 130, POR_APROBAR),
-  ruta('RT11', 15, 'LURÍN - CHANCAY', 'Despacho carga suelta', 180, POR_APROBAR),
+  ruta('RT10', 14, 'CALLAO - CHANCAY - PUCUSANA', 'Despacho carga suelta', 130, APROBADA),
+  ruta('RT11', 15, 'LURÍN - CHANCAY', 'Despacho carga suelta', 180, APROBADA),
   ruta('RT12', 16, 'CIENEGUILLA', 'Despacho carga suelta', 110, MANUAL),
   ruta('RT13', 17, 'CALERA', 'Despacho carga suelta', 220, MANUAL),
 ]
@@ -299,11 +304,11 @@ function conceptoCompatible(c: ConceptoRuta, e: EntradaMotor): boolean {
 /** Sin vigencia aprobada: no se aplica antes de la fecha de la fuente (sin retroactivo) */
 function fueraDeVigencia(fecha: string): string | null {
   return fecha < FECHA_FUENTE
-    ? `Fecha ${fecha} anterior a la fuente del tarifario (${FECHA_FUENTE}): sin vigencia para esa fecha, no se aplica retroactivo`
+    ? `Fecha ${fecha} anterior a la vigencia de las tarifas actuales (enero 2026): no se aplica retroactivo`
     : null
 }
 
-const ALERTA_VIGENCIA = 'Importe histórico no aprobado: faltan vigencia y aprobación (Margiory valida importes y fechas)'
+const ALERTA_VIGENCIA = 'Vigente desde enero 2026 (Margiory, 10/11/2026); sigue siendo simulación hasta el cierre del piloto'
 
 /** RF guía §4: un tramo admite una sola línea por conductor */
 export function lineasDuplicadas(lineas: LineaMotor[]): string[] {
@@ -618,8 +623,8 @@ export const CASOS_DEMO: CasoDemo[] = [
     entrada: mock({ servicio: 'S90021', zona: 'Zona 7', destino: acreditado('Lurín') }) },
   { prueba: 'P3', titulo: 'Zona 7 · Lurín · IMO', esperado: 'SIMULADO S/110 (cambia por carga)',
     entrada: mock({ servicio: 'S90022', zona: 'Zona 7', tipoCarga: 'IMO', destino: acreditado('Lurín') }) },
-  { prueba: 'P3', titulo: 'Zona 7 · Lurín · servicio de febrero 2026', esperado: 'REQUIERE REVISIÓN por vigencia',
-    entrada: mock({ servicio: 'S90023', zona: 'Zona 7', fecha: '2026-02-12', destino: acreditado('Lurín') }) },
+  { prueba: 'P3', titulo: 'Zona 7 · Lurín · servicio de diciembre 2025', esperado: 'REQUIERE REVISIÓN: antes de la vigencia (enero 2026)',
+    entrada: mock({ servicio: 'S90023', zona: 'Zona 7', fecha: '2025-12-15', destino: acreditado('Lurín') }) },
   { prueba: 'P3', titulo: 'Zona 7 · Pachacamac', esperado: 'REQUIERE REVISIÓN: Lurín no se traslada a toda la Zona 7',
     entrada: mock({ servicio: 'S90024', zona: 'Zona 7', destino: acreditado('Pachacamac') }) },
   { prueba: 'Ruta', titulo: 'Provincia · ruta exacta CALLAO - MELCHORITA', esperado: 'SIMULADO S/200 (RT08, «match exacto / por aprobar»)',
