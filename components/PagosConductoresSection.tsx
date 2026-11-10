@@ -4,18 +4,21 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { RefreshCw, Wallet, ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, Loader2, Info, ExternalLink, AlarmClock, Trophy, UtensilsCrossed, Moon, Undo2, MapPin } from 'lucide-react'
 import {
-  COLUMNA_LABEL, calcularTarifa, rangoSemanaPago, sabadoDe, servicioCodigo,
-  type DevolucionPago, type ServicioPago, type TarifaResultado,
+  RefreshCw, Wallet, ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, Loader2, Info, ExternalLink, AlarmClock,
+  Trophy, UtensilsCrossed, Moon, Undo2, MapPin, Truck, Gauge, Receipt, PackageX,
+} from 'lucide-react'
+import {
+  rangoSemanaPago, sabadoDe, servicioCodigo,
+  type AsistenciaPago, type DevolucionPago, type GastoPago, type ServicioPago,
 } from '@/lib/pruebas/pagosConductores'
 import {
-  CONCEPTO_LABEL, calcularAdicionales, esFinalizado, horaLabel, totalAdicionales, type Adicional,
+  CONCEPTO_LABEL, calcularAdicionales, esFinalizado, horaLabel, totalAdicionales, type Adicional, type EstadoAdicional,
 } from '@/lib/pruebas/adicionalesConductores'
-import { compararCrosland } from '@/lib/pruebas/comparacionMotor'
+import { VERSION_TARIFARIO, entradaDesdeOdoo, simularTarifa, type LineaMotor } from '@/lib/pruebas/motorZonas'
 import { MotorZonasPanel } from '@/components/MotorZonasPanel'
 
-function formatFecha(value: string | false): string {
+function formatFecha(value: string | false | null): string {
   if (!value) return '—'
   const [y, m, d] = value.split('-')
   return `${d}/${m}/${y}`
@@ -25,14 +28,26 @@ function soles(n: number): string {
   return `S/ ${n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-interface FilaServicio { servicio: ServicioPago; tarifa: TarifaResultado }
+const ESTADO_BADGE: Record<EstadoAdicional, { label: string; clase: string }> = {
+  simulado: { label: 'Simulado', clase: 'bg-amber-100 text-amber-800' },
+  requiere_revision: { label: 'Requiere revisión', clase: 'bg-red-100 text-red-800' },
+  pagado: { label: 'Ya pagado', clase: 'bg-slate-200 text-slate-700' },
+}
+
+function Estado({ estado }: { estado: EstadoAdicional }) {
+  const b = ESTADO_BADGE[estado]
+  return <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ${b.clase}`}>{b.label}</span>
+}
+
+/** Una línea de tarifa base del motor para un conductor (principal o retorno) */
+interface FilaTarifa { servicio: ServicioPago; linea: LineaMotor; motivo: string | null }
 
 interface ResumenConductor {
   key: string
   conductor: string
-  servicios: FilaServicio[]
-  pagables: number
-  sinTarifa: number
+  tarifas: FilaTarifa[]
+  servicios: number
+  enRevision: number
   subtotal: number
   adicionales: Adicional[]
   totalAdicionales: number
@@ -41,13 +56,14 @@ interface ResumenConductor {
 export function PagosConductoresSection() {
   const [servicios, setServicios] = useState<ServicioPago[]>([])
   const [devoluciones, setDevoluciones] = useState<DevolucionPago[]>([])
+  const [asistencias, setAsistencias] = useState<AsistenciaPago[]>([])
+  const [gastos, setGastos] = useState<GastoPago[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sabado, setSabado] = useState(() => sabadoDe(new Date()))
   const [soloFinalizados, setSoloFinalizados] = useState(true)
   const [abiertos, setAbiertos] = useState<string[]>([])
   const [detalle, setDetalle] = useState<{ adicional: Adicional; conductor: string } | null>(null)
-  const [verComparacion, setVerComparacion] = useState(false)
 
   const semana = useMemo(() => rangoSemanaPago(sabado), [sabado])
 
@@ -60,10 +76,14 @@ export function PagosConductoresSection() {
       if (!res.ok) throw new Error(data.error || 'Error al cargar servicios')
       setServicios(data.servicios ?? [])
       setDevoluciones(data.devoluciones ?? [])
+      setAsistencias(data.asistencias ?? [])
+      setGastos(data.gastos ?? [])
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
       setServicios([])
       setDevoluciones([])
+      setAsistencias([])
+      setGastos([])
     } finally {
       setLoading(false)
     }
@@ -71,54 +91,53 @@ export function PagosConductoresSection() {
 
   useEffect(() => { fetchData(semana) }, [semana])
 
+  const visibles = useMemo(
+    () => soloFinalizados ? servicios.filter(s => esFinalizado(s.etapa)) : servicios,
+    [servicios, soloFinalizados],
+  )
+
   const resumen = useMemo(() => {
     const porConductor = new Map<string, ResumenConductor>()
     const obtener = (id: number | null, nombre: string | null) => {
       const key = id ? String(id) : 'sin'
       let r = porConductor.get(key)
       if (!r) {
-        r = { key, conductor: nombre ?? 'Sin conductor', servicios: [], pagables: 0, sinTarifa: 0, subtotal: 0, adicionales: [], totalAdicionales: 0 }
+        r = { key, conductor: nombre ?? 'Sin conductor', tarifas: [], servicios: 0, enRevision: 0, subtotal: 0, adicionales: [], totalAdicionales: 0 }
         porConductor.set(key, r)
       }
       return r
     }
-    for (const s of servicios) {
-      if (soloFinalizados && !esFinalizado(s.etapa)) continue
-      const r = obtener(s.conductorId, s.conductor)
-      const tarifa = calcularTarifa(s.atributos)
-      r.servicios.push({ servicio: s, tarifa })
-      if (tarifa.monto !== null) {
-        r.pagables++
-        r.subtotal += tarifa.monto
-      } else {
-        r.sinTarifa++
+
+    // Tarifa base: una línea por tramo y conductor (A principal, B retorno Crosland)
+    for (const s of visibles) {
+      const res = simularTarifa(entradaDesdeOdoo(s, devoluciones))
+      for (const linea of res.lineas) {
+        const r = obtener(linea.conductorId, linea.conductor)
+        const simulada = linea.estado === 'simulado' && res.estado === 'simulado'
+        r.tarifas.push({ servicio: s, linea, motivo: simulada ? null : (res.motivos[0] ?? 'Requiere revisión') })
+        if (linea.tramo === 'principal') r.servicios++
+        if (simulada) r.subtotal += linea.monto!
+        else r.enRevision++
       }
     }
 
-    // Devoluciones de vacío hechas por otro conductor: adicional para quien la hizo
-    const devolucionesPorConductor = new Map<string, DevolucionPago[]>()
-    for (const d of devoluciones) {
-      if (!d.conductorId || d.conductorId === d.padreConductorId) continue
-      if (soloFinalizados && !esFinalizado(d.etapa)) continue
-      const r = obtener(d.conductorId, d.conductor)
-      devolucionesPorConductor.set(r.key, [...(devolucionesPorConductor.get(r.key) ?? []), d])
-    }
+    // Adicionales (guía v1.0): también para quien solo hizo devoluciones de otros
+    for (const d of devoluciones) if (d.conductorId && d.conductorId !== d.padreConductorId) obtener(d.conductorId, d.conductor)
     for (const r of Array.from(porConductor.values())) {
       if (r.key === 'sin') continue
-      const todos = servicios.filter(s => String(s.conductorId) === r.key)
-      r.adicionales = calcularAdicionales(r.servicios.map(f => f.servicio), todos, devolucionesPorConductor.get(r.key) ?? [])
+      const conductorId = Number(r.key)
+      r.adicionales = calcularAdicionales({
+        servicios: visibles.filter(s => s.conductorId === conductorId), devoluciones, todos: servicios,
+        conductorId, asistencias, gastos,
+      })
       r.totalAdicionales = totalAdicionales(r.adicionales)
+      r.enRevision += r.adicionales.filter(a => a.estado === 'requiere_revision').length
     }
     return Array.from(porConductor.values()).sort((a, b) => a.conductor.localeCompare(b.conductor))
-  }, [servicios, devoluciones, soloFinalizados])
+  }, [visibles, servicios, devoluciones, asistencias, gastos])
 
-  const comparacion = useMemo(
-    () => compararCrosland(soloFinalizados ? servicios.filter(s => esFinalizado(s.etapa)) : servicios, devoluciones),
-    [servicios, devoluciones, soloFinalizados],
-  )
-
-  const totalServicios = resumen.reduce((s, r) => s + r.servicios.length, 0)
-  const totalSinTarifa = resumen.reduce((s, r) => s + r.sinTarifa, 0)
+  const totalServicios = resumen.reduce((s, r) => s + r.servicios, 0)
+  const totalRevision = resumen.reduce((s, r) => s + r.enRevision, 0)
   const totalSubtotal = resumen.reduce((s, r) => s + r.subtotal, 0)
   const totalAdic = resumen.reduce((s, r) => s + r.totalAdicionales, 0)
 
@@ -143,7 +162,7 @@ export function PagosConductoresSection() {
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Prueba</span>
             </h2>
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              Tarifa por servicio según zona y tipo de carga, más adicionales
+              Liquidación simulada · tarifa base y adicionales
             </p>
           </div>
         </div>
@@ -156,12 +175,11 @@ export function PagosConductoresSection() {
       <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl text-sm">
         <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
         <p>
-          <strong>Módulo en prueba.</strong> Por ahora solo se calculan las tarifas de Zona 1 a 4.
-          Los servicios de Zona 5, 6, 7 y Provincia aparecen como &quot;sin tarifa&quot; y no suman al total.
-          Los adicionales se calculan con la hora de cita y los horarios que el conductor marca en la app. Máquina,
-          Amanecida por permanencia en planta (S/ 40) y Otros adicionales se coordinan aparte; el Viático queda &quot;por validar&quot;.
-          {' '}Las tarifas de la tabla de abajo usan las <strong>reglas anteriores</strong> (solo zona y carga) y no están validadas:
-          la propuesta del motor nuevo está en el panel &quot;Motor de tarifas por zona Odoo&quot;.
+          <strong>Simulación, no pago.</strong> Tarifa base según la ficha de ejecución y el {VERSION_TARIFARIO};
+          adicionales según las Reglas de liquidación de conductores (guía piloto v1.0), con las definiciones de Margiory
+          del 10/11/2026 (vigencia desde enero 2026, I09 en Crosland nocturno). «Requiere revisión» no suma al total: falta un dato o una decisión. Los tramos y
+          adicionales se acreditan con los hitos que marca el conductor en la app, nunca con «Servicio finalizado».
+          No se pagan, descuentan ni sincronizan con Odoo.
         </p>
       </div>
 
@@ -193,17 +211,17 @@ export function PagosConductoresSection() {
           <p className="text-2xl font-extrabold tabular-nums">{totalServicios}</p>
           <p className="text-[11px] text-muted-foreground font-medium">Servicios</p>
         </div>
-        <div className={`rounded-xl border p-3 ${totalSinTarifa > 0 ? 'border-amber-300 bg-amber-50/60' : 'bg-card/40 border-border/50'}`}>
-          <p className="text-2xl font-extrabold tabular-nums">{totalSinTarifa}</p>
-          <p className="text-[11px] text-muted-foreground font-medium">Sin tarifa</p>
+        <div className={`rounded-xl border p-3 ${totalRevision > 0 ? 'border-red-200 bg-red-50/60' : 'bg-card/40 border-border/50'}`}>
+          <p className="text-2xl font-extrabold tabular-nums">{totalRevision}</p>
+          <p className="text-[11px] text-muted-foreground font-medium">Líneas en revisión</p>
         </div>
         <div className="rounded-xl border bg-card/40 border-border/50 p-3">
           <p className="text-2xl font-extrabold tabular-nums">{soles(totalAdic)}</p>
-          <p className="text-[11px] text-muted-foreground font-medium">Adicionales</p>
+          <p className="text-[11px] text-muted-foreground font-medium">Adicionales simulados</p>
         </div>
         <div className="rounded-xl border bg-card/40 border-border/50 p-3">
           <p className="text-2xl font-extrabold tabular-nums">{soles(totalSubtotal + totalAdic)}</p>
-          <p className="text-[11px] text-muted-foreground font-medium">Total de la semana</p>
+          <p className="text-[11px] text-muted-foreground font-medium">Total simulado de la semana</p>
         </div>
       </div>
 
@@ -211,56 +229,7 @@ export function PagosConductoresSection() {
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
       )}
 
-      <MotorZonasPanel
-        servicios={soloFinalizados ? servicios.filter(s => esFinalizado(s.etapa)) : servicios}
-        devoluciones={devoluciones}
-      />
-
-      {comparacion.length > 0 && (
-        <div className="rounded-xl border border-amber-200">
-          <button
-            type="button"
-            onClick={() => setVerComparacion(v => !v)}
-            aria-expanded={verComparacion}
-            className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold"
-          >
-            <ChevronDown className={`h-4 w-4 transition-transform ${verComparacion ? '' : '-rotate-90'}`} />
-            Comparación con el motor nuevo · Crosland ({comparacion.length})
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Simulado</span>
-          </button>
-          {verComparacion && (
-            <div className="overflow-x-auto border-t border-amber-200">
-              <p className="px-4 py-2 text-xs text-muted-foreground">
-                No es monto de pago ni regla aprobada. Usa fechas programadas, no la ejecución real del retorno.
-              </p>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Servicio</TableHead>
-                    <TableHead>Principal</TableHead>
-                    <TableHead>Retorno</TableHead>
-                    <TableHead className="text-right">Cálculo actual</TableHead>
-                    <TableHead className="text-right">Motor nuevo</TableHead>
-                    <TableHead className="text-right">Diferencia</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {comparacion.map(c => (
-                    <TableRow key={c.servicioId}>
-                      <TableCell className="font-medium">{c.servicio}</TableCell>
-                      <TableCell>{c.conductor ?? '—'}</TableCell>
-                      <TableCell>{c.conductorRetorno ?? '—'}</TableCell>
-                      <TableCell className="text-right tabular-nums">{c.anterior === null ? 'Sin tarifa' : soles(c.anterior)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{c.motor === null ? `Revisión: ${c.motivo}` : soles(c.motor)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{c.diferencia === null ? '—' : soles(c.diferencia)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
-      )}
+      <MotorZonasPanel servicios={visibles} devoluciones={devoluciones} />
 
       <div className="rounded-xl border overflow-x-auto">
         <Table>
@@ -268,10 +237,10 @@ export function PagosConductoresSection() {
             <TableRow>
               <TableHead>Conductor</TableHead>
               <TableHead className="text-right">Servicios</TableHead>
-              <TableHead className="text-right">Sin tarifa</TableHead>
-              <TableHead className="text-right">Tarifas</TableHead>
+              <TableHead className="text-right">En revisión</TableHead>
+              <TableHead className="text-right">Tarifa base</TableHead>
               <TableHead className="text-right">Adicionales</TableHead>
-              <TableHead className="text-right">Total a pagar</TableHead>
+              <TableHead className="text-right">Total simulado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -299,51 +268,58 @@ export function PagosConductoresSection() {
                           {r.conductor}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{r.servicios.length}</TableCell>
-                      <TableCell className={`text-right tabular-nums ${r.sinTarifa > 0 ? 'text-amber-700 font-semibold' : 'text-muted-foreground'}`}>
-                        {r.sinTarifa || '—'}
+                      <TableCell className="text-right tabular-nums">{r.servicios}</TableCell>
+                      <TableCell className={`text-right tabular-nums ${r.enRevision > 0 ? 'text-red-700 font-semibold' : 'text-muted-foreground'}`}>
+                        {r.enRevision || '—'}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{soles(r.subtotal)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.subtotal ? soles(r.subtotal) : '—'}</TableCell>
                       <TableCell className="text-right tabular-nums">{r.totalAdicionales ? soles(r.totalAdicionales) : '—'}</TableCell>
                       <TableCell className="text-right tabular-nums font-bold">{soles(r.subtotal + r.totalAdicionales)}</TableCell>
                     </TableRow>
                     {abierto && (
                       <TableRow className="bg-muted/20 hover:bg-muted/20">
                         <TableCell colSpan={6} className="p-0">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="pl-10">Servicio</TableHead>
-                                <TableHead>Fecha</TableHead>
-                                <TableHead>Cliente</TableHead>
-                                <TableHead>Tipo</TableHead>
-                                <TableHead>Zona</TableHead>
-                                <TableHead>Tarifa aplicada</TableHead>
-                                <TableHead className="text-right">Monto</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {r.servicios.map(({ servicio: s, tarifa }) => (
-                                <TableRow key={s.id} className={tarifa.monto === null ? 'bg-amber-50/50' : undefined}>
-                                  <TableCell className="pl-10 font-mono text-xs font-semibold whitespace-nowrap">{servicioCodigo(s.name)}</TableCell>
-                                  <TableCell className="text-xs whitespace-nowrap">{formatFecha(s.fecha)}</TableCell>
-                                  <TableCell className="text-xs max-w-[200px] truncate" title={s.cliente ?? ''}>{s.cliente ?? '—'}</TableCell>
-                                  <TableCell className="text-xs whitespace-nowrap">
-                                    {[s.atributos.tipoServicio, s.atributos.modalidad, s.atributos.tipoCarga].filter(Boolean).join(' · ') || '—'}
-                                  </TableCell>
-                                  <TableCell className="text-xs font-semibold whitespace-nowrap">{s.atributos.zona ?? '—'}</TableCell>
-                                  <TableCell className="text-xs whitespace-nowrap">
-                                    {tarifa.monto !== null && tarifa.columna
-                                      ? COLUMNA_LABEL[tarifa.columna]
-                                      : <span className="text-amber-700">{tarifa.motivo}</span>}
-                                  </TableCell>
-                                  <TableCell className="text-right text-xs font-semibold tabular-nums whitespace-nowrap">
-                                    {tarifa.monto !== null ? soles(tarifa.monto) : '—'}
-                                  </TableCell>
+                          {r.tarifas.length > 0 && (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="pl-10">Servicio</TableHead>
+                                  <TableHead>Fecha</TableHead>
+                                  <TableHead>Cliente</TableHead>
+                                  <TableHead>Tipo · zona</TableHead>
+                                  <TableHead>Tarifa base</TableHead>
+                                  <TableHead className="text-right">Monto</TableHead>
                                 </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+                              </TableHeader>
+                              <TableBody>
+                                {r.tarifas.map(({ servicio: s, linea, motivo }) => (
+                                  <TableRow key={`${s.id}-${linea.tramo}`} className={motivo ? 'bg-red-50/40' : undefined}>
+                                    <TableCell className="pl-10 font-mono text-xs font-semibold whitespace-nowrap">
+                                      {servicioCodigo(s.name)}
+                                      {linea.tramo === 'retorno' && <span className="ml-1 font-sans text-[10px] font-normal text-muted-foreground">(retorno)</span>}
+                                    </TableCell>
+                                    <TableCell className="text-xs whitespace-nowrap">{formatFecha(s.fecha)}</TableCell>
+                                    <TableCell className="text-xs max-w-[200px] truncate" title={s.cliente ?? ''}>{s.cliente ?? '—'}</TableCell>
+                                    <TableCell className="text-xs whitespace-nowrap">
+                                      {[s.atributos.tipoServicio, s.atributos.modalidad, s.atributos.tipoCarga, s.atributos.zona].filter(Boolean).join(' · ') || '—'}
+                                    </TableCell>
+                                    <TableCell className="text-xs whitespace-normal min-w-[240px]">
+                                      <span className="inline-flex flex-wrap items-center gap-1.5">
+                                        <Estado estado={motivo ? 'requiere_revision' : 'simulado'} />
+                                        {linea.ruleId && <span className="font-semibold">{linea.ruleId}</span>}
+                                        <span>{linea.concepto}</span>
+                                      </span>
+                                      {motivo && <p className="mt-0.5 text-red-800">{motivo}</p>}
+                                      {linea.hito && <p className="mt-0.5 text-muted-foreground">{linea.hito.codigo} · {linea.hito.momento}</p>}
+                                    </TableCell>
+                                    <TableCell className="text-right text-xs font-semibold tabular-nums whitespace-nowrap">
+                                      {linea.monto !== null && !motivo ? soles(linea.monto) : '—'}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
                           {r.adicionales.length > 0 && (
                             <Table>
                               <TableHeader>
@@ -358,18 +334,21 @@ export function PagosConductoresSection() {
                               </TableHeader>
                               <TableBody>
                                 {r.adicionales.map((a, i) => (
-                                  <TableRow key={i} className={a.porValidar ? 'bg-amber-50/50' : undefined}>
-                                    <TableCell className="pl-10 text-xs font-semibold whitespace-nowrap">
-                                      {CONCEPTO_LABEL[a.concepto]}
-                                      {a.porValidar && (
-                                        <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">Por validar</span>
-                                      )}
+                                  <TableRow key={i} className={a.estado === 'requiere_revision' ? 'bg-red-50/40' : undefined}>
+                                    <TableCell className="pl-10 text-xs font-semibold">
+                                      <span className="inline-flex flex-wrap items-center gap-1.5">
+                                        <span className="whitespace-nowrap">{CONCEPTO_LABEL[a.concepto]}</span>
+                                        <Estado estado={a.estado} />
+                                      </span>
                                     </TableCell>
                                     <TableCell className="text-xs whitespace-nowrap">{a.fecha ? formatFecha(a.fecha) : 'Semana'}</TableCell>
                                     <TableCell className="font-mono text-xs whitespace-nowrap">{a.servicio ?? '—'}</TableCell>
-                                    <TableCell className="text-xs">{a.detalle}</TableCell>
-                                    <TableCell className={`text-right text-xs font-semibold tabular-nums whitespace-nowrap ${a.porValidar ? 'text-muted-foreground line-through' : ''}`}>
-                                      {soles(a.monto)}
+                                    <TableCell className="text-xs whitespace-normal min-w-[240px]">
+                                      {a.detalle}
+                                      {a.motivo && <p className="mt-0.5 text-red-800">{a.motivo}</p>}
+                                    </TableCell>
+                                    <TableCell className={`text-right text-xs font-semibold tabular-nums whitespace-nowrap ${a.estado === 'pagado' ? 'text-muted-foreground line-through' : ''}`}>
+                                      {a.monto === null ? '—' : soles(a.monto)}
                                     </TableCell>
                                     <TableCell className="w-10 pr-3">
                                       <Button
@@ -403,12 +382,13 @@ export function PagosConductoresSection() {
       />
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
-        La zona, el tipo de servicio y el tipo de carga se toman del producto de la orden de venta en Odoo.
-        Las devoluciones/retiros de vacío (subtareas) no se cuentan. Contenedor 20 y 40 pagan igual. La semana va de sábado a viernes; el básico mensual no se incluye.
-        Adicionales: Programación 03:00 (cita 03:00–03:29, no acumula con amanecida), Cena (S/ 20 en servicio después de las 19:00;
-        S/ 30 si el primer servicio del día inició hasta las 06:00 y devolvió desde las 17:00), Amanecida CROSLAND (S/ 30 después de
-        las 22:00, S/ 50 después de las 00:00), Devolución de vacío de otro compañero (S/ 20; S/ 30 en DPW/APMT) y Bono S/ 100 desde
-        8 servicios integrales finalizados en la semana (sin traslados internos, provincia ni devoluciones pendientes).
+        Tarifa base: distrito físico acreditado, ruta especial exacta o contrato Crosland (A integral S/ 90; A S/ 70 + B S/ 20,
+        o S/ 30 en DPW/APMT), según el {VERSION_TARIFARIO}. Adicionales (guía v1.0): 01 Cena S/ 20 (I08/D10 después de las 19:00) ·
+        02 ADHT (sin umbral, en revisión) · 03/04 Crosland nocturno S/ 30 / medianoche S/ 50 (I06→I08) · 05 Crosland devolución
+        posterior S/ 30 (solo caso 21:30→23:00) · 06 TDC fuera de Crosland (en revisión) · 07 Retiro 03:00 S/ 20 · 09 Máquina
+        S/ 5 por día (máx. S/ 30) · 10 Bono S/ 100 con 8 integrales · 11 Viático (en revisión) · 12 Gastos con comprobante ·
+        13 No devolución (incidencia, nunca descuento). 08 Pernocte no se calcula: lo confirma Operaciones. La semana va de
+        sábado a viernes; el básico mensual no se incluye.
       </p>
     </div>
   )
@@ -430,13 +410,20 @@ interface EstiloConcepto {
   solidSoft: string
 }
 
+// Clases completas para que Tailwind las incluya
 const CONCEPTO_ESTILO: Record<Adicional['concepto'], EstiloConcepto> = {
-  programacion_0300: { icon: AlarmClock, soft: 'bg-sky-100 text-sky-700', text: 'text-sky-700', highlight: 'border-sky-400 bg-sky-50', solid: 'bg-sky-500', solidSoft: 'bg-sky-200' },
-  bono: { icon: Trophy, soft: 'bg-emerald-100 text-emerald-700', text: 'text-emerald-700', highlight: 'border-emerald-400 bg-emerald-50', solid: 'bg-emerald-500', solidSoft: 'bg-emerald-200' },
   cena: { icon: UtensilsCrossed, soft: 'bg-orange-100 text-orange-700', text: 'text-orange-700', highlight: 'border-orange-400 bg-orange-50', solid: 'bg-orange-500', solidSoft: 'bg-orange-200' },
-  amanecida: { icon: Moon, soft: 'bg-indigo-100 text-indigo-700', text: 'text-indigo-700', highlight: 'border-indigo-400 bg-indigo-50', solid: 'bg-indigo-500', solidSoft: 'bg-indigo-200' },
-  devolucion_vacio: { icon: Undo2, soft: 'bg-teal-100 text-teal-700', text: 'text-teal-700', highlight: 'border-teal-400 bg-teal-50', solid: 'bg-teal-500', solidSoft: 'bg-teal-200' },
+  adht: { icon: Undo2, soft: 'bg-teal-100 text-teal-700', text: 'text-teal-700', highlight: 'border-teal-400 bg-teal-50', solid: 'bg-teal-500', solidSoft: 'bg-teal-200' },
+  crosland_nocturno: { icon: Moon, soft: 'bg-indigo-100 text-indigo-700', text: 'text-indigo-700', highlight: 'border-indigo-400 bg-indigo-50', solid: 'bg-indigo-500', solidSoft: 'bg-indigo-200' },
+  crosland_medianoche: { icon: Moon, soft: 'bg-violet-100 text-violet-700', text: 'text-violet-700', highlight: 'border-violet-400 bg-violet-50', solid: 'bg-violet-500', solidSoft: 'bg-violet-200' },
+  crosland_devolucion: { icon: Undo2, soft: 'bg-indigo-100 text-indigo-700', text: 'text-indigo-700', highlight: 'border-indigo-400 bg-indigo-50', solid: 'bg-indigo-500', solidSoft: 'bg-indigo-200' },
+  tdc: { icon: Truck, soft: 'bg-teal-100 text-teal-700', text: 'text-teal-700', highlight: 'border-teal-400 bg-teal-50', solid: 'bg-teal-500', solidSoft: 'bg-teal-200' },
+  retiro_0300: { icon: AlarmClock, soft: 'bg-sky-100 text-sky-700', text: 'text-sky-700', highlight: 'border-sky-400 bg-sky-50', solid: 'bg-sky-500', solidSoft: 'bg-sky-200' },
+  maquina: { icon: Gauge, soft: 'bg-slate-100 text-slate-700', text: 'text-slate-700', highlight: 'border-slate-400 bg-slate-50', solid: 'bg-slate-500', solidSoft: 'bg-slate-200' },
+  bono: { icon: Trophy, soft: 'bg-emerald-100 text-emerald-700', text: 'text-emerald-700', highlight: 'border-emerald-400 bg-emerald-50', solid: 'bg-emerald-500', solidSoft: 'bg-emerald-200' },
   viatico: { icon: MapPin, soft: 'bg-amber-100 text-amber-800', text: 'text-amber-800', highlight: 'border-amber-400 bg-amber-50', solid: 'bg-amber-500', solidSoft: 'bg-amber-200' },
+  gasto: { icon: Receipt, soft: 'bg-cyan-100 text-cyan-700', text: 'text-cyan-700', highlight: 'border-cyan-400 bg-cyan-50', solid: 'bg-cyan-500', solidSoft: 'bg-cyan-200' },
+  no_devolucion: { icon: PackageX, soft: 'bg-red-100 text-red-700', text: 'text-red-700', highlight: 'border-red-400 bg-red-50', solid: 'bg-red-500', solidSoft: 'bg-red-200' },
 }
 
 function duracion(min: number): string {
@@ -711,16 +698,14 @@ function DetalleAdicionalDialog({ detalle, servicios, onClose }: {
                 <div className="min-w-0 flex-1">
                   <DialogTitle className="flex items-center gap-2 flex-wrap text-lg">
                     {CONCEPTO_LABEL[a.concepto]}
-                    {a.porValidar && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">Por validar</span>
-                    )}
+                    <Estado estado={a.estado} />
                   </DialogTitle>
                   <DialogDescription>
                     {detalle.conductor} · {a.fecha ? formatFecha(a.fecha) : 'Semana completa'}
                   </DialogDescription>
                 </div>
-                <p className={`shrink-0 text-2xl font-extrabold tabular-nums ${a.porValidar ? 'text-muted-foreground line-through' : estilo.text}`}>
-                  {soles(a.monto)}
+                <p className={`shrink-0 text-2xl font-extrabold tabular-nums ${a.estado === 'simulado' ? estilo.text : 'text-muted-foreground'} ${a.estado === 'pagado' ? 'line-through' : ''}`}>
+                  {a.monto === null ? 'Sin importe' : soles(a.monto)}
                 </p>
               </div>
             </DialogHeader>
@@ -729,11 +714,15 @@ function DetalleAdicionalDialog({ detalle, servicios, onClose }: {
               {/* Resumen */}
               <div className="space-y-4 p-6 md:overflow-y-auto">
                 <div className={`rounded-xl border-2 p-4 ${estilo.highlight}`}>
-                  <p className={`mb-1 text-[11px] font-bold uppercase tracking-wider ${estilo.text}`}>Por qué aplica</p>
+                  <p className={`mb-1 text-[11px] font-bold uppercase tracking-wider ${estilo.text}`}>
+                    {a.estado === 'requiere_revision' ? 'Por qué requiere revisión' : 'Por qué aplica'}
+                  </p>
                   <p className="text-base font-bold leading-snug">{a.detalle}</p>
+                  {a.motivo && <p className="mt-1 text-sm font-semibold text-red-800">{a.motivo}</p>}
+                  {a.hitos.length > 0 && <p className="mt-1 text-[11px] text-muted-foreground">Hitos: {a.hitos.join(', ')}</p>}
                   <details className="group mt-2">
                     <summary className="cursor-pointer list-none text-[11px] font-semibold text-muted-foreground hover:text-foreground">
-                      <span className="group-open:hidden">Ver regla de operaciones ▸</span>
+                      <span className="group-open:hidden">Ver regla de la guía v1.0 ▸</span>
                       <span className="hidden group-open:inline">Ocultar regla ▾</span>
                     </summary>
                     <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{a.regla}</p>
@@ -784,7 +773,7 @@ function DetalleAdicionalDialog({ detalle, servicios, onClose }: {
                           Ver servicio <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                       </div>
-                      {a.concepto === 'devolucion_vacio' && (
+                      {a.concepto === 'tdc' && (
                         <p className="mb-2 text-[11px] text-muted-foreground">Servicio original del compañero, del que se hizo la devolución.</p>
                       )}
                       <DatosServicio servicio={unico} />
@@ -794,7 +783,7 @@ function DetalleAdicionalDialog({ detalle, servicios, onClose }: {
 
                 {relacionados.length > 1 && (
                   <p className="text-xs text-muted-foreground">
-                    Se cuentan {relacionados.length} servicios integrales finalizados. Haz clic en cualquiera para abrirlo.
+                    Se cuentan {relacionados.length} servicios. Haz clic en cualquiera para abrirlo.
                   </p>
                 )}
               </div>

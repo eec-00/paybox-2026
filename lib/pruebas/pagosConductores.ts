@@ -9,13 +9,9 @@
 //   Tipo de Carga:      General | IMO | IQBF
 //   Zona:               Zona 1..7 | Provincia
 //
-// El pago se calcula por semana de sábado a viernes. El básico mensual
-// (S/ 1300) no entra en este cálculo. Los adicionales (cena, amanecida,
-// bono, etc.) están en adicionalesConductores.ts.
-//
-// Tarifas (tabla de operaciones). Por ahora solo Zona 1 a 4; Zona 5, 6, 7 y
-// Provincia quedan "sin tarifa" hasta definir su equivalencia con las rutas
-// con nombre de la tabla (Chilca, Chancay, Huacho, etc.).
+// El pago se calcula por semana de sábado a viernes. La tarifa base la da
+// motorZonas.ts (ficha, guía v1.0 y tarifario v0.9) y los adicionales
+// adicionalesConductores.ts (guía v1.0). El básico mensual no entra.
 // ============================================================================
 
 export interface AtributosServicio {
@@ -78,84 +74,41 @@ export interface DevolucionPago {
   padreConductor: string | null
 }
 
+/** Día con marca de entrada en el módulo Asistencia de la app (guía v1.0 §3.09) */
+export interface AsistenciaPago {
+  /** Empleado de Odoo (x_studio_conductor) */
+  conductorId: number
+  /** Fecha en Lima (YYYY-MM-DD) */
+  fecha: string
+  /** Marcó también la salida del día */
+  salida: boolean
+}
+
+/** Gasto registrado por el conductor en el módulo Gastos de la app (guía v1.0 §3.12) */
+export interface GastoPago {
+  id: string
+  /** Tarea de Odoo del servicio */
+  servicioId: number
+  servicio: string | null
+  conductorId: number | null
+  conductor: string | null
+  descripcion: string | null
+  monto: number
+  moneda: string
+  /** 'pendiente' | 'pagado' */
+  estado: string
+  /** Fotos de comprobante adjuntas */
+  fotos: number
+  /** Fecha de registro en Lima */
+  fecha: string
+}
+
 /** Nombre del atributo en Odoo → clave en AtributosServicio */
 export const ATRIBUTOS_ODOO: Record<string, keyof AtributosServicio> = {
   'Tipo de Servicio': 'tipoServicio',
   'Modalidad de Carga': 'modalidad',
   'Tipo de Carga': 'tipoCarga',
   'Zona': 'zona',
-}
-
-export type ColumnaTarifa =
-  | 'contenedor_general'
-  | 'contenedor_imo'
-  | 'carga_suelta'
-  | 'isotanque_importacion'
-  | 'isotanque_exportacion'
-  | 'isotanque_traslado'
-
-export const COLUMNA_LABEL: Record<ColumnaTarifa, string> = {
-  contenedor_general: 'Contenedor carga general',
-  contenedor_imo: 'Contenedor IMO / IQBF',
-  carga_suelta: 'Carga suelta',
-  isotanque_importacion: 'Isotanque importación (lleno)',
-  isotanque_exportacion: 'Isotanque exportación (vacío)',
-  isotanque_traslado: 'Traslado isotanque',
-}
-
-export const ZONAS_CON_TARIFA = ['Zona 1', 'Zona 2', 'Zona 3', 'Zona 4'] as const
-
-export const TARIFAS: Record<ColumnaTarifa, Partial<Record<string, number>>> = {
-  contenedor_general:    { 'Zona 1': 70, 'Zona 2': 80, 'Zona 3': 90,  'Zona 4': 100 },
-  contenedor_imo:        { 'Zona 1': 70, 'Zona 2': 80, 'Zona 3': 90,  'Zona 4': 110 },
-  carga_suelta:          { 'Zona 1': 80, 'Zona 2': 90, 'Zona 3': 100, 'Zona 4': 110 },
-  isotanque_importacion: { 'Zona 1': 70 },
-  isotanque_exportacion: { 'Zona 1': 60 },
-  isotanque_traslado:    { 'Zona 1': 60 },
-}
-
-export interface TarifaResultado {
-  columna: ColumnaTarifa | null
-  monto: number | null
-  /** Por qué no tiene monto (si monto es null) */
-  motivo: string | null
-}
-
-function columnaPara(a: AtributosServicio): ColumnaTarifa | null {
-  switch (a.modalidad) {
-    case 'Contenedor 20':
-    case 'Contenedor 40':
-      if (a.tipoCarga === 'General') return 'contenedor_general'
-      if (a.tipoCarga === 'IMO' || a.tipoCarga === 'IQBF') return 'contenedor_imo'
-      return null
-    case 'Carga Suelta':
-      return 'carga_suelta'
-    case 'Isotanque':
-      if (a.tipoServicio === 'Importación') return 'isotanque_importacion'
-      if (a.tipoServicio === 'Exportación') return 'isotanque_exportacion'
-      if (a.tipoServicio === 'Traslado Interno') return 'isotanque_traslado'
-      return null
-    default:
-      return null
-  }
-}
-
-export function calcularTarifa(a: AtributosServicio): TarifaResultado {
-  if (!a.zona || !a.modalidad) {
-    return { columna: null, monto: null, motivo: 'Sin producto/atributos en Odoo' }
-  }
-  const columna = columnaPara(a)
-  if (!columna) {
-    return { columna: null, monto: null, motivo: `Sin tarifa para ${a.tipoServicio ?? '—'} · ${a.modalidad}` }
-  }
-  if (!(ZONAS_CON_TARIFA as readonly string[]).includes(a.zona)) {
-    return { columna, monto: null, motivo: `${a.zona} aún sin tarifa` }
-  }
-  const monto = TARIFAS[columna][a.zona]
-  if (monto === undefined) {
-    return { columna, monto: null, motivo: `${COLUMNA_LABEL[columna]} sin tarifa en ${a.zona}` }
-  }
-  return { columna, monto, motivo: null }
 }
 
 /** "S01189 - Servicio de transporte (...)" → "S01189" */
