@@ -129,6 +129,22 @@ export function hora(s: ServicioPago, key: string): number | null {
   return s.horarios.linea.find(h => h.key === key)?.min ?? null
 }
 
+/** ¿El hito quedó registrado con ubicación desde la app? (fuente de la marca, guía §2) */
+function conUbicacion(s: ServicioPago, key: string): boolean {
+  return s.horarios.linea.find(h => h.key === key)?.real ?? false
+}
+
+/** «I08 19:30» o «I08 19:30 (sin ubicación)» o «I08 —» */
+function marca(s: ServicioPago, key: string, codigo: string): string {
+  const m = hora(s, key)
+  if (m === null) return `${codigo} —`
+  return `${codigo} ${horaLabel(m)}${conUbicacion(s, key) ? '' : ' (sin ubicación)'}`
+}
+
+const RECONSTRUCCION: [string, string][] = [
+  ['salida_cliente', 'I09'], ['llegada_devolucion', 'I10'], ['ingreso_devolucion', 'I11'], ['contenedor_devuelto', 'I12'],
+]
+
 function sim(base: Omit<Adicional, 'estado' | 'motivo'>): Adicional {
   return { ...base, estado: 'simulado', motivo: null }
 }
@@ -156,13 +172,13 @@ function cenaDe(s: ServicioPago): Adicional | null {
     servicioIds: [s.id], umbral: { min: MIN_19, label: 'Límite 19:00' },
   }
   if (fin !== null && fin > MIN_19) {
-    return sim({ ...base, monto: 20, detalle: `${codFin} Fin descarga ${horaLabel(fin)}`, hitos: [codFin], claves: [keyFin] })
+    return sim({ ...base, monto: 20, detalle: `${marca(s, keyFin, codFin)} (Fin descarga)`, hitos: [codFin], claves: [keyFin] })
   }
   const posterior = def.despues.map(([k, c]) => [k, c, hora(s, k)] as const).find(([, , m]) => m !== null && m > MIN_19)
   if (!posterior) return null
-  const [k, c, m] = posterior
+  const [k, c] = posterior
   return rev(
-    { ...base, detalle: `${fin === null ? `${codFin} sin marcar` : `${codFin} ${horaLabel(fin)}`}; ${c} ${horaLabel(m!)}`, hitos: [codFin, c], claves: [keyFin, k] },
+    { ...base, detalle: `${fin === null ? `${codFin} sin marcar` : marca(s, keyFin, codFin)}; ${marca(s, k, c)}`, hitos: [codFin, c], claves: [keyFin, k] },
     fin === null ? `${codFin} sin marcar y siguió trabajando después de las 19:00` : `${codFin} antes de las 19:00 pero siguió trabajando después`,
   )
 }
@@ -171,9 +187,8 @@ function cenaDe(s: ServicioPago): Adicional | null {
 
 function adhtDe(s: ServicioPago): Adicional | null {
   if (s.flujo !== 'importacion' || s.devolucionOtroConductor) return null
-  const [i10, i11, i12] = ['llegada_devolucion', 'ingreso_devolucion', 'contenedor_devuelto'].map(k => hora(s, k))
-  if (i12 === null) return null
-  const txt = [['I10', i10], ['I11', i11], ['I12', i12]].map(([c, m]) => `${c} ${m === null ? '—' : horaLabel(m as number)}`).join(' → ')
+  if (hora(s, 'contenedor_devuelto') === null) return null
+  const txt = RECONSTRUCCION.slice(1).map(([k, c]) => marca(s, k, c)).join(' → ')
   return rev({
     concepto: 'adht', fecha: s.fecha || null, servicio: servicioCodigo(s.name), detalle: txt, regla: REGLAS.adht,
     hitos: ['I10', 'I11', 'I12'], servicioIds: [s.id], claves: ['llegada_devolucion', 'ingreso_devolucion', 'contenedor_devuelto'],
@@ -186,7 +201,8 @@ function croslandDe(s: ServicioPago): Adicional | null {
   if (s.flujo !== 'importacion' || !esCrosland(s.cliente)) return null
   const [i06, i07, i08] = ['ingreso_cliente', 'inicio_descarga', 'fin_descarga'].map(k => hora(s, k))
   const base = { fecha: s.fecha || null, servicio: servicioCodigo(s.name), servicioIds: [s.id] }
-  const intervalo = `I06 ${i06 === null ? '—' : horaLabel(i06)} → I07 ${i07 === null ? '—' : horaLabel(i07)} → I08 ${i08 === null ? '—' : horaLabel(i08)}`
+  const intervalo = [['ingreso_cliente', 'I06'], ['inicio_descarga', 'I07'], ['fin_descarga', 'I08'], ['salida_cliente', 'I09']]
+    .map(([k, c]) => marca(s, k, c)).join(' → ')
 
   if (i08 !== null && i08 >= MIN_22) {
     const medianoche = i08 >= MIN_24
@@ -206,7 +222,8 @@ function croslandDe(s: ServicioPago): Adicional | null {
   if (i08 === null || i12 === null || i12 < MIN_22) return null
   const linea = {
     ...base, concepto: 'crosland_devolucion' as const, regla: REGLAS.crosland_devolucion,
-    detalle: `I08 ${horaLabel(i08)} → I12 ${horaLabel(i12)}`, hitos: ['I08', 'I12'], claves: ['fin_descarga', 'contenedor_devuelto'],
+    detalle: `${[['fin_descarga', 'I08'], ...RECONSTRUCCION].map(([k, c]) => marca(s, k, c)).join(' → ')} · evidencia de Operaciones por contrastar`,
+    hitos: ['I08', 'I09', 'I10', 'I11', 'I12'], claves: ['fin_descarga', ...RECONSTRUCCION.map(([k]) => k)],
   }
   if (i08 === MIN_2130 && i12 >= MIN_2230 && i12 <= MIN_2330) return sim({ ...linea, monto: 30 })
   return rev(linea, 'Solo el caso I08 21:30 → I12 23:00 está validado; no se extrapola')
@@ -231,10 +248,12 @@ function retiroDe(s: ServicioPago): Adicional | null {
   const i01 = hora(s, 'inicio_ruta')
   const linea = {
     concepto: 'retiro_0300' as const, fecha: s.fecha || null, servicio: servicioCodigo(s.name), regla: REGLAS.retiro_0300,
-    detalle: `Cita ${horaLabel(s.horaCita)} · I01 ${i01 === null ? 'sin marcar' : horaLabel(i01)}`,
-    hitos: ['Cita', 'I01'], servicioIds: [s.id], claves: ['cita', 'inicio_ruta'],
+    detalle: `Cita ${horaLabel(s.horaCita)} · ${marca(s, 'inicio_ruta', 'I01')} · ${marca(s, 'llegada_cola_retiro', 'I02')} · ${marca(s, 'ingreso_almacen_retiro', 'I03')}`,
+    hitos: ['Cita', 'I01', 'I02', 'I03'], servicioIds: [s.id], claves: ['cita', 'inicio_ruta', 'llegada_cola_retiro', 'ingreso_almacen_retiro'],
   }
   if (i01 === null) return rev(linea, 'Sin I01 (Inicio ruta) que respalde la salida')
+  // La app no pide foto en I01: la hora de salida se acepta solo si quedó registrada con ubicación
+  if (!conUbicacion(s, 'inicio_ruta')) return rev(linea, 'Salida de cochera sin ubicación registrada ni foto: hay que comprobarla, no asumirla')
   return sim({ ...linea, monto: 20 })
 }
 
@@ -250,7 +269,7 @@ function maquinaDe(servicios: ServicioPago[], asistencias: AsistenciaPago[]): Ad
   const base = {
     concepto: 'maquina' as const, fecha: null, servicio: null, regla: REGLAS.maquina, hitos: ['Asistencia'],
     servicioIds: servicios.filter(s => s.fecha && contados.includes(s.fecha)).map(s => s.id), claves: [],
-    detalle: `${contados.length} día(s) con entrada, salida y servicio${sinSalida.length ? ` · sin salida marcada: ${sinSalida.join(', ')}` : ''}`,
+    detalle: `${contados.length} día(s) con entrada, salida y servicio${sinSalida.length ? ` · sin salida marcada: ${sinSalida.join(', ')}` : ''} · actividad efectiva por contrastar con Operaciones`,
   }
   if (contados.length === 0) return rev(base, 'Días con entrada y servicio pero sin salida en Asistencia')
   return sim({ ...base, monto: contados.length * MAQUINA_DIA })
@@ -297,7 +316,7 @@ function bonoDe(servicios: ServicioPago[]): Adicional | null {
   const base = {
     concepto: 'bono' as const, fecha: null, servicio: null, regla: REGLAS.bono, hitos: ['I08/I09', 'I12', 'flujo completo'],
     servicioIds: [...integrales, ...enRevision].map(x => x.s.id), claves: [],
-    detalle: `${integrales.length} integrales completos${enRevision.length ? ` + ${enRevision.length} por revisar (ITK / devolución por B)` : ''}`,
+    detalle: `${integrales.length} integrales completos${enRevision.length ? ` + ${enRevision.length} por revisar (ITK / devolución por B)` : ''} · evidencia EIR/ticket/portal por contrastar`,
   }
   if (integrales.length >= BONO_MIN) return sim({ ...base, monto: 100 })
   return rev(base, 'Llega a 8 solo contando ITK o devoluciones por B: elegibilidad la revisan Rosario y Margiory')
@@ -344,7 +363,8 @@ function noDevolucionDe(s: ServicioPago, devoluciones: DevolucionPago[]): Adicio
   const responsable = s.devolucionOtroConductor ? (subtareas[0]?.conductor ?? 'sin asignar') : (s.conductor ?? '—')
   return rev({
     concepto: 'no_devolucion', fecha: s.fecha || null, servicio: servicioCodigo(s.name), regla: REGLAS.no_devolucion,
-    detalle: `Servicio cerrado sin I12 · responsable de la devolución: ${responsable}`, hitos: ['I09', 'I10', 'I11', 'I12'],
+    detalle: `Servicio cerrado sin I12 · ${RECONSTRUCCION.slice(0, 3).map(([k, c]) => marca(s, k, c)).join(' → ')} · responsable de la devolución: ${responsable}`,
+    hitos: ['I09', 'I10', 'I11', 'I12'],
     servicioIds: [s.id], claves: ['salida_cliente', 'llegada_devolucion', 'ingreso_devolucion', 'contenedor_devuelto'],
   }, 'Incidencia: Operaciones debe acreditar la devolución. No se descuenta')
 }

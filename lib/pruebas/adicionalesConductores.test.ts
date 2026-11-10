@@ -141,6 +141,13 @@ describe('07 · Retiro 03:00', () => {
   it('cita 03:30 no aplica', () => {
     expect(de(calc([servicio({ horaCita: H(3, 30), horas: completo() })]), 'retiro_0300')).toHaveLength(0)
   })
+  it('I01 sin ubicación registrada → revisión (la salida se comprueba, no se asume)', () => {
+    const s = servicio({ horaCita: H(3), horas: completo({ inicio_ruta: H(2, 20) }) })
+    s.horarios.linea = s.horarios.linea.map(h => h.key === 'inicio_ruta' ? { ...h, real: false } : h)
+    const [r] = de(calc([s]), 'retiro_0300')
+    expect(r.estado).toBe('requiere_revision')
+    expect(r.detalle).toMatch(/I01 02:20 \(sin ubicación\)/)
+  })
   it('sin I01 → revisión', () => {
     expect(de(calc([servicio({ horaCita: H(3), horas: completo({ inicio_ruta: null }) })]), 'retiro_0300')[0].estado).toBe('requiere_revision')
   })
