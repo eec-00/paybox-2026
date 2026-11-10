@@ -3,7 +3,7 @@ import { compararCrosland } from './comparacionMotor'
 import type { DevolucionPago, ServicioPago } from './pagosConductores'
 
 const servicio = (over: Partial<ServicioPago> = {}): ServicioPago => ({
-  id: 1, name: 'S09001 - Servicio', fecha: '2026-10-16', etapa: 'Servicio Finalizado', cliente: 'CROSLAND SAC', clienteId: 7,
+  id: 1, name: 'S09001 - Servicio', fecha: '2026-10-16', etapa: 'Servicio Finalizado', cliente: 'CROSLAND SAC',
   conductorId: 1, conductor: 'A', placa: null, horaCita: null, flujo: 'importacion',
   devolucionOtroConductor: false, horarios: { inicio: null, fin: null, devolucion: null, linea: [] },
   atributos: { tipoServicio: 'Importación', modalidad: 'Contenedor 20', tipoCarga: 'General', zona: 'Zona 3' },

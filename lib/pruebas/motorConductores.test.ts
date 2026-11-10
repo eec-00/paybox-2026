@@ -320,7 +320,7 @@ describe('Retrospectivas W05–W14 y HIST-05/06', () => {
 describe('Diferencias con el cálculo anterior (RF-040/042)', () => {
   const horarios = { inicio: null, fin: null, devolucion: null, linea: [] }
   const servicio = (over: Partial<ServicioPago> = {}): ServicioPago => ({
-    id: 1, name: 'S09001 - Servicio', fecha: VIERNES, etapa: 'Servicio Finalizado', cliente: 'CROSLAND', clienteId: 7,
+    id: 1, name: 'S09001 - Servicio', fecha: VIERNES, etapa: 'Servicio Finalizado', cliente: 'CROSLAND',
     conductorId: A, conductor: 'A', placa: null, horaCita: null, flujo: 'importacion',
     devolucionOtroConductor: true, horarios,
     atributos: { tipoServicio: 'Importación', modalidad: 'Contenedor 20', tipoCarga: 'General', zona: 'Zona 3' },

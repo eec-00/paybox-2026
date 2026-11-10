@@ -189,7 +189,6 @@ export async function GET(request: Request) {
         fecha: t.x_studio_fecha_de_la_programacin,
         etapa: t.stage_id ? t.stage_id[1] : null,
         cliente: t.partner_id ? t.partner_id[1] : null,
-        clienteId: t.partner_id ? t.partner_id[0] : null,
         conductorId: t.x_studio_conductor ? t.x_studio_conductor[0] : null,
         conductor: t.x_studio_conductor ? t.x_studio_conductor[1] : null,
         placa: t.x_studio_placa ? t.x_studio_placa[1] : null,

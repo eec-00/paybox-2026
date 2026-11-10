@@ -13,7 +13,6 @@ import {
   CONCEPTO_LABEL, calcularAdicionales, esFinalizado, horaLabel, totalAdicionales, type Adicional,
 } from '@/lib/pruebas/adicionalesConductores'
 import { compararCrosland } from '@/lib/pruebas/comparacionMotor'
-import { MotorZonasPanel } from '@/components/MotorZonasPanel'
 
 function formatFecha(value: string | false): string {
   if (!value) return '—'
@@ -160,8 +159,6 @@ export function PagosConductoresSection() {
           Los servicios de Zona 5, 6, 7 y Provincia aparecen como &quot;sin tarifa&quot; y no suman al total.
           Los adicionales se calculan con la hora de cita y los horarios que el conductor marca en la app. Máquina,
           Amanecida por permanencia en planta (S/ 40) y Otros adicionales se coordinan aparte; el Viático queda &quot;por validar&quot;.
-          {' '}Las tarifas de la tabla de abajo usan las <strong>reglas anteriores</strong> (solo zona y carga) y no están validadas:
-          la propuesta del motor nuevo está en el panel &quot;Motor de tarifas por zona Odoo&quot;.
         </p>
       </div>
 
@@ -210,11 +207,6 @@ export function PagosConductoresSection() {
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
       )}
-
-      <MotorZonasPanel
-        servicios={soloFinalizados ? servicios.filter(s => esFinalizado(s.etapa)) : servicios}
-        devoluciones={devoluciones}
-      />
 
       {comparacion.length > 0 && (
         <div className="rounded-xl border border-amber-200">
