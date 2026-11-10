@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import {
-  ATRIBUTOS_ODOO, type AtributosServicio, type DevolucionPago, type HorariosServicio, type ServicioPago,
+  ATRIBUTOS_ODOO, type AsistenciaPago, type AtributosServicio, type DevolucionPago, type GastoPago, type HorariosServicio, type ServicioPago,
 } from '@/lib/pruebas/pagosConductores'
 import {
   ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS, MODALIDAD_DEVOLUCION_FIELD, MODALIDAD_RETIRO_FIELD, MODALIDAD_OTRO_CONDUCTOR,
   detectTipoServicio, getHitosForTask, type TaskTypeFlags,
 } from '@/lib/servicios/hitos'
-import { registrosPorStep, tiemposHitos } from '@/lib/servicios/fechasHitos'
+import { fechaLima, registrosPorStep, sumarDias, tiemposHitos } from '@/lib/servicios/fechasHitos'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -234,7 +234,63 @@ export async function GET(request: Request) {
       }]
     })
 
-    return NextResponse.json({ servicios, devoluciones, rango: { start, end } })
+    // Asistencia (máquina) y gastos (reembolsables) de la app, cruzados con el
+    // empleado de Odoo por user_profiles.odoo_employee_id
+    const admin = createAdminClient()
+    const empleados = Array.from(new Set(
+      [...servicios.map(s => s.conductorId), ...devoluciones.map(d => d.conductorId)].filter((x): x is number => x !== null),
+    ))
+    const taskIds = [...tasks.map(t => t.id), ...subtareas.map(st => st.id)]
+    const { data: gastosRaw, error: gastosError } = taskIds.length
+      ? await admin.from('gastos_conductor')
+        .select('id, servicio_id, servicio_nombre, conductor_id, conductor_nombre, descripcion, monto, moneda, estado, fotos, created_at')
+        .in('servicio_id', taskIds)
+      : { data: [], error: null }
+    if (gastosError) throw new Error(`gastos_conductor: ${gastosError.message}`)
+
+    const usuariosGasto = Array.from(new Set((gastosRaw ?? []).map(g => g.conductor_id as string)))
+    const perfiles: { id: string; odoo_employee_id: number | null }[] = []
+    if (empleados.length) {
+      const { data, error: e } = await admin.from('user_profiles').select('id, odoo_employee_id').in('odoo_employee_id', empleados)
+      if (e) throw new Error(`user_profiles: ${e.message}`)
+      perfiles.push(...(data ?? []))
+    }
+    if (usuariosGasto.length) {
+      const { data, error: e } = await admin.from('user_profiles').select('id, odoo_employee_id').in('id', usuariosGasto)
+      if (e) throw new Error(`user_profiles: ${e.message}`)
+      perfiles.push(...(data ?? []))
+    }
+    const empleadoDe = new Map(perfiles.map(p => [p.id, p.odoo_employee_id]))
+
+    const usuariosConductores = perfiles.filter(p => p.odoo_employee_id !== null && empleados.includes(p.odoo_employee_id)).map(p => p.id)
+    const { data: asistRaw, error: asistError } = usuariosConductores.length
+      ? await admin.from('asistencias_conductor')
+        .select('conductor_id, created_at, salida_at')
+        .in('conductor_id', Array.from(new Set(usuariosConductores)))
+        .gte('created_at', `${start}T05:00:00Z`)
+        .lt('created_at', `${sumarDias(end, 1)}T05:00:00Z`)
+      : { data: [], error: null }
+    if (asistError) throw new Error(`asistencias_conductor: ${asistError.message}`)
+
+    const asistencias: AsistenciaPago[] = (asistRaw ?? []).flatMap(a => {
+      const conductorId = empleadoDe.get(a.conductor_id as string)
+      return conductorId ? [{ conductorId, fecha: fechaLima(a.created_at as string), salida: !!a.salida_at }] : []
+    })
+    const gastos: GastoPago[] = (gastosRaw ?? []).map(g => ({
+      id: g.id as string,
+      servicioId: g.servicio_id as number,
+      servicio: (g.servicio_nombre as string | null) ?? null,
+      conductorId: empleadoDe.get(g.conductor_id as string) ?? null,
+      conductor: (g.conductor_nombre as string | null) ?? null,
+      descripcion: (g.descripcion as string | null) ?? null,
+      monto: Number(g.monto),
+      moneda: (g.moneda as string) || 'soles',
+      estado: g.estado as string,
+      fotos: Array.isArray(g.fotos) ? g.fotos.length : 0,
+      fecha: fechaLima(g.created_at as string),
+    }))
+
+    return NextResponse.json({ servicios, devoluciones, asistencias, gastos, rango: { start, end } })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error)
     console.error('Error en /api/pruebas/pagos-conductores:', msg)
