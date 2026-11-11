@@ -176,9 +176,14 @@ describe('10 · Bono', () => {
   it('8 integrales → S/100', () => {
     expect(de(calc(Array.from({ length: 8 }, () => servicio({ horas: completo() }))), 'bono')[0]).toMatchObject({ estado: 'simulado', monto: 100 })
   })
-  it('7 integrales + 1 con devolución por B → revisión', () => {
+  it('7 integrales + 1 con devolución por tercero → no acumula, sin bono', () => {
     const lista = [...Array.from({ length: 7 }, () => servicio({ horas: completo() })), servicio({ devolucionOtroConductor: true, horas: completo() })]
-    expect(de(calc(lista), 'bono')[0]).toMatchObject({ estado: 'requiere_revision', monto: null })
+    expect(de(calc(lista), 'bono')).toHaveLength(0)
+  })
+  it('8 integrales + 1 devolución por tercero → S/100, la excluida no suma', () => {
+    const lista = [...Array.from({ length: 8 }, () => servicio({ horas: completo() })), servicio({ devolucionOtroConductor: true, horas: completo() })]
+    expect(de(calc(lista), 'bono')[0]).toMatchObject({ estado: 'simulado', monto: 100, servicioIds: expect.any(Array) })
+    expect(de(calc(lista), 'bono')[0].servicioIds).toHaveLength(8)
   })
   it('sin I12 propio no es integral', () => {
     expect(integralidad(servicio({ horas: completo({ contenedor_devuelto: null }) }))).toBe('no')
