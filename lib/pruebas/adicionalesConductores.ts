@@ -87,9 +87,9 @@ export const REGLAS: Record<ConceptoAdicional, string> = {
   tdc: 'Guía §3.06 · S/20 o S/30 según ruta y depósito. Repartos A/B documentados solo para Crosland; no se extrapolan a otros clientes ni a Chancay.',
   retiro_0300: 'Guía §3.07 · S/20. Cita original Odoo de RETIRO exactamente a las 03:00; contrastar I01 (Inicio ruta), I02/I03 y foto de salida de cochera. No aplica a cita 03:30 ni a I01 aislado. Revisar incompatibilidad con pernocte.',
   maquina: 'Guía §3.09 · S/5 por día válido, máximo S/30 por semana (seis días). Fuente: módulo Asistencia de la app (entrada/salida) con servicio asignado ese día. No aplica a días sin servicio.',
-  bono: 'Guía §3.10 · S/100 semanal. Ocho Sxxxxx únicos y completos (sábado–viernes). Importación: I08/I09 + devolución propia I12. Despacho/exportación: flujo propio completo. ITK y devolución por B cuentan, pero quedan en revisión de elegibilidad.',
+  bono: 'Guía §3.10 · S/100 semanal. Ocho Sxxxxx únicos y completos (sábado–viernes). Importación: I08/I09 + devolución propia I12. Despacho/exportación: flujo propio completo. Traslados internos de isotanque (ITK) y devoluciones por terceros NO son acumulables (Rosario, 11/11/2026).',
   viatico: 'Guía §3.11 · S/35. Despacho a provincia con D06/D07/D08/D11, destino físico Odoo, autorización previa y comprobante. Excluye Chancay. D07 solo no activa el viático.',
-  gasto: 'Guía §3.12 · Importe realmente sustentado en el módulo Gastos de la app (comprobante). Diferenciar pendiente y pagado; no abonar dos veces lo ya desembolsado.',
+  gasto: 'Guía §3.12 · Importe realmente sustentado en el módulo Gastos de la app (comprobante). Diferenciar pendiente y pagado; no abonar dos veces lo ya desembolsado. Gastos en dólares: tipo de cambio venta del día (Rosario, 11/11/2026).',
   no_devolucion: 'Guía §3.13 · Incidencia. Ausencia de I12 no prueba por sí sola la falta de devolución; Operaciones puede acreditarla. Descuento histórico S/20: PROHIBIDO AUTOMATIZAR.',
 }
 
@@ -280,7 +280,8 @@ function maquinaDe(servicios: ServicioPago[], asistencias: AsistenciaPago[]): Ad
 
 // ── 10 · Bono ───────────────────────────────────────────────────────────
 
-type Integralidad = 'integral' | 'revision' | 'no'
+/** 'excluido': completo, pero Rosario (11/11) lo deja fuera del bono (ITK o devolución por tercero) */
+type Integralidad = 'integral' | 'excluido' | 'no'
 
 export function integralidad(s: ServicioPago): Integralidad {
   const operativos = s.horarios.linea.filter(h => h.key !== 'servicio_finalizado')
@@ -289,7 +290,7 @@ export function integralidad(s: ServicioPago): Integralidad {
     case 'importacion': {
       const principal = hora(s, 'fin_descarga') !== null || hora(s, 'salida_cliente') !== null
       if (!principal) return 'no'
-      if (s.devolucionOtroConductor) return 'revision'
+      if (s.devolucionOtroConductor) return 'excluido'
       return hora(s, 'contenedor_devuelto') !== null ? 'integral' : 'no'
     }
     case 'despacho':
@@ -298,31 +299,29 @@ export function integralidad(s: ServicioPago): Integralidad {
     case 'traslado_interno':
     case 'isotanque_lleno':
     case 'isotanque_vacio':
-      return completo ? 'revision' : 'no'
+      return completo ? 'excluido' : 'no'
     default:
       return 'no'
   }
 }
 
 function bonoDe(servicios: ServicioPago[]): Adicional | null {
-  const porCodigo = new Map<string, { s: ServicioPago; i: Integralidad }>()
+  const porCodigo = new Map<string, Integralidad>()
+  const ids = new Map<string, number>()
   for (const s of servicios) {
     const i = integralidad(s)
     if (i === 'no') continue
     const cod = servicioCodigo(s.name)
-    const prev = porCodigo.get(cod)
-    if (!prev || (prev.i === 'revision' && i === 'integral')) porCodigo.set(cod, { s, i })
+    if (porCodigo.get(cod) !== 'integral') { porCodigo.set(cod, i); ids.set(cod, s.id) }
   }
-  const integrales = Array.from(porCodigo.values()).filter(x => x.i === 'integral')
-  const enRevision = Array.from(porCodigo.values()).filter(x => x.i === 'revision')
-  if (integrales.length + enRevision.length < BONO_MIN) return null
-  const base = {
+  const integrales = Array.from(porCodigo).filter(([, i]) => i === 'integral').map(([cod]) => cod)
+  const excluidos = Array.from(porCodigo.values()).filter(i => i === 'excluido').length
+  if (integrales.length < BONO_MIN) return null
+  return sim({
     concepto: 'bono' as const, fecha: null, servicio: null, regla: REGLAS.bono, hitos: ['I08/I09', 'I12', 'flujo completo'],
-    servicioIds: [...integrales, ...enRevision].map(x => x.s.id), claves: [],
-    detalle: `${integrales.length} integrales completos${enRevision.length ? ` + ${enRevision.length} por revisar (ITK / devolución por B)` : ''} · evidencia EIR/ticket/portal por contrastar`,
-  }
-  if (integrales.length >= BONO_MIN) return sim({ ...base, monto: 100 })
-  return rev(base, 'Llega a 8 solo contando ITK o devoluciones por B: elegibilidad la revisan Rosario y Margiory')
+    servicioIds: integrales.map(cod => ids.get(cod)!), claves: [], monto: 100,
+    detalle: `${integrales.length} integrales completos${excluidos ? ` · ${excluidos} no acumulable(s) (ITK / devolución por tercero)` : ''} · evidencia EIR/ticket/portal por contrastar`,
+  })
 }
 
 // ── 11 · Viático ────────────────────────────────────────────────────────
@@ -351,7 +350,7 @@ function gastoDe(g: GastoPago, servicios: ServicioPago[]): Adicional {
     detalle: `${g.descripcion ?? 'Gasto'} · ${g.moneda === 'dolares' ? 'US$' : 'S/'} ${g.monto.toFixed(2)} · ${g.fotos} comprobante(s)`,
   }
   if (g.estado === 'pagado') return { ...base, monto: g.monto, estado: 'pagado', motivo: null }
-  if (g.moneda !== 'soles') return rev(base, 'Gasto en dólares: conversión por definir')
+  if (g.moneda !== 'soles') return rev(base, `Gasto en dólares: convertir con el tipo de cambio venta del ${g.fecha ?? 'día del gasto'} (aún no se carga en el sistema)`)
   if (g.fotos === 0) return rev(base, 'Sin comprobante adjunto')
   return sim({ ...base, monto: g.monto })
 }

@@ -510,7 +510,7 @@ function simularCrosland(c: Corrida): ResultadoMotor {
     c.paso('B', false, 'Devolución sin I12')
     return c.revision(['Devolución sin I12 acreditado: no se sabe si es integral (CR-01) o reparto A/B'], [linea('principal', A, null)])
   }
-  c.alertas.push('Excepción de cliente pendiente de vigencia y sede (Excel v0.9); B requiere constancia de Operaciones')
+  c.alertas.push('Excepción de cliente pendiente de vigencia y sede (Excel v0.9); B se acredita con I12 en su subtarea asignada, el EIR se adjunta solo cuando lo entregan (Rosario, 11/11)')
 
   if (B.conductorId === A.conductorId) {
     c.paso('B', true, `Mismo conductor devolvió (${B.hito.codigo} ${B.hito.momento}) → CR-01`)
