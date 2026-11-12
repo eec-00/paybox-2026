@@ -87,8 +87,8 @@ describe('03/04/05 · Crosland', () => {
     expect(de(calc([crosland({ fin_descarga: H(21, 50), salida_cliente: H(21, 58) })]), 'crosland_nocturno')).toHaveLength(0)
   })
 
-  it('caso Margiory: I07 21:50, I08 00:30 → S/50 que sustituye S/30', () => {
-    const lista = calc([crosland({ inicio_descarga: H(21, 50), fin_descarga: H(24, 30) })])
+  it('caso Margiory: I07 21:50, I08 00:30, I09 00:45 → S/50 que sustituye S/30', () => {
+    const lista = calc([crosland({ inicio_descarga: H(21, 50), fin_descarga: H(24, 30), salida_cliente: H(24, 45) })])
     expect(de(lista, 'crosland_medianoche')[0]).toMatchObject({ estado: 'simulado', monto: 50 })
     expect(de(lista, 'crosland_nocturno')).toHaveLength(0)
     expect(de(lista, 'cena')[0]).toMatchObject({ monto: 20 })
@@ -104,6 +104,11 @@ describe('03/04/05 · Crosland', () => {
     const lista = calc([crosland({ fin_descarga: H(18), salida_cliente: H(18, 20), contenedor_devuelto: H(20, 10) })])
     expect(de(lista, 'cena')[0]).toMatchObject({ estado: 'simulado', monto: 20, hitos: ['I08', 'I12'] })
     expect(de(lista, 'crosland_nocturno')).toHaveLength(0)
+  })
+
+  it('Margiory 12/11: medianoche decide I09 — descarga 23:50 y salida 00:10 → S/50', () => {
+    const [m] = de(calc([crosland({ fin_descarga: H(23, 50), salida_cliente: H(24, 10) })]), 'crosland_medianoche')
+    expect(m).toMatchObject({ estado: 'simulado', monto: 50, hitos: ['I06', 'I09'] })
   })
 
   it('amanecida no suma la noche (Rosario 12/11)', () => {
@@ -242,8 +247,13 @@ describe('12 · Gastos', () => {
     expect(de(lista, 'gasto').map(g => g.estado)).toEqual(['simulado', 'pagado', 'requiere_revision'])
     expect(totalAdicionales(lista)).toBe(12.5)
   })
-  it('dólares → revisión', () => {
-    expect(de(calc([], { gastos: [gasto({ moneda: 'dolares' })] }), 'gasto')[0].estado).toBe('requiere_revision')
+  it('dólares sin tipo de cambio publicado → revisión', () => {
+    expect(de(calc([], { gastos: [gasto({ moneda: 'dolares', tipoCambio: null })] }), 'gasto')[0].estado).toBe('requiere_revision')
+  })
+  it('dólares con TC SBS → simulado en soles', () => {
+    const [g] = de(calc([], { gastos: [gasto({ moneda: 'dolares', monto: 12.5, tipoCambio: { valor: 3.414, fecha: '2026-11-10' } })] }), 'gasto')
+    expect(g).toMatchObject({ estado: 'simulado', monto: 42.68 })
+    expect(g.detalle).toMatch(/TC venta SBS 3\.414 \(10\/11\) = S\/ 42\.68/)
   })
 })
 
