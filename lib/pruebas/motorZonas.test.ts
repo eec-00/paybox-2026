@@ -187,7 +187,7 @@ describe('entradaDesdeOdoo', () => {
   const linea = (key: string, label: string, min: number | null) => ({ key, label, min, real: true })
   const s: ServicioPago = {
     id: 5, name: 'S03117 - Servicio', fecha: '2026-11-10', etapa: 'Servicio Finalizado', cliente: 'CROSLAND MOTOS S.A.C',
-    clienteId: 77, conductorId: 1, conductor: 'A', placa: null, horaCita: null, flujo: 'importacion',
+    clienteId: 308, conductorId: 1, conductor: 'A', placa: null, horaCita: null, flujo: 'importacion',
     devolucionOtroConductor: true,
     horarios: { inicio: null, fin: null, devolucion: null, linea: [linea('fin_descarga', 'Fin descarga', 14 * 60), linea('salida_cliente', 'Salida de cliente', null)] },
     atributos: { tipoServicio: 'Importación', modalidad: 'Contenedor 40', tipoCarga: 'General', zona: 'Zona 5' },
@@ -214,7 +214,26 @@ describe('entradaDesdeOdoo', () => {
   })
 
   it('ordinario real sin destino estructurado → revisión', () => {
-    const e = entradaDesdeOdoo({ ...s, cliente: 'OTRO', devolucionOtroConductor: false }, [])
+    const e = entradaDesdeOdoo({ ...s, cliente: 'OTRO', clienteId: 9001, devolucionOtroConductor: false }, [])
     expect(simularTarifa(e).motivos[0]).toMatch(/Destino físico/)
+  })
+
+  it('Margiory 12/11: Hertford y Crosland Repuestos van con tarifa Crosland', () => {
+    for (const [clienteId, cliente] of [[317, 'HERTFORD AUTOMOTRIZ S.A.'], [421, 'CROSLAND REPUESTOS S.A.C., Almacén Callao']] as const) {
+      expect(simularTarifa(entradaDesdeOdoo({ ...s, clienteId, cliente }, [d])).ruleIds).toEqual(['CR-02', 'CR-04'])
+    }
+  })
+
+  it('Crosland Técnica y Crossland Facturas no entran al contrato: ordinario con alerta', () => {
+    for (const [clienteId, cliente] of [[804, 'CROSLAND TECNICA S.A.'], [918, 'CROSLAND MOTOS S.A.C, Crossland Facturas']] as const) {
+      const r = simularTarifa(entradaDesdeOdoo({ ...s, clienteId, cliente, devolucionOtroConductor: false }, []))
+      expect(r.ruleIds.some(id => id.startsWith('CR-'))).toBe(false)
+      expect(r.alertas.join(' ')).toMatch(/excluyó del contrato/)
+    }
+  })
+
+  it('nombre Crosland fuera de la lista → ordinario con alerta para confirmar', () => {
+    const r = simularTarifa(entradaDesdeOdoo({ ...s, clienteId: 5555, cliente: 'CROSLAND NUEVA SEDE', devolucionOtroConductor: false }, []))
+    expect(r.alertas.join(' ')).toMatch(/no está en la lista/)
   })
 })

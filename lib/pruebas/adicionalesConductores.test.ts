@@ -76,7 +76,7 @@ describe('02 · ADHT', () => {
 
 describe('03/04/05 · Crosland', () => {
   const crosland = (horas: Record<string, number | null>, over: Partial<ServicioPago> = {}) =>
-    servicio({ cliente: 'CROSLAND MOTOS', horas: completo(horas), ...over })
+    servicio({ cliente: 'CROSLAND MOTOS', clienteId: 308, horas: completo(horas), ...over })
 
   it('decide I09: descarga antes de las 22:00 pero salida 22:15 → S/30', () => {
     const [n] = de(calc([crosland({ fin_descarga: H(21, 40), salida_cliente: H(22, 15) })]), 'crosland_nocturno')
@@ -116,6 +116,10 @@ describe('03/04/05 · Crosland', () => {
     expect(lista.filter(a => a.estado === 'simulado').map(a => a.concepto).sort()).toEqual(['cena', 'crosland_medianoche'])
   })
 
+  it('Crosland Técnica (804) no es Crosland aunque lleve el nombre', () => {
+    expect(de(calc([crosland({ fin_descarga: H(22), salida_cliente: H(22, 30) }, { clienteId: 804, cliente: 'CROSLAND TECNICA S.A.' })]), 'crosland_nocturno')).toHaveLength(0)
+  })
+
   it('sin I06 → revisión', () => {
     const [n] = de(calc([crosland({ ingreso_cliente: null, fin_descarga: H(22), salida_cliente: H(22, 30) })]), 'crosland_nocturno')
     expect(n.estado).toBe('requiere_revision')
@@ -146,7 +150,7 @@ describe('06 · TDC fuera de Crosland', () => {
   })
 
   it('Crosland no genera TDC aquí (va en la tarifa base)', () => {
-    const padre = servicio({ cliente: 'CROSLAND', devolucionOtroConductor: true })
+    const padre = servicio({ cliente: 'CROSLAND', clienteId: 308, devolucionOtroConductor: true })
     const d: DevolucionPago = {
       id: 98, name: 'Dev', etapa: 'Servicio Finalizado', conductorId: 2, conductor: 'B', almacen: 'DPW', fecha: '2026-11-10',
       padreId: padre.id, padreName: padre.name, padreConductorId: 1, padreConductor: 'A', devueltoMin: H(16),
@@ -269,7 +273,7 @@ describe('13 · No devolución', () => {
 
 describe('total', () => {
   it('solo suma lo simulado; nunca hay montos negativos (sin descuentos)', () => {
-    const lista = calc([servicio({ cliente: 'CROSLAND', horas: completo({ fin_descarga: H(24, 30), contenedor_devuelto: null }) })])
+    const lista = calc([servicio({ cliente: 'CROSLAND', clienteId: 308, horas: completo({ fin_descarga: H(24, 30), contenedor_devuelto: null }) })])
     expect(lista.every(a => a.monto === null || a.monto > 0)).toBe(true)
     expect(totalAdicionales(lista)).toBe(lista.filter(a => a.estado === 'simulado').reduce((t, a) => t + a.monto!, 0))
   })

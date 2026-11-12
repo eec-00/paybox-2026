@@ -115,8 +115,31 @@ export function esPuerto(almacen: string | null): boolean {
   return a.includes('DPW') || a.includes('APMT') || a.includes('DP WORLD')
 }
 
-export function esCrosland(cliente: string | null): boolean {
-  return (cliente ?? '').toUpperCase().includes('CROSLAND')
+/**
+ * Clientes (partner_id de Odoo) que se pagan con la tarifa Crosland, confirmados
+ * por Margiory el 12/11/2026: «aplica para todos», salvo Crosland Técnica (es
+ * contacto, no almacén de entrega) y el contacto de facturación «Crossland Facturas».
+ */
+export const CROSLAND_ODOO_IDS: Record<number, string> = {
+  308: 'CROSLAND MOTOS S.A.C',
+  417: 'CROSLAND MOTOS · Akemi Kiwaki Arauco',
+  964: 'CROSLAND MOTOS · Elevadores',
+  1063: 'CROSLAND MOTOS · Santa Rosa',
+  419: 'CROSLAND MOTOS · Sensores',
+  420: 'CROSLAND REPUESTOS S.A.C.',
+  421: 'CROSLAND REPUESTOS · Almacén Callao',
+  317: 'HERTFORD AUTOMOTRIZ S.A.',
+  360: 'HERTFORD AUTOMOTRIZ · entrega',
+}
+
+/** Excluidos expresamente por Margiory (12/11/2026) */
+export const CROSLAND_EXCLUIDOS: Record<number, string> = {
+  804: 'CROSLAND TECNICA S.A.',
+  918: 'Crossland Facturas',
+}
+
+export function esCrosland(clienteId: number | null): boolean {
+  return clienteId !== null && clienteId in CROSLAND_ODOO_IDS
 }
 
 /** Minutos de un hito marcado, o null */
@@ -171,7 +194,7 @@ function cenaDe(s: ServicioPago): Adicional | null {
   }
   // Crosland: la devolución propia va en la tarifa; si termina después de las 19:00 se paga la cena
   const i12 = hora(s, 'contenedor_devuelto')
-  if (s.flujo === 'importacion' && esCrosland(s.cliente) && !s.devolucionOtroConductor && i12 !== null && i12 > MIN_19) {
+  if (s.flujo === 'importacion' && esCrosland(s.clienteId) && !s.devolucionOtroConductor && i12 !== null && i12 > MIN_19) {
     return sim({
       ...base, monto: 20, detalle: `${fin === null ? `${codFin} sin marcar` : marca(s, keyFin, codFin)}; ${marca(s, 'contenedor_devuelto', 'I12')} (devolución propia)`,
       hitos: [codFin, 'I12'], claves: [keyFin, 'contenedor_devuelto'],
@@ -201,7 +224,7 @@ function adhtDe(s: ServicioPago): Adicional | null {
 // ── 03/04 · Crosland ─────────────────────────────────────────────────
 
 function croslandDe(s: ServicioPago): Adicional | null {
-  if (s.flujo !== 'importacion' || !esCrosland(s.cliente)) return null
+  if (s.flujo !== 'importacion' || !esCrosland(s.clienteId)) return null
   const [i06, i09] = ['ingreso_cliente', 'salida_cliente'].map(k => hora(s, k))
   const base = { fecha: s.fecha || null, servicio: servicioCodigo(s.name), servicioIds: [s.id] }
   const intervalo = [['ingreso_cliente', 'I06'], ['inicio_descarga', 'I07'], ['fin_descarga', 'I08'], ['salida_cliente', 'I09']]
@@ -231,7 +254,7 @@ function croslandDe(s: ServicioPago): Adicional | null {
 
 function tdcDe(d: DevolucionPago, padre: ServicioPago | undefined): Adicional | null {
   if (d.conductorId === null || d.conductorId === d.padreConductorId) return null
-  if (padre && esCrosland(padre.cliente)) return null // CR-03/CR-04 en motorZonas
+  if (padre && esCrosland(padre.clienteId)) return null // CR-03/CR-04 en motorZonas
   const linea = {
     concepto: 'tdc' as const, fecha: d.fecha || null, servicio: servicioCodigo(d.padreName), regla: REGLAS.tdc,
     detalle: `Devolución de ${d.padreConductor ?? 'otro conductor'}${d.almacen ? ` en ${d.almacen}` : ''} · I12 ${d.devueltoMin === null ? 'sin marcar' : horaLabel(d.devueltoMin)}`,

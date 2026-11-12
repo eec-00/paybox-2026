@@ -24,7 +24,7 @@
 // ============================================================================
 
 import { sumarDias } from '@/lib/fechas'
-import { esPuerto } from './adicionalesConductores'
+import { CROSLAND_EXCLUIDOS, CROSLAND_ODOO_IDS, esPuerto } from './adicionalesConductores'
 import { servicioCodigo, type DevolucionPago, type ServicioPago } from './pagosConductores'
 
 export const VERSION_TARIFARIO = 'Tarifario v0.9 · 07/11/2026'
@@ -166,14 +166,15 @@ export type ReglaCrosland = keyof typeof REGLAS_CROSLAND
 
 export interface ClienteEspecial {
   clave: 'crosland'
-  /** partner_id de Odoo; null hasta registrarlo (mientras tanto se reconoce por nombre, con alerta) */
-  odooId: number | null
-  /** Texto que identifica al cliente en el nombre de Odoo («Crosland» en los tres documentos) */
+  /** partner_id de Odoo que se pagan con este contrato (empresa, sedes y contactos) */
+  odooIds: number[]
+  /** partner_id que llevan el nombre pero NO entran al contrato */
+  excluidos: number[]
   nombre: string
 }
 
 export const CLIENTES_ESPECIALES: ClienteEspecial[] = [
-  { clave: 'crosland', odooId: null, nombre: 'CROSLAND' },
+  { clave: 'crosland', nombre: 'CROSLAND', odooIds: Object.keys(CROSLAND_ODOO_IDS).map(Number), excluidos: Object.keys(CROSLAND_EXCLUIDOS).map(Number) },
 ]
 
 // ── Entrada ─────────────────────────────────────────────────────────────
@@ -280,12 +281,16 @@ export function camposNulos(e: EntradaMotor): string[] {
   return faltan
 }
 
-export function clienteEspecial(e: EntradaMotor): { cliente: ClienteEspecial; porNombre: boolean } | null {
-  for (const c of CLIENTES_ESPECIALES) {
-    if (c.odooId !== null && e.clienteId === c.odooId) return { cliente: c, porNombre: false }
-    if (c.odooId === null && normalizar(e.cliente).includes(normalizar(c.nombre))) return { cliente: c, porNombre: true }
-  }
-  return null
+export function clienteEspecial(e: EntradaMotor): ClienteEspecial | null {
+  return CLIENTES_ESPECIALES.find(c => e.clienteId !== null && c.odooIds.includes(e.clienteId)) ?? null
+}
+
+/** Cliente con nombre de contrato especial que no está en su lista (o excluido): se avisa, no se aplica */
+function nombreEspecialFueraDeLista(e: EntradaMotor): ClienteEspecial | null {
+  return CLIENTES_ESPECIALES.find(c => {
+    const n = normalizar(e.cliente)
+    return n.includes(normalizar(c.nombre)) || n.includes(normalizar(c.nombre).replace('OSL', 'OSSL'))
+  }) ?? null
 }
 
 function coincideDistrito(r: Regla, distrito: string): boolean {
@@ -382,9 +387,14 @@ export function simularTarifa(e: EntradaMotor): ResultadoMotor {
   // B1 · contrato especial de cliente
   const especial = clienteEspecial(e)
   if (especial) {
-    if (especial.porNombre) c.alertas.push(`Cliente reconocido como ${especial.cliente.nombre} por su nombre en Odoo («${e.cliente}»): falta registrar su partner_id`)
-    c.paso('B', true, `Contrato especial ${especial.cliente.nombre}: prima sobre la tarifa de zona`)
+    c.paso('B', true, `Contrato especial ${especial.nombre} (cliente ${e.clienteId}, lista confirmada por Margiory 12/11/2026): prima sobre la tarifa de zona`)
     return simularCrosland(c)
+  }
+  const parecido = nombreEspecialFueraDeLista(e)
+  if (parecido) {
+    c.alertas.push(e.clienteId !== null && parecido.excluidos.includes(e.clienteId)
+      ? `«${e.cliente}» lleva el nombre ${parecido.nombre} pero Margiory lo excluyó del contrato (12/11/2026): se calcula como cliente ordinario`
+      : `«${e.cliente}» lleva el nombre ${parecido.nombre} pero no está en la lista del contrato: se calcula como cliente ordinario; confirmar con Margiory`)
   }
 
   // B2 · ruta exacta
@@ -594,7 +604,7 @@ const mock = (over: Partial<EntradaMotor> & Pick<EntradaMotor, 'servicio'>): Ent
 })
 
 const acreditado = (distrito: string) => ({ distrito, acreditado: true, fuente: 'Caso de prueba controlado' })
-const CROSLAND = { clienteId: 9002, cliente: 'CROSLAND (mock)', zona: 'Zona 5' }
+const CROSLAND = { clienteId: 308, cliente: 'CROSLAND MOTOS S.A.C (mock)', zona: 'Zona 5' }
 
 export interface CasoDemo {
   /** P1–P3: pruebas obligatorias (ficha §4) · Ruta: ruta especial exacta (ficha §3-B) · Bloqueo: controles (ficha §3-D, §5.3) */
