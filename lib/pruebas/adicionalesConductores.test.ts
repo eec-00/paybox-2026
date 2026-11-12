@@ -94,15 +94,21 @@ describe('03/04/05 · Crosland', () => {
     expect(de(lista, 'cena')[0]).toMatchObject({ monto: 20 })
   })
 
-  it('caso Rosario: I08 21:30 → I12 23:00 → S/30 y sin ADHT', () => {
-    const lista = calc([crosland({ fin_descarga: H(21, 30), contenedor_devuelto: H(23) })])
-    expect(de(lista, 'crosland_devolucion')[0]).toMatchObject({ estado: 'simulado', monto: 30 })
-    expect(de(lista, 'adht')).toHaveLength(0)
+  it('Rosario 12/11: I08 21:30 → I12 23:20, la devolución va en la tarifa: solo cena S/20 (+ ADHT en revisión)', () => {
+    const lista = calc([crosland({ fin_descarga: H(21, 30), contenedor_devuelto: H(23, 20) })])
+    expect(lista.filter(a => a.estado === 'simulado').map(a => [a.concepto, a.monto])).toEqual([['cena', 20]])
+    expect(de(lista, 'adht')[0].estado).toBe('requiere_revision')
   })
 
-  it('otra hora no se extrapola: I08 20:00 → I12 23:00 → revisión', () => {
-    const [d] = de(calc([crosland({ fin_descarga: H(20), contenedor_devuelto: H(23) })]), 'crosland_devolucion')
-    expect(d.estado).toBe('requiere_revision')
+  it('Rosario 12/11: descarga 18:00 y devuelve después de las 19:00 → cena S/20, sin noche', () => {
+    const lista = calc([crosland({ fin_descarga: H(18), salida_cliente: H(18, 20), contenedor_devuelto: H(20, 10) })])
+    expect(de(lista, 'cena')[0]).toMatchObject({ estado: 'simulado', monto: 20, hitos: ['I08', 'I12'] })
+    expect(de(lista, 'crosland_nocturno')).toHaveLength(0)
+  })
+
+  it('amanecida no suma la noche (Rosario 12/11)', () => {
+    const lista = calc([crosland({ fin_descarga: H(24, 30), salida_cliente: H(24, 45) })])
+    expect(lista.filter(a => a.estado === 'simulado').map(a => a.concepto).sort()).toEqual(['cena', 'crosland_medianoche'])
   })
 
   it('sin I06 → revisión', () => {
@@ -112,14 +118,26 @@ describe('03/04/05 · Crosland', () => {
 })
 
 describe('06 · TDC fuera de Crosland', () => {
-  it('B devuelve el contenedor de otro cliente → revisión', () => {
+  const devB = (almacen: string, devueltoMin: number | null) => {
     const padre = servicio({ conductorId: 1, devolucionOtroConductor: true })
     const d: DevolucionPago = {
-      id: 99, name: 'Dev', etapa: 'Servicio Finalizado', conductorId: 2, conductor: 'B', almacen: 'DPW', fecha: '2026-11-10',
-      padreId: padre.id, padreName: padre.name, padreConductorId: 1, padreConductor: 'A', devueltoMin: H(16),
+      id: 99, name: 'Dev', etapa: 'Servicio Finalizado', conductorId: 2, conductor: 'B', almacen, fecha: '2026-11-10',
+      padreId: padre.id, padreName: padre.name, padreConductorId: 1, padreConductor: 'A', devueltoMin,
     }
-    const lista = calcularAdicionales({ servicios: [], devoluciones: [d], todos: [padre], conductorId: 2, asistencias: [], gastos: [] })
-    expect(de(lista, 'tdc')[0]).toMatchObject({ estado: 'requiere_revision', monto: null })
+    return de(calcularAdicionales({ servicios: [], devoluciones: [d], todos: [padre], conductorId: 2, asistencias: [], gastos: [] }), 'tdc')[0]
+  }
+
+  it('B devuelve en DPW o APM → S/30', () => {
+    expect(devB('DPW', H(16))).toMatchObject({ estado: 'simulado', monto: 30 })
+    expect(devB('APMT CALLAO', H(16))).toMatchObject({ estado: 'simulado', monto: 30 })
+  })
+
+  it('B devuelve en cualquier otro almacén → S/20', () => {
+    expect(devB('NEPTUNIA', H(16))).toMatchObject({ estado: 'simulado', monto: 20 })
+  })
+
+  it('sin I12 en la subtarea → revisión', () => {
+    expect(devB('DPW', null)).toMatchObject({ estado: 'requiere_revision', monto: null })
   })
 
   it('Crosland no genera TDC aquí (va en la tarifa base)', () => {
@@ -188,6 +206,20 @@ describe('10 · Bono', () => {
   it('sin I12 propio no es integral', () => {
     expect(integralidad(servicio({ horas: completo({ contenedor_devuelto: null }) }))).toBe('no')
   })
+  it('isotanque lleno/vacío completo cuenta; ITK y provincia no (Rosario 12/11)', () => {
+    const iso = (flujo: ServicioPago['flujo']) => {
+      const s = servicio({ flujo })
+      s.horarios.linea = [{ key: 'retiro', label: 'r', min: H(8), real: true }, { key: 'entrega', label: 'e', min: H(12), real: true }]
+      return s
+    }
+    expect(integralidad(iso('isotanque_lleno'))).toBe('integral')
+    expect(integralidad(iso('isotanque_vacio'))).toBe('integral')
+    expect(integralidad(iso('traslado_interno'))).toBe('excluido')
+    const prov = servicio({ flujo: 'despacho', atributos: { tipoServicio: 'Despacho', modalidad: 'Carga Suelta', tipoCarga: 'General', zona: 'Provincia' } })
+    prov.horarios.linea = prov.horarios.linea.map(h => ({ ...h, min: H(10) }))
+    expect(integralidad(prov)).toBe('excluido')
+  })
+
   it('despacho exige el flujo completo (D11 solo no basta)', () => {
     expect(integralidad(servicio({ flujo: 'despacho', horas: { salida_destino: H(15) } }))).toBe('no')
   })

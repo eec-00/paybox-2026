@@ -15,7 +15,8 @@
 // días después), ver lib/servicios/fechasHitos.ts.
 //
 // Fuera de cálculo automático: 08 · Pernocte (S/40) — no tiene hito disparador;
-// lo confirma Operaciones. El tramo base y el reparto Crosland A/B (06 · TDC
+// lo confirma Operaciones. 05 · Devolución posterior Crosland ya no se paga
+// aparte: va en la tarifa (Rosario, 12/11/2026). El tramo base y el reparto Crosland A/B (06 · TDC
 // de Crosland) los calcula motorZonas.ts.
 // ============================================================================
 
@@ -28,7 +29,6 @@ export type ConceptoAdicional =
   | 'adht'
   | 'crosland_nocturno'
   | 'crosland_medianoche'
-  | 'crosland_devolucion'
   | 'tdc'
   | 'retiro_0300'
   | 'maquina'
@@ -45,7 +45,6 @@ export const CONCEPTO_LABEL: Record<ConceptoAdicional, string> = {
   adht: '02 · ADHT devolución tardía',
   crosland_nocturno: '03 · Crosland nocturno',
   crosland_medianoche: '04 · Crosland medianoche',
-  crosland_devolucion: '05 · Crosland devolución posterior',
   tdc: '06 · TDC por otro conductor',
   retiro_0300: '07 · Retiro 03:00',
   maquina: '09 · Máquina',
@@ -79,26 +78,22 @@ export interface Adicional {
 }
 
 export const REGLAS: Record<ConceptoAdicional, string> = {
-  cena: 'Guía §3.01 · S/20. Importación: I08 (Fin descarga) después de las 19:00; despacho: D10. Si I08/D10 fue antes de las 19:00 pero el conductor siguió trabajando después (I09/D11, I10–I12), requiere revisión. Nunca I13/D12 ni hora de regreso a cochera.',
-  adht: 'Guía §3.02 · S/30 histórico. Hitos I10 → I11 → I12. No existe umbral general homologado: se muestran los horarios y queda en revisión. SSEE del depósito, cita ≥17:00, fin de cita 23:00 y tolerancia de 35 min NO activan el bono.',
+  cena: 'Guía §3.01 · S/20. Importación: I08 (Fin descarga) después de las 19:00; despacho: D10. Crosland: también si el mismo conductor devuelve (I12) después de las 19:00, porque la devolución va en su tarifa (Rosario, 12/11/2026). En otros clientes, si I08/D10 fue antes de las 19:00 pero el conductor siguió trabajando después (I09/D11, I10–I12), requiere revisión. Nunca I13/D12 ni hora de regreso a cochera.',
+  adht: 'Guía §3.02 · S/30 histórico. Hitos I10 → I11 → I12. No existe umbral general homologado: se muestran los horarios y queda en revisión. SSEE del depósito, cita ≥17:00, fin de cita 23:00 y tolerancia de 35 min NO activan el bono. Crosland: si corresponde ADHT se pagan S/30 en lugar de la cena (Rosario, 12/11/2026).',
   crosland_nocturno: 'Guía §3.03 · S/30 ref. Crosland, atención desde I06 (Ingreso cliente). Hito decisivo: I09 (Salida cliente) después de las 22:00, definido por Margiory el 10/11/2026. No usar I12 ni I13; no duplicar con ADHT.',
-  crosland_medianoche: 'Guía §3.04 · S/50 ref. Crosland, I06 → I08 con fecha completa: la descarga cruzó las 00:00. Sustituye los S/30 nocturnos; no se suman.',
-  crosland_devolucion: 'Guía §3.05 · S/30. Único caso validado por Rosario: I08 = 21:30 y el mismo conductor devuelve hasta aprox. I12 = 23:00. No se extrapola 23:00 como umbral general.',
-  tdc: 'Guía §3.06 · S/20 o S/30 según ruta y depósito. Repartos A/B documentados solo para Crosland; no se extrapolan a otros clientes ni a Chancay.',
+  crosland_medianoche: 'Guía §3.04 · S/50 ref. Crosland, I06 → I08 con fecha completa: la descarga cruzó las 00:00. Sustituye los S/30 nocturnos; no se suman (Rosario, 12/11/2026).',
+  tdc: 'Guía §3.06 · Otros clientes: el conductor B que devuelve el contenedor de otro cobra S/30 si lo devuelve en APM o DPW y S/20 en cualquier otro almacén (Rosario, 12/11/2026). Basta I12 en la subtarea asignada. Crosland va en la tarifa base (CR-03/CR-04).',
   retiro_0300: 'Guía §3.07 · S/20. Cita original Odoo de RETIRO exactamente a las 03:00; contrastar I01 (Inicio ruta), I02/I03 y foto de salida de cochera. No aplica a cita 03:30 ni a I01 aislado. Revisar incompatibilidad con pernocte.',
   maquina: 'Guía §3.09 · S/5 por día válido, máximo S/30 por semana (seis días). Fuente: módulo Asistencia de la app (entrada/salida) con servicio asignado ese día. No aplica a días sin servicio.',
-  bono: 'Guía §3.10 · S/100 semanal. Ocho Sxxxxx únicos y completos (sábado–viernes). Importación: I08/I09 + devolución propia I12. Despacho/exportación: flujo propio completo. Traslados internos de isotanque (ITK) y devoluciones por terceros NO son acumulables (Rosario, 11/11/2026).',
+  bono: 'Guía §3.10 · S/100 semanal. Ocho Sxxxxx únicos y completos (sábado–viernes). Importación: I08/I09 + devolución propia I12. Despacho/exportación: flujo propio completo. Las entregas de isotanque lleno o vacío sí cuentan. NO son acumulables: traslados internos de isotanque (ITK), viajes a provincia (fuera de Lima) y devoluciones por terceros (Rosario, 11 y 12/11/2026).',
   viatico: 'Guía §3.11 · S/35. Despacho a provincia con D06/D07/D08/D11, destino físico Odoo, autorización previa y comprobante. Excluye Chancay. D07 solo no activa el viático.',
-  gasto: 'Guía §3.12 · Importe realmente sustentado en el módulo Gastos de la app (comprobante). Diferenciar pendiente y pagado; no abonar dos veces lo ya desembolsado. Gastos en dólares: tipo de cambio venta del día (Rosario, 11/11/2026).',
+  gasto: 'Guía §3.12 · Importe realmente sustentado en el módulo Gastos de la app (comprobante). Diferenciar pendiente y pagado; no abonar dos veces lo ya desembolsado. Gastos en dólares: tipo de cambio venta de la SBS del día del gasto (Rosario, 12/11/2026).',
   no_devolucion: 'Guía §3.13 · Incidencia. Ausencia de I12 no prueba por sí sola la falta de devolución; Operaciones puede acreditarla. Descuento histórico S/20: PROHIBIDO AUTOMATIZAR.',
 }
 
 const ETAPA_FINALIZADA = 'Servicio Finalizado'
 const MIN_19 = 19 * 60
-const MIN_2130 = 21 * 60 + 30
 const MIN_22 = 22 * 60
-const MIN_2230 = 22 * 60 + 30
-const MIN_2330 = 23 * 60 + 30
 const MIN_24 = 24 * 60
 const CITA_0300 = 3 * 60
 const MAQUINA_DIA = 5
@@ -174,6 +169,14 @@ function cenaDe(s: ServicioPago): Adicional | null {
   if (fin !== null && fin > MIN_19) {
     return sim({ ...base, monto: 20, detalle: `${marca(s, keyFin, codFin)} (Fin descarga)`, hitos: [codFin], claves: [keyFin] })
   }
+  // Crosland: la devolución propia va en la tarifa; si termina después de las 19:00 se paga la cena
+  const i12 = hora(s, 'contenedor_devuelto')
+  if (s.flujo === 'importacion' && esCrosland(s.cliente) && !s.devolucionOtroConductor && i12 !== null && i12 > MIN_19) {
+    return sim({
+      ...base, monto: 20, detalle: `${fin === null ? `${codFin} sin marcar` : marca(s, keyFin, codFin)}; ${marca(s, 'contenedor_devuelto', 'I12')} (devolución propia)`,
+      hitos: [codFin, 'I12'], claves: [keyFin, 'contenedor_devuelto'],
+    })
+  }
   const posterior = def.despues.map(([k, c]) => [k, c, hora(s, k)] as const).find(([, , m]) => m !== null && m > MIN_19)
   if (!posterior) return null
   const [k, c] = posterior
@@ -195,7 +198,7 @@ function adhtDe(s: ServicioPago): Adicional | null {
   }, 'Sin umbral aprobado: Margiory propone I10 + cita ≥17:00 acreditada como SSEE, pero la guía y el piloto prohíben usar SSEE como disparador automático. Decisión pendiente de PMO')
 }
 
-// ── 03/04/05 · Crosland ─────────────────────────────────────────────────
+// ── 03/04 · Crosland ─────────────────────────────────────────────────
 
 function croslandDe(s: ServicioPago): Adicional | null {
   if (s.flujo !== 'importacion' || !esCrosland(s.cliente)) return null
@@ -220,16 +223,8 @@ function croslandDe(s: ServicioPago): Adicional | null {
     return sim({ ...linea, monto: medianoche ? 50 : 30 })
   }
 
-  // 05 · solo el caso validado (mismo conductor devuelve)
-  const i12 = s.devolucionOtroConductor ? null : hora(s, 'contenedor_devuelto')
-  if (i08 === null || i12 === null || i12 < MIN_22) return null
-  const linea = {
-    ...base, concepto: 'crosland_devolucion' as const, regla: REGLAS.crosland_devolucion,
-    detalle: `${[['fin_descarga', 'I08'], ...RECONSTRUCCION].map(([k, c]) => marca(s, k, c)).join(' → ')} · evidencia de Operaciones por contrastar`,
-    hitos: ['I08', 'I09', 'I10', 'I11', 'I12'], claves: ['fin_descarga', ...RECONSTRUCCION.map(([k]) => k)],
-  }
-  if (i08 === MIN_2130 && i12 >= MIN_2230 && i12 <= MIN_2330) return sim({ ...linea, monto: 30 })
-  return rev(linea, 'Solo el caso I08 21:30 → I12 23:00 está validado; no se extrapola')
+  // 05 · la devolución propia no se paga aparte: va en la tarifa y suma la cena (Rosario, 12/11/2026)
+  return null
 }
 
 // ── 06 · TDC fuera de Crosland ──────────────────────────────────────────
@@ -237,11 +232,13 @@ function croslandDe(s: ServicioPago): Adicional | null {
 function tdcDe(d: DevolucionPago, padre: ServicioPago | undefined): Adicional | null {
   if (d.conductorId === null || d.conductorId === d.padreConductorId) return null
   if (padre && esCrosland(padre.cliente)) return null // CR-03/CR-04 en motorZonas
-  return rev({
-    concepto: 'tdc', fecha: d.fecha || null, servicio: servicioCodigo(d.padreName), regla: REGLAS.tdc,
+  const linea = {
+    concepto: 'tdc' as const, fecha: d.fecha || null, servicio: servicioCodigo(d.padreName), regla: REGLAS.tdc,
     detalle: `Devolución de ${d.padreConductor ?? 'otro conductor'}${d.almacen ? ` en ${d.almacen}` : ''} · I12 ${d.devueltoMin === null ? 'sin marcar' : horaLabel(d.devueltoMin)}`,
     hitos: ['I12'], servicioIds: [d.padreId], claves: [],
-  }, 'Reparto A/B solo documentado para Crosland: importe según ruta y depósito por definir')
+  }
+  if (d.devueltoMin === null) return rev(linea, 'Sin I12 en la subtarea de devolución')
+  return sim({ ...linea, monto: esPuerto(d.almacen) ? 30 : 20 })
 }
 
 // ── 07 · Retiro 03:00 ───────────────────────────────────────────────────
@@ -280,10 +277,15 @@ function maquinaDe(servicios: ServicioPago[], asistencias: AsistenciaPago[]): Ad
 
 // ── 10 · Bono ───────────────────────────────────────────────────────────
 
-/** 'excluido': completo, pero Rosario (11/11) lo deja fuera del bono (ITK o devolución por tercero) */
+/** 'excluido': completo, pero Rosario (11 y 12/11) lo deja fuera del bono (ITK, provincia o devolución por tercero) */
 type Integralidad = 'integral' | 'excluido' | 'no'
 
 export function integralidad(s: ServicioPago): Integralidad {
+  const i = integralidadFlujo(s)
+  return i === 'integral' && s.atributos.zona === 'Provincia' ? 'excluido' : i
+}
+
+function integralidadFlujo(s: ServicioPago): Integralidad {
   const operativos = s.horarios.linea.filter(h => h.key !== 'servicio_finalizado')
   const completo = operativos.length > 0 && operativos.every(h => h.min !== null)
   switch (s.flujo) {
@@ -295,10 +297,10 @@ export function integralidad(s: ServicioPago): Integralidad {
     }
     case 'despacho':
     case 'exportacion':
-      return completo ? 'integral' : 'no'
-    case 'traslado_interno':
     case 'isotanque_lleno':
     case 'isotanque_vacio':
+      return completo ? 'integral' : 'no'
+    case 'traslado_interno':
       return completo ? 'excluido' : 'no'
     default:
       return 'no'
@@ -320,7 +322,7 @@ function bonoDe(servicios: ServicioPago[]): Adicional | null {
   return sim({
     concepto: 'bono' as const, fecha: null, servicio: null, regla: REGLAS.bono, hitos: ['I08/I09', 'I12', 'flujo completo'],
     servicioIds: integrales.map(cod => ids.get(cod)!), claves: [], monto: 100,
-    detalle: `${integrales.length} integrales completos${excluidos ? ` · ${excluidos} no acumulable(s) (ITK / devolución por tercero)` : ''} · evidencia EIR/ticket/portal por contrastar`,
+    detalle: `${integrales.length} integrales completos${excluidos ? ` · ${excluidos} no acumulable(s) (ITK / provincia / devolución por tercero)` : ''} · evidencia EIR/ticket/portal por contrastar`,
   })
 }
 
@@ -350,7 +352,7 @@ function gastoDe(g: GastoPago, servicios: ServicioPago[]): Adicional {
     detalle: `${g.descripcion ?? 'Gasto'} · ${g.moneda === 'dolares' ? 'US$' : 'S/'} ${g.monto.toFixed(2)} · ${g.fotos} comprobante(s)`,
   }
   if (g.estado === 'pagado') return { ...base, monto: g.monto, estado: 'pagado', motivo: null }
-  if (g.moneda !== 'soles') return rev(base, `Gasto en dólares: convertir con el tipo de cambio venta del ${g.fecha ?? 'día del gasto'} (aún no se carga en el sistema)`)
+  if (g.moneda !== 'soles') return rev(base, `Gasto en dólares: convertir con el tipo de cambio venta SBS del ${g.fecha ?? 'día del gasto'} (aún no se carga en el sistema)`)
   if (g.fotos === 0) return rev(base, 'Sin comprobante adjunto')
   return sim({ ...base, monto: g.monto })
 }
@@ -387,7 +389,7 @@ export interface EntradaAdicionales {
 }
 
 const ORDEN: ConceptoAdicional[] = [
-  'cena', 'adht', 'crosland_nocturno', 'crosland_medianoche', 'crosland_devolucion', 'tdc', 'retiro_0300',
+  'cena', 'adht', 'crosland_nocturno', 'crosland_medianoche', 'tdc', 'retiro_0300',
   'maquina', 'bono', 'viatico', 'gasto', 'no_devolucion',
 ]
 
