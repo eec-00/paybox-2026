@@ -383,10 +383,11 @@ export function PagosConductoresSection() {
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
         Tarifa base: distrito físico acreditado, ruta especial exacta o contrato Crosland (A integral S/ 90; A S/ 70 + B S/ 20,
-        o S/ 30 en DPW/APMT), según el {VERSION_TARIFARIO}. Adicionales (guía v1.0): 01 Cena S/ 20 (I08/D10 después de las 19:00) ·
-        02 ADHT (sin umbral, en revisión) · 03/04 Crosland nocturno S/ 30 / medianoche S/ 50 (I06→I08) · 05 Crosland devolución
-        posterior S/ 30 (solo caso 21:30→23:00) · 06 TDC fuera de Crosland (en revisión) · 07 Retiro 03:00 S/ 20 · 09 Máquina
-        S/ 5 por día (máx. S/ 30) · 10 Bono S/ 100 con 8 integrales · 11 Viático (en revisión) · 12 Gastos con comprobante ·
+        o S/ 30 en DPW/APMT), según el {VERSION_TARIFARIO}. Adicionales (guía v1.0): 01 Cena S/ 20 (I08/D10 después de las 19:00;
+        en Crosland también por devolución propia después de las 19:00) · 02 ADHT (sin umbral, en revisión) · 03/04 Crosland
+        nocturno S/ 30 / medianoche S/ 50 · 05 Crosland devolución posterior: va en la tarifa, no se paga aparte · 06 TDC fuera de
+        Crosland S/ 20 (S/ 30 en APM/DPW) · 07 Retiro 03:00 S/ 20 · 09 Máquina S/ 5 por día (máx. S/ 30) · 10 Bono S/ 100 con
+        8 integrales (sin ITK ni provincia) · 11 Viático (en revisión) · 12 Gastos con comprobante ·
         13 No devolución (incidencia, nunca descuento). 08 Pernocte no se calcula: lo confirma Operaciones. La semana va de
         sábado a viernes; el básico mensual no se incluye.
       </p>
@@ -416,7 +417,6 @@ const CONCEPTO_ESTILO: Record<Adicional['concepto'], EstiloConcepto> = {
   adht: { icon: Undo2, soft: 'bg-teal-100 text-teal-700', text: 'text-teal-700', highlight: 'border-teal-400 bg-teal-50', solid: 'bg-teal-500', solidSoft: 'bg-teal-200' },
   crosland_nocturno: { icon: Moon, soft: 'bg-indigo-100 text-indigo-700', text: 'text-indigo-700', highlight: 'border-indigo-400 bg-indigo-50', solid: 'bg-indigo-500', solidSoft: 'bg-indigo-200' },
   crosland_medianoche: { icon: Moon, soft: 'bg-violet-100 text-violet-700', text: 'text-violet-700', highlight: 'border-violet-400 bg-violet-50', solid: 'bg-violet-500', solidSoft: 'bg-violet-200' },
-  crosland_devolucion: { icon: Undo2, soft: 'bg-indigo-100 text-indigo-700', text: 'text-indigo-700', highlight: 'border-indigo-400 bg-indigo-50', solid: 'bg-indigo-500', solidSoft: 'bg-indigo-200' },
   tdc: { icon: Truck, soft: 'bg-teal-100 text-teal-700', text: 'text-teal-700', highlight: 'border-teal-400 bg-teal-50', solid: 'bg-teal-500', solidSoft: 'bg-teal-200' },
   retiro_0300: { icon: AlarmClock, soft: 'bg-sky-100 text-sky-700', text: 'text-sky-700', highlight: 'border-sky-400 bg-sky-50', solid: 'bg-sky-500', solidSoft: 'bg-sky-200' },
   maquina: { icon: Gauge, soft: 'bg-slate-100 text-slate-700', text: 'text-slate-700', highlight: 'border-slate-400 bg-slate-50', solid: 'bg-slate-500', solidSoft: 'bg-slate-200' },
