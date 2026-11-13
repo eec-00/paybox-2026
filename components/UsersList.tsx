@@ -50,13 +50,13 @@ function ModulePermsBadges({ user }: { user: UserProfile }) {
   }
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-wrap gap-1.5 max-w-sm">
       {enabled.map((key) => {
         const access = mp[key]
         const fullAccess = access.can_create && access.can_edit && access.can_delete
         return (
           <div key={key} className="flex items-center gap-1">
-            <span className="inline-flex px-1.5 py-0.5 text-xs font-medium bg-primary/10 text-primary rounded">
+            <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary rounded">
               {MODULE_LABELS[key] ?? key}
             </span>
             {!fullAccess && !SOLO_VER.includes(key) && (
@@ -392,15 +392,15 @@ export function UsersList() {
 
       {/* Dialog para editar permisos */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="sm:max-w-2xl max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 p-0">
+          <DialogHeader className="px-6 pt-6 pb-4">
             <DialogTitle>Editar Permisos de Usuario</DialogTitle>
             <DialogDescription>
               Modifica el rol y permisos de {selectedUser?.email}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-5 overflow-y-auto border-y px-6 py-5">
             {/* Selector de Rol */}
             <div className="space-y-2">
               <Label>Rol del Usuario</Label>
@@ -439,10 +439,10 @@ export function UsersList() {
 
             {/* Editor de módulos (solo para roles no privilegiados) */}
             {editRole !== 'admin' && editRole !== 'developer' && (
-              <div className="space-y-3 border-t pt-3">
+              <div className="space-y-3">
                 <div>
                   <Label>Acceso por módulo</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Activa un módulo para habilitarlo. Puedes desactivar acciones específicas dentro de cada uno.
                   </p>
                 </div>
@@ -489,7 +489,7 @@ export function UsersList() {
             )}
           </div>
 
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 px-6 py-4">
             <Button
               variant="outline"
               onClick={() => setDialogOpen(false)}
