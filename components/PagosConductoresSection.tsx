@@ -385,9 +385,9 @@ export function PagosConductoresSection() {
         Tarifa base: distrito físico acreditado, ruta especial exacta o contrato Crosland (A integral S/ 90; A S/ 70 + B S/ 20,
         o S/ 30 en DPW/APMT), según el {VERSION_TARIFARIO}. Adicionales (guía v1.0): 01 Cena S/ 20 (I08/D10 después de las 19:00;
         en Crosland también por devolución propia después de las 19:00) · 02 ADHT (sin umbral, en revisión) · 03/04 Crosland
-        nocturno S/ 30 / medianoche S/ 50 · 05 Crosland devolución posterior: va en la tarifa, no se paga aparte · 06 TDC fuera de
+        nocturno S/ 30 / medianoche S/ 50 (I09 después de las 22:00 / 00:00) · 05 Crosland devolución posterior: va en la tarifa, no se paga aparte · 06 TDC fuera de
         Crosland S/ 20 (S/ 30 en APM/DPW) · 07 Retiro 03:00 S/ 20 · 09 Máquina S/ 5 por día (máx. S/ 30) · 10 Bono S/ 100 con
-        8 integrales (sin ITK ni provincia) · 11 Viático (en revisión) · 12 Gastos con comprobante ·
+        8 integrales (sin ITK ni provincia) · 11 Viático (en revisión) · 12 Gastos con comprobante (dólares al TC venta SBS del día) ·
         13 No devolución (incidencia, nunca descuento). 08 Pernocte no se calcula: lo confirma Operaciones. La semana va de
         sábado a viernes; el básico mensual no se incluye.
       </p>

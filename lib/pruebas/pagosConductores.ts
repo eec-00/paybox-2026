@@ -101,6 +101,8 @@ export interface GastoPago {
   fotos: number
   /** Fecha de registro en Lima */
   fecha: string
+  /** Solo dólares: tipo de cambio venta SBS aplicable (null si aún no está publicado) */
+  tipoCambio?: { valor: number; fecha: string } | null
 }
 
 /** Nombre del atributo en Odoo → clave en AtributosServicio */

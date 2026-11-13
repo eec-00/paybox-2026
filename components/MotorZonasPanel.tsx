@@ -4,7 +4,7 @@ import { Fragment, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, ShieldAlert } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
-  CASOS_DEMO, VERSION_TARIFARIO, entradaDesdeOdoo, simularTarifa, type ResultadoMotor,
+  CASOS_DEMO, GRUPOS_CASO, VERSION_TARIFARIO, entradaDesdeOdoo, simularTarifa, type ResultadoMotor,
 } from '@/lib/pruebas/motorZonas'
 import type { DevolucionPago, ServicioPago } from '@/lib/pruebas/pagosConductores'
 
@@ -22,6 +22,8 @@ function EstadoBadge({ r }: { r: ResultadoMotor }) {
 interface Fila {
   key: string
   etiqueta: string | null
+  /** Prueba obligatoria de la ficha (P1–P3) */
+  prueba?: string
   titulo: string
   esperado: string | null
   r: ResultadoMotor
@@ -45,7 +47,7 @@ function TablaResultados({ filas }: { filas: Fila[] }) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {filas.map(({ key, etiqueta, titulo, esperado, r }) => {
+        {filas.map(({ key, etiqueta, prueba, titulo, esperado, r }) => {
           const abierto = abiertos.includes(key)
           return (
             <Fragment key={key}>
@@ -54,6 +56,7 @@ function TablaResultados({ filas }: { filas: Fila[] }) {
                   {abierto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </TableCell>
                 <TableCell className="font-medium whitespace-nowrap">
+                  {prueba && <span className="mr-1 rounded bg-primary px-1.5 py-0.5 text-[11px] font-bold text-primary-foreground" title="Prueba obligatoria de la ficha de ejecución">{prueba}</span>}
                   {etiqueta && <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-[11px] font-bold">{etiqueta}</span>}
                   {r.servicio}
                   {r.origen === 'mock' && <span className="ml-1.5 text-[11px] text-muted-foreground">(mock)</span>}
@@ -124,8 +127,11 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
   const [abierto, setAbierto] = useState(true)
   const [verSemana, setVerSemana] = useState(false)
 
-  const demo: Fila[] = useMemo(() => CASOS_DEMO.map(c => ({
-    key: c.entrada.servicio, etiqueta: c.prueba, titulo: c.titulo, esperado: c.esperado, r: simularTarifa(c.entrada),
+  const demo = useMemo(() => (Object.keys(GRUPOS_CASO) as (keyof typeof GRUPOS_CASO)[]).map(grupo => ({
+    grupo,
+    filas: CASOS_DEMO.filter(c => c.grupo === grupo).map((c): Fila => ({
+      key: c.entrada.servicio, etiqueta: c.etiqueta, prueba: c.prueba, titulo: c.titulo, esperado: c.esperado, r: simularTarifa(c.entrada),
+    })),
   })), [])
 
   const reales: Fila[] = useMemo(() => servicios.map(s => {
@@ -147,7 +153,7 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
         className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold"
       >
         <ChevronDown className={`h-4 w-4 transition-transform ${abierto ? '' : '-rotate-90'}`} />
-        Motor de tarifas por zona Odoo · demo PMO-69
+        Motor de tarifas · casos de prueba
         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Simulación</span>
       </button>
       {abierto && (
@@ -161,17 +167,15 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
             </p>
           </div>
 
-          <div className="overflow-x-auto">
-            <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Casos de prueba controlados (datos mock)
-            </p>
-            <p className="px-4 pb-2 text-xs text-muted-foreground">
-              <strong>P1–P3:</strong> las tres pruebas obligatorias de la ficha (Ate vs. SJL, Crosland A/B, Lurín General vs. IMO).{' '}
-              <strong>Ruta:</strong> ruta especial con itinerario exacto del Excel.{' '}
-              <strong>Bloqueo:</strong> controles que deben frenar el cálculo cuando falta un dato o una decisión.
-            </p>
-            <TablaResultados filas={demo} />
-          </div>
+          {demo.map(({ grupo, filas }) => (
+            <div key={grupo} className="overflow-x-auto">
+              <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {GRUPOS_CASO[grupo].titulo} · {filas.length} casos (datos mock)
+              </p>
+              <p className="px-4 pb-2 text-xs text-muted-foreground">{GRUPOS_CASO[grupo].descripcion}</p>
+              <TablaResultados filas={filas} />
+            </div>
+          ))}
 
           <div className="overflow-x-auto">
             <button

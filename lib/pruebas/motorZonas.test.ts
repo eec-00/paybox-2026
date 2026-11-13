@@ -25,7 +25,23 @@ describe('catálogo = Excel v0.9', () => {
     expect(regla('Z2-LIMA-GEN')).toMatchObject({ distrito: 'Lima (Cercado)', monto: 80 })
   })
 
-  it('13 rutas; solo las «MATCH EXACTO / POR APROBAR» se simulan', () => {
+  it('casos por zona: los 12 distritos × 3 tipos, cada uno con el importe del Excel', () => {
+    const zona = CASOS_DEMO.filter(c => c.grupo === 'zona')
+    expect(zona).toHaveLength(36)
+    expect(new Set(zona.map(c => c.etiqueta))).toEqual(new Set(['Zona 1', 'Zona 2', 'Zona 3', 'Zona 4', 'Zona 5', 'Zona 6', 'Zona 7']))
+    for (const c of [...zona, ...CASOS_DEMO.filter(x => x.grupo === 'ruta')]) {
+      expect(simularTarifa(c.entrada).total, c.titulo).toBe(Number(c.esperado.replace('SIMULADO S/', '')))
+    }
+  })
+
+  it('las tres pruebas obligatorias de la ficha (§4) siguen marcadas', () => {
+    const de = (p: string) => CASOS_DEMO.filter(c => c.prueba === p).map(c => c.entrada.servicio)
+    expect(de('P1')).toEqual(expect.arrayContaining(['S91111', 'S91121', 'S90003']))
+    expect(de('P2')).toEqual(['S90011', 'S90012', 'S90013', 'S90014'])
+    expect(de('P3')).toEqual(expect.arrayContaining(['S91171', 'S91172', 'S90023']))
+  })
+
+  it('13 rutas; solo las aprobadas por Margiory (RT08, RT10, RT11) se simulan', () => {
     expect(RUTAS_ESPECIALES).toHaveLength(13)
     expect(RUTAS_ESPECIALES.filter(r => r.simulable).map(r => r.id)).toEqual(['RT08', 'RT10', 'RT11'])
   })
@@ -40,11 +56,11 @@ describe('catálogo = Excel v0.9', () => {
 
 describe('P1 · Zona 4: Ate frente a San Juan de Lurigancho', () => {
   it('Ate → S/80', () => {
-    expect(correr('S90001')).toMatchObject({ estado: 'simulado', total: 80, ruleIds: ['Z4-ATE-GEN'] })
+    expect(correr('S91111')).toMatchObject({ estado: 'simulado', total: 80, ruleIds: ['Z4-ATE-GEN'] })
   })
 
   it('SJL → S/90, misma zona', () => {
-    expect(correr('S90002')).toMatchObject({ estado: 'simulado', total: 90, ruleIds: ['Z4-SAN-JUAN-DE-LURIGANCHO-GEN'] })
+    expect(correr('S91121')).toMatchObject({ estado: 'simulado', total: 90, ruleIds: ['Z4-SAN-JUAN-DE-LURIGANCHO-GEN'] })
   })
 
   it('sin dirección acreditada → revisión sin importe', () => {
@@ -54,33 +70,33 @@ describe('P1 · Zona 4: Ate frente a San Juan de Lurigancho', () => {
   })
 
   it('destino no acreditado → revisión', () => {
-    const e = { ...caso('S90001'), destino: { distrito: 'Ate', acreditado: false, fuente: 'nombre de tarea' } }
+    const e = { ...caso('S91111'), destino: { distrito: 'Ate', acreditado: false, fuente: 'nombre de tarea' } }
     expect(simularTarifa(e).estado).toBe('requiere_revision')
   })
 
   it('distrito solo propuesto en el Excel (Bellavista) no hereda Callao', () => {
-    const e = { ...caso('S90001'), zona: 'Zona 1', destino: { distrito: 'Bellavista', acreditado: true, fuente: 'x' } }
+    const e = { ...caso('S91111'), zona: 'Zona 1', destino: { distrito: 'Bellavista', acreditado: true, fuente: 'x' } }
     expect(simularTarifa(e)).toMatchObject({ estado: 'requiere_revision', total: null })
   })
 
   it('exportación y 20 pies pagan igual que importación 40 (Margiory, 10/11)', () => {
-    const r = simularTarifa({ ...caso('S90001'), tipoServicio: 'Exportación', modalidad: 'Contenedor 20' })
+    const r = simularTarifa({ ...caso('S91111'), tipoServicio: 'Exportación', modalidad: 'Contenedor 20' })
     expect(r).toMatchObject({ estado: 'simulado', total: 80 })
     expect(r.alertas.join(' ')).not.toMatch(/por confirmar/)
   })
 
   it('Ate figura como confirmado por Margiory; Callao no', () => {
-    expect(correr('S90001').alertas.join(' ')).toMatch(/CONFIRMADA POR MARGIORY/)
-    const callao = simularTarifa({ ...caso('S90001'), zona: 'Zona 1', destino: { distrito: 'Callao', acreditado: true, fuente: 'x' } })
+    expect(correr('S91111').alertas.join(' ')).toMatch(/CONFIRMADA POR MARGIORY/)
+    const callao = simularTarifa({ ...caso('S91111'), zona: 'Zona 1', destino: { distrito: 'Callao', acreditado: true, fuente: 'x' } })
     expect(callao.alertas.join(' ')).toMatch(/NO APROBADA/)
   })
 
   it('servicio de marzo 2026 ya está dentro de la vigencia', () => {
-    expect(simularTarifa({ ...caso('S90021'), fecha: '2026-03-02' }).estado).toBe('simulado')
+    expect(simularTarifa({ ...caso('S91171'), fecha: '2026-03-02' }).estado).toBe('simulado')
   })
 
   it('«Lima» acreditado coincide con «Lima (Cercado)»', () => {
-    const e = { ...caso('S90001'), zona: 'Zona 2', destino: { distrito: 'Lima', acreditado: true, fuente: 'x' } }
+    const e = { ...caso('S91111'), zona: 'Zona 2', destino: { distrito: 'Lima', acreditado: true, fuente: 'x' } }
     expect(simularTarifa(e).ruleIds).toEqual(['Z2-LIMA-GEN'])
   })
 })
@@ -122,9 +138,9 @@ describe('P2 · Crosland', () => {
 
 describe('P3 · Lurín', () => {
   it('General S/100 · IMO S/110 · IQBF S/110', () => {
-    expect(correr('S90021')).toMatchObject({ total: 100, ruleIds: ['Z7-LURIN-GEN'] })
-    expect(correr('S90022')).toMatchObject({ total: 110, ruleIds: ['Z7-LURIN-IMO'] })
-    expect(simularTarifa({ ...caso('S90022'), tipoCarga: 'IQBF' }).total).toBe(110)
+    expect(correr('S91171')).toMatchObject({ total: 100, ruleIds: ['Z7-LURIN-GEN'] })
+    expect(correr('S91172')).toMatchObject({ total: 110, ruleIds: ['Z7-LURIN-IMO'] })
+    expect(simularTarifa({ ...caso('S91172'), tipoCarga: 'IQBF' }).total).toBe(110)
   })
 
   it('fecha anterior a la fuente → bloqueo por vigencia', () => {
@@ -187,7 +203,7 @@ describe('entradaDesdeOdoo', () => {
   const linea = (key: string, label: string, min: number | null) => ({ key, label, min, real: true })
   const s: ServicioPago = {
     id: 5, name: 'S03117 - Servicio', fecha: '2026-11-10', etapa: 'Servicio Finalizado', cliente: 'CROSLAND MOTOS S.A.C',
-    clienteId: 77, conductorId: 1, conductor: 'A', placa: null, horaCita: null, flujo: 'importacion',
+    clienteId: 308, conductorId: 1, conductor: 'A', placa: null, horaCita: null, flujo: 'importacion',
     devolucionOtroConductor: true,
     horarios: { inicio: null, fin: null, devolucion: null, linea: [linea('fin_descarga', 'Fin descarga', 14 * 60), linea('salida_cliente', 'Salida de cliente', null)] },
     atributos: { tipoServicio: 'Importación', modalidad: 'Contenedor 40', tipoCarga: 'General', zona: 'Zona 5' },
@@ -214,7 +230,26 @@ describe('entradaDesdeOdoo', () => {
   })
 
   it('ordinario real sin destino estructurado → revisión', () => {
-    const e = entradaDesdeOdoo({ ...s, cliente: 'OTRO', devolucionOtroConductor: false }, [])
+    const e = entradaDesdeOdoo({ ...s, cliente: 'OTRO', clienteId: 9001, devolucionOtroConductor: false }, [])
     expect(simularTarifa(e).motivos[0]).toMatch(/Destino físico/)
+  })
+
+  it('Margiory 12/11: Hertford y Crosland Repuestos van con tarifa Crosland', () => {
+    for (const [clienteId, cliente] of [[317, 'HERTFORD AUTOMOTRIZ S.A.'], [421, 'CROSLAND REPUESTOS S.A.C., Almacén Callao']] as const) {
+      expect(simularTarifa(entradaDesdeOdoo({ ...s, clienteId, cliente }, [d])).ruleIds).toEqual(['CR-02', 'CR-04'])
+    }
+  })
+
+  it('Crosland Técnica y Crossland Facturas no entran al contrato: ordinario con alerta', () => {
+    for (const [clienteId, cliente] of [[804, 'CROSLAND TECNICA S.A.'], [918, 'CROSLAND MOTOS S.A.C, Crossland Facturas']] as const) {
+      const r = simularTarifa(entradaDesdeOdoo({ ...s, clienteId, cliente, devolucionOtroConductor: false }, []))
+      expect(r.ruleIds.some(id => id.startsWith('CR-'))).toBe(false)
+      expect(r.alertas.join(' ')).toMatch(/excluyó del contrato/)
+    }
+  })
+
+  it('nombre Crosland fuera de la lista → ordinario con alerta para confirmar', () => {
+    const r = simularTarifa(entradaDesdeOdoo({ ...s, clienteId: 5555, cliente: 'CROSLAND NUEVA SEDE', devolucionOtroConductor: false }, []))
+    expect(r.alertas.join(' ')).toMatch(/no está en la lista/)
   })
 })

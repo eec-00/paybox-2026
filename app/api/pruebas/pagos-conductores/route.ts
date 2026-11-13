@@ -7,6 +7,7 @@ import {
   detectTipoServicio, getHitosForTask, type TaskTypeFlags,
 } from '@/lib/servicios/hitos'
 import { fechaLima, registrosPorStep, sumarDias, tiemposHitos } from '@/lib/servicios/fechasHitos'
+import { consultarSerieTcSbs, tipoCambioDelDia } from '@/lib/pruebas/tipoCambioSbs'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -289,6 +290,13 @@ export async function GET(request: Request) {
       fotos: Array.isArray(g.fotos) ? g.fotos.length : 0,
       fecha: fechaLima(g.created_at as string),
     }))
+
+    // Gastos en dólares: tipo de cambio venta SBS del día del gasto (BCRP)
+    const fechasDolares = gastos.filter(g => g.moneda === 'dolares').map(g => g.fecha).sort()
+    if (fechasDolares.length) {
+      const serie = await consultarSerieTcSbs(sumarDias(fechasDolares[0], -10), fechasDolares[fechasDolares.length - 1])
+      for (const g of gastos) if (g.moneda === 'dolares') g.tipoCambio = tipoCambioDelDia(serie, g.fecha)
+    }
 
     return NextResponse.json({ servicios, devoluciones, asistencias, gastos, rango: { start, end } })
   } catch (error: unknown) {
