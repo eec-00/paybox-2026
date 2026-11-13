@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { isAdmin, getUserPermissions, getCurrentUserProfile } from '@/lib/utils/auth'
+import { seccionesPermitidas } from '@/lib/utils/modulos'
 import { Sidebar } from '@/components/Sidebar'
 import { ProfileSettingsModal } from '@/components/ProfileSettingsModal'
 import { UpdatesNotification } from '@/components/UpdatesNotification'
@@ -56,14 +57,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       const permissions = await getUserPermissions()
       setCanCreate(permissions.can_create)
 
-      if (!adminStatus && profile?.module_permissions) {
-        const mp = profile.module_permissions
-        const sections: string[] = []
-        if (mp.pagos?.enabled)          sections.push('finanzas')
-        if (mp.servicios?.enabled)      sections.push('servicios')
-        if (mp.automatizacion?.enabled) sections.push('automatizacion')
-        if (mp.rrhh?.enabled)           sections.push('rrhh')
-        setAllowedModules(sections)
+      // Siempre una lista para quien no es admin: así Pruebas (opt-in) no se
+      // cuela cuando el perfil no tiene permisos por módulo.
+      if (!adminStatus && profile) {
+        setAllowedModules(seccionesPermitidas(profile))
       }
 
       setLoading(false)

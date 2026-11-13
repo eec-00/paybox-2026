@@ -319,7 +319,7 @@ export function Sidebar({
       label: 'Pruebas',
       icon: FlaskConical,
       description: 'Módulos en prueba',
-      adminOnly: true,
+      adminOnly: false,
       children: [
         {
           type: 'item',
@@ -328,7 +328,7 @@ export function Sidebar({
           label: 'Pagos Conductores',
           icon: Wallet,
           description: 'Pago por servicio según zona',
-          adminOnly: true,
+          adminOnly: false,
         },
       ],
     },
@@ -351,7 +351,7 @@ export function Sidebar({
   const visibleItems = menuItems
     .filter((item) => {
       if (item.adminOnly && !isAdmin) return false
-      if (item.id === 'bienvenida' || item.id === 'sunat' || item.id === 'detracciones') return true
+      if (item.id === 'bienvenida') return true
       if (item.type === 'group') {
         return canSeeModule(item.id) || item.children.some((c) => canSeeModule(c.id))
       }
@@ -361,8 +361,7 @@ export function Sidebar({
       if (
         item.type === 'group' &&
         allowedModules !== null &&
-        !allowedModules.includes(item.id) &&
-        item.id !== 'sunat'
+        !allowedModules.includes(item.id)
       ) {
         return { ...item, children: item.children.filter((c) => canSeeModule(c.id)) }
       }

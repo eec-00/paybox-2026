@@ -6,6 +6,8 @@ interface ModuleDef {
   id: keyof ModulePermissions
   label: string
   desc: string
+  /** Solo se decide si lo ve o no (sin Crear / Editar / Eliminar) */
+  viewOnly?: boolean
 }
 
 const MODULES: ModuleDef[] = [
@@ -13,6 +15,9 @@ const MODULES: ModuleDef[] = [
   { id: 'servicios',      label: 'Módulo de Servicios',      desc: 'Trailers, Flota y Sobrecostos' },
   { id: 'automatizacion', label: 'Módulo de Automatización', desc: 'Conductores, Tractos y Carretas' },
   { id: 'rrhh',           label: 'Recursos Humanos',         desc: 'Vacaciones y Asistencia' },
+  { id: 'sunat',          label: 'SUNAT',                    desc: 'GRE Transportistas y Bienes Fiscalizables', viewOnly: true },
+  { id: 'detracciones',   label: 'Detracciones',             desc: 'Conciliación con Banco de la Nación', viewOnly: true },
+  { id: 'pruebas',        label: 'Pruebas',                  desc: 'Módulos en prueba (Pagos Conductores)', viewOnly: true },
 ]
 
 interface Props {
@@ -21,13 +26,16 @@ interface Props {
   disabled?: boolean
 }
 
-function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) {
+function Toggle({ checked, onChange, disabled, label }: { checked: boolean; onChange: () => void; disabled?: boolean; label: string }) {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
       onClick={onChange}
       disabled={disabled}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-40 disabled:cursor-not-allowed ${
         checked ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
       }`}
     >
@@ -37,6 +45,12 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
     </button>
   )
 }
+
+const CRUD: { field: keyof Omit<ModuleAccess, 'enabled'>; label: string }[] = [
+  { field: 'can_create', label: 'Crear' },
+  { field: 'can_edit',   label: 'Editar' },
+  { field: 'can_delete', label: 'Eliminar' },
+]
 
 export function ModulePermissionsEditor({ value, onChange, disabled }: Props) {
   // Perfiles guardados antes de que existiera un módulo no tienen su clave
@@ -60,56 +74,78 @@ export function ModulePermissionsEditor({ value, onChange, disabled }: Props) {
     updateModule(id, { [field]: !perms[id][field] })
   }
 
-  return (
-    <div className="space-y-3">
-      {MODULES.map((mod) => {
-        const access = perms[mod.id]
-        return (
-          <div key={mod.id} className="border rounded-lg overflow-hidden">
-            {/* Header del módulo */}
-            <div
-              className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent/40 transition-colors select-none"
-              onClick={() => !disabled && toggleModule(mod.id)}
-            >
-              <div>
-                <p className="font-medium text-sm">{mod.label}</p>
-                <p className="text-xs text-muted-foreground">{mod.desc}</p>
-              </div>
-              <Toggle checked={access.enabled} onChange={() => toggleModule(mod.id)} disabled={disabled} />
-            </div>
+  const renderRow = (mod: ModuleDef) => {
+    const access = perms[mod.id]
+    return (
+      <li
+        key={mod.id}
+        className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_auto_auto] items-center gap-x-5 gap-y-2.5 px-4 py-3"
+      >
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => toggleModule(mod.id)}
+          className="text-left min-w-0 disabled:cursor-not-allowed"
+        >
+          <span className="block text-sm font-medium leading-tight">{mod.label}</span>
+          <span className="block text-xs text-muted-foreground mt-0.5">{mod.desc}</span>
+        </button>
 
-            {/* Métodos HTTP (CRUD) — solo si el módulo está habilitado */}
-            {access.enabled && (
-              <div className="border-t bg-muted/30 px-3 py-2 flex gap-4">
-                {(
-                  [
-                    { field: 'can_create', label: 'Crear' },
-                    { field: 'can_edit',   label: 'Editar' },
-                    { field: 'can_delete', label: 'Eliminar' },
-                  ] as { field: keyof Omit<ModuleAccess, 'enabled'>; label: string }[]
-                ).map(({ field, label }) => (
-                  <label
-                    key={field}
-                    className="flex items-center gap-1.5 cursor-pointer select-none"
-                    onClick={(e) => { e.stopPropagation(); !disabled && toggleCrud(mod.id, field) }}
-                  >
-                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                      access[field] ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'
-                    }`}>
-                      {access[field] && (
-                        <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none">
-                          <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </div>
-                    <span className="text-xs font-medium">{label}</span>
-                  </label>
-                ))}
-              </div>
-            )}
+        {/* Acciones: siempre ocupan su lugar para que la fila no salte al activar */}
+        {!mod.viewOnly && (
+          <div
+            className={`col-span-2 sm:col-span-1 row-start-2 sm:row-start-auto flex items-center gap-4 transition-opacity ${
+              access.enabled ? '' : 'opacity-35 pointer-events-none'
+            }`}
+            aria-hidden={!access.enabled}
+          >
+            {CRUD.map(({ field, label }) => (
+              <button
+                key={field}
+                type="button"
+                role="checkbox"
+                aria-checked={access[field]}
+                disabled={disabled || !access.enabled}
+                tabIndex={access.enabled ? 0 : -1}
+                onClick={() => toggleCrud(mod.id, field)}
+                className="flex items-center gap-1.5 text-xs font-medium select-none rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >
+                <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                  access[field] ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'
+                }`}>
+                  {access[field] && (
+                    <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none">
+                      <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </span>
+                {label}
+              </button>
+            ))}
           </div>
-        )
-      })}
+        )}
+
+        <Toggle
+          checked={access.enabled}
+          onChange={() => toggleModule(mod.id)}
+          disabled={disabled}
+          label={`Acceso a ${mod.label}`}
+        />
+      </li>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <ul className="divide-y rounded-lg border">
+        {MODULES.filter(m => !m.viewOnly).map(renderRow)}
+      </ul>
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground">Secciones de solo lectura: se decide si las ve o no</p>
+        <ul className="divide-y rounded-lg border">
+          {MODULES.filter(m => m.viewOnly).map(renderRow)}
+        </ul>
+      </div>
     </div>
   )
 }

@@ -13,13 +13,25 @@ export interface ModulePermissions {
   automatizacion: ModuleAccess
   /** Recursos Humanos: Vacaciones + Asistencia */
   rrhh: ModuleAccess
+  /** SUNAT (GRE Transportistas y Bienes Fiscalizables). Solo "ver". */
+  sunat: ModuleAccess
+  /** Detracciones. Solo "ver". */
+  detracciones: ModuleAccess
+  /** Módulos en prueba (hoy: Pagos Conductores). Solo "ver". */
+  pruebas: ModuleAccess
 }
 
+// sunat y detracciones nacieron visibles para todos: por defecto siguen
+// habilitados, así los perfiles guardados antes de que existieran no pierden
+// acceso. Pruebas es opt-in: nadie que no sea admin lo ve hasta que se lo den.
 export const DEFAULT_MODULE_PERMISSIONS: ModulePermissions = {
   pagos:          { enabled: false, can_create: false, can_edit: false, can_delete: false },
   servicios:      { enabled: false, can_create: false, can_edit: false, can_delete: false },
   automatizacion: { enabled: false, can_create: false, can_edit: false, can_delete: false },
   rrhh:           { enabled: false, can_create: false, can_edit: false, can_delete: false },
+  sunat:          { enabled: true,  can_create: false, can_edit: false, can_delete: false },
+  detracciones:   { enabled: true,  can_create: false, can_edit: false, can_delete: false },
+  pruebas:        { enabled: false, can_create: false, can_edit: false, can_delete: false },
 }
 
 export interface UserProfile {

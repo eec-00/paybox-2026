@@ -11,6 +11,7 @@ import { consultarSerieTcSbs, tipoCambioDelDia } from '@/lib/pruebas/tipoCambioS
 import { CAMPO_FECHA_DEVOLUCION, citaDevolucionMin } from '@/lib/servicios/citas'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { puedeVerModulo } from '@/lib/utils/modulos'
 
 
 
@@ -86,18 +87,18 @@ function calcularHorarios(task: TaskRow, registros: Record<number, string>): Hor
  */
 export async function GET(request: Request) {
   try {
-    // La pantalla es solo para administradores; el permiso también debe valer acá
+    // El permiso de ver Pruebas (panel de usuarios) también debe valer acá
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('role')
+      .select('role, module_permissions')
       .eq('id', user.id)
       .single()
 
-    if (!profile || !['admin', 'developer'].includes(profile.role)) {
+    if (!puedeVerModulo(profile, 'pruebas')) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 })
     }
 
