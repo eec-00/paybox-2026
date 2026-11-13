@@ -6,6 +6,8 @@ interface ModuleDef {
   id: keyof ModulePermissions
   label: string
   desc: string
+  /** Solo se decide si lo ve o no (sin Crear / Editar / Eliminar) */
+  viewOnly?: boolean
 }
 
 const MODULES: ModuleDef[] = [
@@ -13,6 +15,9 @@ const MODULES: ModuleDef[] = [
   { id: 'servicios',      label: 'Módulo de Servicios',      desc: 'Trailers, Flota y Sobrecostos' },
   { id: 'automatizacion', label: 'Módulo de Automatización', desc: 'Conductores, Tractos y Carretas' },
   { id: 'rrhh',           label: 'Recursos Humanos',         desc: 'Vacaciones y Asistencia' },
+  { id: 'sunat',          label: 'SUNAT',                    desc: 'GRE Transportistas y Bienes Fiscalizables', viewOnly: true },
+  { id: 'detracciones',   label: 'Detracciones',             desc: 'Conciliación con Banco de la Nación', viewOnly: true },
+  { id: 'pruebas',        label: 'Pruebas',                  desc: 'Módulos en prueba (Pagos Conductores)', viewOnly: true },
 ]
 
 interface Props {
@@ -79,7 +84,7 @@ export function ModulePermissionsEditor({ value, onChange, disabled }: Props) {
             </div>
 
             {/* Métodos HTTP (CRUD) — solo si el módulo está habilitado */}
-            {access.enabled && (
+            {access.enabled && !mod.viewOnly && (
               <div className="border-t bg-muted/30 px-3 py-2 flex gap-4">
                 {(
                   [

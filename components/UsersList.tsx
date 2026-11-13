@@ -20,7 +20,13 @@ const MODULE_LABELS: Record<string, string> = {
   servicios:      'Servicios',
   automatizacion: 'Automatización',
   rrhh:           'Recursos Humanos',
+  sunat:          'SUNAT',
+  detracciones:   'Detracciones',
+  pruebas:        'Pruebas',
 }
+
+// Módulos donde solo se decide si lo ven (sin Crear / Editar / Eliminar)
+const SOLO_VER: string[] = ['sunat', 'detracciones', 'pruebas']
 
 const CRUD_LABELS = [
   { key: 'can_create', label: 'C' },
@@ -33,11 +39,11 @@ function ModulePermsBadges({ user }: { user: UserProfile }) {
     return <span className="text-xs text-muted-foreground">Todos los permisos</span>
   }
 
-  const mp = user.module_permissions
-  if (!mp) {
+  if (!user.module_permissions) {
     return <span className="text-xs text-muted-foreground">Todos los módulos</span>
   }
 
+  const mp = { ...DEFAULT_MODULE_PERMISSIONS, ...user.module_permissions }
   const enabled = (Object.keys(mp) as (keyof typeof mp)[]).filter((k) => mp[k]?.enabled)
   if (enabled.length === 0) {
     return <span className="text-xs text-muted-foreground">Sin acceso</span>
@@ -53,7 +59,7 @@ function ModulePermsBadges({ user }: { user: UserProfile }) {
             <span className="inline-flex px-1.5 py-0.5 text-xs font-medium bg-primary/10 text-primary rounded">
               {MODULE_LABELS[key] ?? key}
             </span>
-            {!fullAccess && (
+            {!fullAccess && !SOLO_VER.includes(key) && (
               <span className="flex gap-0.5">
                 {CRUD_LABELS.map(({ key: ck, label }) => (
                   <span
