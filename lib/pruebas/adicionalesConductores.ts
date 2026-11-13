@@ -79,7 +79,7 @@ export interface Adicional {
 
 export const REGLAS: Record<ConceptoAdicional, string> = {
   cena: 'Guía §3.01 · S/20. Importación: I08 (Fin descarga) después de las 19:00; despacho: D10. Crosland: también si el mismo conductor devuelve (I12) después de las 19:00, porque la devolución va en su tarifa (Rosario, 12/11/2026). En otros clientes, si I08/D10 fue antes de las 19:00 pero el conductor siguió trabajando después (I09/D11, I10–I12), requiere revisión. Nunca I13/D12 ni hora de regreso a cochera.',
-  adht: 'S/30. Regla de Margiory (10/11/2026), confirmada el 12/11/2026 en lugar de la guía §3.02: I10 (Llegada a depósito) a las 17:00 o después, con cita de devolución a las 17:00 o después acreditada como SSEE. Si el conductor ingresa (I11) antes de la cita, no corresponde: ya lo cubre la máquina. Crosland: el ADHT reemplaza a la cena (Rosario, 12/11/2026).',
+  adht: 'S/30. Regla de Margiory (10/11/2026), confirmada el 12/11/2026 en lugar de la guía §3.02: I10 (Llegada a depósito) a las 17:00 o después, con cita de devolución a las 17:00 o después (Servicio Extraordinario, SSEE: el mismo conductor hace retiro, traslado y devolución de vacío). Si el conductor ingresa (I11) antes de la cita, no corresponde: ya lo cubre la máquina. Crosland: el ADHT reemplaza a la cena (Rosario, 12/11/2026).',
   crosland_nocturno: 'Guía §3.03 · S/30 ref. Crosland, atención desde I06 (Ingreso cliente). Hito decisivo: I09 (Salida cliente) después de las 22:00, definido por Margiory el 10/11/2026. No usar I12 ni I13; no duplicar con ADHT.',
   crosland_medianoche: 'Guía §3.04 · S/50 ref. Crosland, atención desde I06. Hito decisivo: I09 (Salida cliente) después de las 00:00, igual que el nocturno (Margiory, 12/11/2026). Sustituye los S/30 nocturnos; no se suman (Rosario, 12/11/2026).',
   tdc: 'Guía §3.06 · Otros clientes: el conductor B que devuelve el contenedor de otro cobra S/30 si lo devuelve en APM o DPW y S/20 en cualquier otro almacén (Rosario, 12/11/2026). Basta I12 en la subtarea asignada. Crosland va en la tarifa base (CR-03/CR-04).',
@@ -217,7 +217,8 @@ function adhtDe(s: ServicioPago): Adicional | null {
   const i10 = hora(s, 'llegada_devolucion')
   if (i10 === null || i10 < MIN_17) return null
   const cita = s.citaDevolucion ?? null
-  // Cita sin día en Odoo: se asume el día de programación hasta tener «Cita de devolución» con fecha y hora
+  // SSEE (Servicio Extraordinario): el mismo conductor hace retiro + traslado + devolución de vacío
+  // y la cita de devolución es de 17:00 en adelante. Cita = Fecha de Devolucion + Hora de Devolucion.
   if (cita !== null && cita < MIN_17) return null
   const i11 = hora(s, 'ingreso_devolucion')
   if (cita !== null && i11 !== null && i11 < cita) return null
@@ -228,7 +229,6 @@ function adhtDe(s: ServicioPago): Adicional | null {
     umbral: { min: MIN_17, label: 'Límite 17:00' },
   }
   if (cita === null) return rev(linea, 'Falta la hora de la cita de devolución en Odoo (hoy la cita solo se adjunta como archivo)')
-  if (s.citaDevolucionSsee !== true) return rev(linea, 'Falta acreditar que la cita de devolución es SSEE: Odoo todavía no tiene dónde registrarlo')
   return sim({ ...linea, monto: 30 })
 }
 

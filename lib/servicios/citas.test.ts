@@ -1,26 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { aplicarCitasNuevas, citaLima, diasEntre } from './citas'
+import { citaDevolucionMin, diasEntre } from './citas'
 
-describe('citas con fecha y hora (Odoo guarda UTC, Perú es UTC−5)', () => {
-  it('convierte el datetime de Odoo a fecha y hora de Lima', () => {
-    expect(citaLima('2026-11-14 08:00:00')).toEqual({ fecha: '2026-11-14', hora: 3 })
-    expect(citaLima('2026-11-15 03:30:00')).toEqual({ fecha: '2026-11-14', hora: 22.5 })
+describe('cita de devolución = Fecha de Devolucion + Hora de Devolucion', () => {
+  it('mismo día del recojo', () => {
+    expect(citaDevolucionMin('2026-11-14', '2026-11-14', 18)).toBe(1080)
   })
 
-  it('vacío o inválido → null', () => {
-    expect(citaLima(false)).toBeNull()
-    expect(citaLima('')).toBeNull()
-    expect(citaLima('basura')).toBeNull()
+  it('otro día → suma días en minutos', () => {
+    expect(citaDevolucionMin('2026-11-14', '2026-11-15', 9.5)).toBe(1440 + 570)
   })
 
-  it('el campo nuevo reemplaza a la hora antigua; vacío deja la antigua', () => {
-    const conNueva = aplicarCitasNuevas({
-      x_studio_hora_de_cita: 9, x_studio_fecha_y_hora_de_cita_de_retiro: '2026-11-14 08:00:00',
-      x_studio_hora_de_devolucion: 0, x_studio_fecha_y_hora_de_cita_de_devolucion: '2026-11-14 23:00:00',
-    })
-    expect(conNueva).toMatchObject({ x_studio_hora_de_cita: 3, x_studio_hora_de_devolucion: 18 })
-    const sinNueva = aplicarCitasNuevas({ x_studio_hora_de_cita: 9, x_studio_fecha_y_hora_de_cita_de_retiro: false })
-    expect(sinNueva.x_studio_hora_de_cita).toBe(9)
+  it('sin fecha de devolución → mismo día del recojo', () => {
+    expect(citaDevolucionMin('2026-11-14', false, 18)).toBe(1080)
+  })
+
+  it('sin hora (vacío o 00:00) → null', () => {
+    expect(citaDevolucionMin('2026-11-14', '2026-11-15', false)).toBeNull()
+    expect(citaDevolucionMin('2026-11-14', '2026-11-15', 0)).toBeNull()
   })
 
   it('días entre fechas', () => {
