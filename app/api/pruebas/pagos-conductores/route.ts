@@ -34,7 +34,7 @@ const BASE_FIELDS = ['name', 'stage_id', 'partner_id', 'sale_line_id', 'x_studio
 // conductor, tipo de flujo) — se validan con fields_get por si alguno no
 // existe en Odoo.
 const ADICIONAL_FIELDS = [
-  'x_studio_hora_de_cita', 'x_studio_almacen_de_devolucion',
+  'x_studio_hora_de_cita', 'x_studio_hora_de_devolucion', 'x_studio_almacen_de_devolucion', 'x_studio_almacen_de_destino',
   MODALIDAD_DEVOLUCION_FIELD, MODALIDAD_RETIRO_FIELD,
   ...TIPO_SERVICIO_BOOL_FIELDS, ...ALL_HITO_FIELDS,
 ]
@@ -184,8 +184,19 @@ export async function GET(request: Request) {
       for (const [taskId, filas] of Array.from(filasPorTask.entries())) registrosPorTask.set(taskId, registrosPorStep(filas))
     }
 
+    // Distrito del «Almacén de Destino» de cada tarea (dirección de entrega del cliente en Odoo)
+    const destinoIds = Array.from(new Set(tasks.map(t => t.x_studio_almacen_de_destino).filter(Array.isArray).map(v => (v as [number, string])[0])))
+    const distritoDe = new Map<number, string | null>()
+    if (destinoIds.length) {
+      const dirs = await odooCall<{ id: number; l10n_pe_district?: M2O }[]>(
+        uid, 'res.partner', 'read', [destinoIds], { fields: ['l10n_pe_district'], context: { active_test: false } },
+      ).catch(() => [])
+      for (const d of dirs) distritoDe.set(d.id, d.l10n_pe_district ? d.l10n_pe_district[1] : null)
+    }
+
     const vacio: AtributosServicio = { tipoServicio: null, modalidad: null, tipoCarga: null, zona: null }
     const servicios: ServicioPago[] = tasks.map(t => {
+      const dest = Array.isArray(t.x_studio_almacen_de_destino) ? t.x_studio_almacen_de_destino as [number, string] : null
       const productId = t.sale_line_id ? productBySaleLine.get(t.sale_line_id[0]) : null
       return {
         id: t.id,
@@ -203,6 +214,9 @@ export async function GET(request: Request) {
         flujo: detectTipoServicio(t),
         devolucionOtroConductor: t[MODALIDAD_DEVOLUCION_FIELD] === MODALIDAD_OTRO_CONDUCTOR,
         horarios: calcularHorarios(t, registrosPorTask.get(t.id) ?? {}),
+        citaDevolucion: typeof t.x_studio_hora_de_devolucion === 'number' && t.x_studio_hora_de_devolucion !== 0
+          ? Math.round(t.x_studio_hora_de_devolucion * 60) : null,
+        almacenDestino: dest ? { id: dest[0], nombre: dest[1], distrito: distritoDe.get(dest[0]) ?? null } : null,
       }
     })
 

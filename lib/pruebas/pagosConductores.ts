@@ -41,6 +41,12 @@ export interface ServicioPago {
   /** Importación cuya devolución de vacío queda a cargo de otro conductor */
   devolucionOtroConductor: boolean
   horarios: HorariosServicio
+  /** Hora de la cita de devolución en minutos («Hora de Devolución» de Odoo; solo hora, sin día). null si no hay */
+  citaDevolucion?: number | null
+  /** Cita de devolución acreditada como SSEE del depósito. undefined: Odoo aún no tiene dónde registrarlo */
+  citaDevolucionSsee?: boolean
+  /** «Almacén de Destino» de la tarea en Odoo (dirección de entrega del cliente) con su distrito */
+  almacenDestino?: { id: number; nombre: string; distrito: string | null } | null
 }
 
 /** Horarios marcados por el conductor, en minutos desde la medianoche del

@@ -234,6 +234,22 @@ describe('entradaDesdeOdoo', () => {
     expect(simularTarifa(e).motivos[0]).toMatch(/Destino físico/)
   })
 
+  it('distrito del Almacén de Destino de Odoo → simulado con alerta de fuente por confirmar', () => {
+    const base = { ...s, clienteId: 326, cliente: 'QUIMTIA S.A.', devolucionOtroConductor: false, atributos: { ...s.atributos, zona: 'Zona 4' } }
+    const r = simularTarifa(entradaDesdeOdoo({ ...base, almacenDestino: { id: 875, nombre: 'FOSFORERA PERUANA S.A., ATE LA MOLINA', distrito: 'Ate' } }, []))
+    expect(r).toMatchObject({ estado: 'simulado', total: 80, ruleIds: ['Z4-ATE-GEN'] })
+    expect(r.alertas.join(' ')).toMatch(/fuente por confirmar con Operaciones/)
+  })
+
+  it('Almacén de Destino: distrito de otra zona, sin distrito o exportación → revisión', () => {
+    const base = { ...s, clienteId: 326, cliente: 'QUIMTIA S.A.', devolucionOtroConductor: false }
+    const lurin = { id: 1, nombre: 'X, LURIN', distrito: 'Lurin' }
+    expect(simularTarifa(entradaDesdeOdoo({ ...base, almacenDestino: lurin }, [])).motivos[0]).toMatch(/no coinciden/)
+    expect(simularTarifa(entradaDesdeOdoo({ ...base, almacenDestino: { ...lurin, distrito: null } }, [])).motivos[0]).toMatch(/no acreditado/)
+    const expo = { ...base, atributos: { ...base.atributos, tipoServicio: 'Exportación', zona: 'Zona 7' }, almacenDestino: lurin }
+    expect(simularTarifa(entradaDesdeOdoo(expo, [])).motivos[0]).toMatch(/Destino físico/)
+  })
+
   it('Margiory 12/11: Hertford y Crosland Repuestos van con tarifa Crosland', () => {
     for (const [clienteId, cliente] of [[317, 'HERTFORD AUTOMOTRIZ S.A.'], [421, 'CROSLAND REPUESTOS S.A.C., Almacén Callao']] as const) {
       expect(simularTarifa(entradaDesdeOdoo({ ...s, clienteId, cliente }, [d])).ruleIds).toEqual(['CR-02', 'CR-04'])

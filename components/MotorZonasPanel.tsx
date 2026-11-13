@@ -190,8 +190,9 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
             {verSemana && (
               <>
                 <p className="px-4 pb-1 text-xs text-muted-foreground">
-                  El destino físico y el itinerario todavía no son datos estructurados en Odoo: hasta que Operaciones confirme
-                  la fuente, los servicios ordinarios quedan en revisión. Los tramos se acreditan con hitos de la app
+                  El distrito sale del «Almacén de Destino» de cada servicio en Odoo (dirección de entrega del cliente), con
+                  alerta hasta que Operaciones confirme esa fuente. Exportación y rutas especiales quedan en revisión: falta
+                  el dato de la planta del cliente y del itinerario. Los tramos se acreditan con hitos de la app
                   (I08/I09, I12, D10/D11), nunca con el cierre administrativo.
                 </p>
                 {reales.length > 0
