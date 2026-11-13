@@ -22,6 +22,8 @@ function EstadoBadge({ r }: { r: ResultadoMotor }) {
 interface Fila {
   key: string
   etiqueta: string | null
+  /** Prueba obligatoria de la ficha (P1–P3) */
+  prueba?: string
   titulo: string
   esperado: string | null
   r: ResultadoMotor
@@ -45,7 +47,7 @@ function TablaResultados({ filas }: { filas: Fila[] }) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {filas.map(({ key, etiqueta, titulo, esperado, r }) => {
+        {filas.map(({ key, etiqueta, prueba, titulo, esperado, r }) => {
           const abierto = abiertos.includes(key)
           return (
             <Fragment key={key}>
@@ -54,6 +56,7 @@ function TablaResultados({ filas }: { filas: Fila[] }) {
                   {abierto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </TableCell>
                 <TableCell className="font-medium whitespace-nowrap">
+                  {prueba && <span className="mr-1 rounded bg-primary px-1.5 py-0.5 text-[11px] font-bold text-primary-foreground" title="Prueba obligatoria de la ficha de ejecución">{prueba}</span>}
                   {etiqueta && <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-[11px] font-bold">{etiqueta}</span>}
                   {r.servicio}
                   {r.origen === 'mock' && <span className="ml-1.5 text-[11px] text-muted-foreground">(mock)</span>}
@@ -127,7 +130,7 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
   const demo = useMemo(() => (Object.keys(GRUPOS_CASO) as (keyof typeof GRUPOS_CASO)[]).map(grupo => ({
     grupo,
     filas: CASOS_DEMO.filter(c => c.grupo === grupo).map((c): Fila => ({
-      key: c.entrada.servicio, etiqueta: c.etiqueta, titulo: c.titulo, esperado: c.esperado, r: simularTarifa(c.entrada),
+      key: c.entrada.servicio, etiqueta: c.etiqueta, prueba: c.prueba, titulo: c.titulo, esperado: c.esperado, r: simularTarifa(c.entrada),
     })),
   })), [])
 

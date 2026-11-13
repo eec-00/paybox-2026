@@ -613,6 +613,8 @@ export interface CasoDemo {
   grupo: GrupoCaso
   /** Etiqueta corta de la fila (Zona 4, RT08, CR-01, Control) */
   etiqueta: string
+  /** Prueba obligatoria de la ficha de ejecución (§4) que cubre el caso */
+  prueba?: 'P1' | 'P2' | 'P3'
   titulo: string
   esperado: string
   entrada: EntradaMotor
@@ -622,7 +624,14 @@ export const GRUPOS_CASO: Record<GrupoCaso, { titulo: string; descripcion: strin
   zona: { titulo: 'Tarifario por zona', descripcion: 'Hoja 00_TARIFARIO_MICHAEL: cada distrito de las zonas 1 a 7 con contenedor carga general, contenedor IMO/IQBF y despacho de carga suelta.' },
   ruta: { titulo: 'Rutas especiales aprobadas', descripcion: 'Hoja 02_RUTAS_Y_EXCEPCIONES: las tres rutas aprobadas por Margiory (10/11/2026), con itinerario exacto. Las demás se mantienen sin activar.' },
   crosland: { titulo: 'Excepción Crosland', descripcion: 'Hoja 02_RUTAS_Y_EXCEPCIONES, CR-01 a CR-04: integral, reparto A/B y devolución en DPW/APMT.' },
-  control: { titulo: 'Controles', descripcion: 'Casos en que el motor debe frenar el cálculo porque falta un dato o una decisión: nunca se paga por deducción.' },
+  control: { titulo: 'Controles', descripcion: 'Casos en que el motor debe frenar el cálculo porque falta un dato o una decisión: nunca se paga por deducción (ficha de ejecución §3-C, §3-D y §5).' },
+}
+
+/** Pruebas obligatorias de la ficha de ejecución §4 (hoja del Excel v0.9): P1 Ate vs SJL, P2 Crosland A/B, P3 Lurín */
+const PRUEBAS_FICHA: Record<string, 'P1' | 'P2' | 'P3'> = {
+  S91111: 'P1', S91121: 'P1', S90003: 'P1',
+  S90011: 'P2', S90012: 'P2', S90013: 'P2', S90014: 'P2',
+  S91171: 'P3', S91172: 'P3', S90023: 'P3', S90024: 'P3',
 }
 
 const TIPOS_CASO = [
@@ -642,7 +651,7 @@ const CASOS_ZONA: CasoDemo[] = FILAS.flatMap(fila => {
   }))
 })
 
-export const CASOS_DEMO: CasoDemo[] = [
+const CASOS_BASE: CasoDemo[] = [
   ...CASOS_ZONA,
   { grupo: 'ruta', etiqueta: 'RT08', titulo: 'Callao – Melchorita · contenedor carga general', esperado: 'SIMULADO S/200',
     entrada: mock({ servicio: 'S90033', zona: 'Provincia', itinerario: 'CALLAO - MELCHORITA' }) },
@@ -675,3 +684,8 @@ export const CASOS_DEMO: CasoDemo[] = [
   { grupo: 'control', etiqueta: 'Control', titulo: 'Servicio sin variante en Odoo', esperado: 'REQUIERE REVISIÓN: campos nulos',
     entrada: mock({ servicio: 'S90036', zona: null, modalidad: null, tipoCarga: null }) },
 ]
+
+export const CASOS_DEMO: CasoDemo[] = CASOS_BASE.map(c => {
+  const prueba = PRUEBAS_FICHA[c.entrada.servicio]
+  return prueba ? { ...c, prueba } : c
+})

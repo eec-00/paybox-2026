@@ -34,6 +34,13 @@ describe('catálogo = Excel v0.9', () => {
     }
   })
 
+  it('las tres pruebas obligatorias de la ficha (§4) siguen marcadas', () => {
+    const de = (p: string) => CASOS_DEMO.filter(c => c.prueba === p).map(c => c.entrada.servicio)
+    expect(de('P1')).toEqual(expect.arrayContaining(['S91111', 'S91121', 'S90003']))
+    expect(de('P2')).toEqual(['S90011', 'S90012', 'S90013', 'S90014'])
+    expect(de('P3')).toEqual(expect.arrayContaining(['S91171', 'S91172', 'S90023']))
+  })
+
   it('13 rutas; solo las aprobadas por Margiory (RT08, RT10, RT11) se simulan', () => {
     expect(RUTAS_ESPECIALES).toHaveLength(13)
     expect(RUTAS_ESPECIALES.filter(r => r.simulable).map(r => r.id)).toEqual(['RT08', 'RT10', 'RT11'])
