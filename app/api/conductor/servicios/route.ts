@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS } from '@/lib/servicios/hitos'
 import { finalizadoPorEtapa } from '@/lib/servicios/progreso'
 import { odooAuth, odooCall } from '@/lib/odoo'
+import { CAMPOS_CITA, aplicarCitasNuevas } from '@/lib/servicios/citas'
 // Datos operativos en vivo (hitos, GPS, servicios recién creados como subtareas
 // de devolución) — nunca debe servirse cacheado, ni la ruta ni los fetch a Odoo.
 export const dynamic = 'force-dynamic'
@@ -14,6 +15,7 @@ const BASE_FIELDS = ['name', 'stage_id', 'partner_id', 'date_deadline', 'parent_
 const CANDIDATE_FIELDS = [
   'x_studio_fecha_de_la_programacin',
   'x_studio_hora_de_cita',
+  ...CAMPOS_CITA,
   'x_studio_placa',
   'x_studio_placa_carreta',
   'x_studio_conductor',
@@ -109,10 +111,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const tasks = await odooCall<any[]>(
+    const tasks = (await odooCall<any[]>(
       uid, 'project.task', 'search_read', [domain],
       { fields, order: 'name desc', limit: 500 }
-    )
+    )).map(aplicarCitasNuevas)
 
     // Las subtareas (ej. "Devolución de vacío") se crean duplicando una
     // plantilla en blanco (ver automatización de Odoo), no copiando los datos
