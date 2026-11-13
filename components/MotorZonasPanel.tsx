@@ -4,7 +4,7 @@ import { Fragment, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, ShieldAlert } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
-  CASOS_DEMO, VERSION_TARIFARIO, entradaDesdeOdoo, simularTarifa, type ResultadoMotor,
+  CASOS_DEMO, GRUPOS_CASO, VERSION_TARIFARIO, entradaDesdeOdoo, simularTarifa, type ResultadoMotor,
 } from '@/lib/pruebas/motorZonas'
 import type { DevolucionPago, ServicioPago } from '@/lib/pruebas/pagosConductores'
 
@@ -124,8 +124,11 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
   const [abierto, setAbierto] = useState(true)
   const [verSemana, setVerSemana] = useState(false)
 
-  const demo: Fila[] = useMemo(() => CASOS_DEMO.map(c => ({
-    key: c.entrada.servicio, etiqueta: c.prueba, titulo: c.titulo, esperado: c.esperado, r: simularTarifa(c.entrada),
+  const demo = useMemo(() => (Object.keys(GRUPOS_CASO) as (keyof typeof GRUPOS_CASO)[]).map(grupo => ({
+    grupo,
+    filas: CASOS_DEMO.filter(c => c.grupo === grupo).map((c): Fila => ({
+      key: c.entrada.servicio, etiqueta: c.etiqueta, titulo: c.titulo, esperado: c.esperado, r: simularTarifa(c.entrada),
+    })),
   })), [])
 
   const reales: Fila[] = useMemo(() => servicios.map(s => {
@@ -161,17 +164,15 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
             </p>
           </div>
 
-          <div className="overflow-x-auto">
-            <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Casos de prueba controlados (datos mock)
-            </p>
-            <p className="px-4 pb-2 text-xs text-muted-foreground">
-              <strong>P1–P3:</strong> las tres pruebas obligatorias de la ficha (Ate vs. SJL, Crosland A/B, Lurín General vs. IMO).{' '}
-              <strong>Ruta:</strong> ruta especial con itinerario exacto del Excel.{' '}
-              <strong>Bloqueo:</strong> controles que deben frenar el cálculo cuando falta un dato o una decisión.
-            </p>
-            <TablaResultados filas={demo} />
-          </div>
+          {demo.map(({ grupo, filas }) => (
+            <div key={grupo} className="overflow-x-auto">
+              <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {GRUPOS_CASO[grupo].titulo} · {filas.length} casos (datos mock)
+              </p>
+              <p className="px-4 pb-2 text-xs text-muted-foreground">{GRUPOS_CASO[grupo].descripcion}</p>
+              <TablaResultados filas={filas} />
+            </div>
+          ))}
 
           <div className="overflow-x-auto">
             <button

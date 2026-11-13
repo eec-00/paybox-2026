@@ -606,47 +606,72 @@ const mock = (over: Partial<EntradaMotor> & Pick<EntradaMotor, 'servicio'>): Ent
 const acreditado = (distrito: string) => ({ distrito, acreditado: true, fuente: 'Caso de prueba controlado' })
 const CROSLAND = { clienteId: 308, cliente: 'CROSLAND MOTOS S.A.C (mock)', zona: 'Zona 5' }
 
+export type GrupoCaso = 'zona' | 'ruta' | 'crosland' | 'control'
+
 export interface CasoDemo {
-  /** P1–P3: pruebas obligatorias (ficha §4) · Ruta: ruta especial exacta (ficha §3-B) · Bloqueo: controles (ficha §3-D, §5.3) */
-  prueba: 'P1' | 'P2' | 'P3' | 'Ruta' | 'Bloqueo'
+  /** zona: 00_TARIFARIO_MICHAEL · ruta: rutas aprobadas de 02_RUTAS_Y_EXCEPCIONES · crosland: CR-01..CR-04 · control: el motor debe frenar */
+  grupo: GrupoCaso
+  /** Etiqueta corta de la fila (Zona 4, RT08, CR-01, Control) */
+  etiqueta: string
   titulo: string
   esperado: string
   entrada: EntradaMotor
 }
 
+export const GRUPOS_CASO: Record<GrupoCaso, { titulo: string; descripcion: string }> = {
+  zona: { titulo: 'Tarifario por zona', descripcion: 'Hoja 00_TARIFARIO_MICHAEL: cada distrito de las zonas 1 a 7 con contenedor carga general, contenedor IMO/IQBF y despacho de carga suelta.' },
+  ruta: { titulo: 'Rutas especiales aprobadas', descripcion: 'Hoja 02_RUTAS_Y_EXCEPCIONES: las tres rutas aprobadas por Margiory (10/11/2026), con itinerario exacto. Las demás se mantienen sin activar.' },
+  crosland: { titulo: 'Excepción Crosland', descripcion: 'Hoja 02_RUTAS_Y_EXCEPCIONES, CR-01 a CR-04: integral, reparto A/B y devolución en DPW/APMT.' },
+  control: { titulo: 'Controles', descripcion: 'Casos en que el motor debe frenar el cálculo porque falta un dato o una decisión: nunca se paga por deducción.' },
+}
+
+const TIPOS_CASO = [
+  { sufijo: '1', etiqueta: 'contenedor carga general', col: 4, over: {} },
+  { sufijo: '2', etiqueta: 'contenedor IMO/IQBF', col: 5, over: { tipoCarga: 'IMO' } },
+  { sufijo: '3', etiqueta: 'despacho carga suelta', col: 6, over: { tipoServicio: 'Despacho', modalidad: 'Carga Suelta', principal: A(D10) } },
+] as const
+
+/** Un caso por distrito y tipo de servicio: S91 + fila del Excel + tipo (S91111 = fila 11 Ate, carga general) */
+const CASOS_ZONA: CasoDemo[] = FILAS.flatMap(fila => {
+  const [n, zona, distrito] = fila
+  return TIPOS_CASO.map(t => ({
+    grupo: 'zona' as const, etiqueta: zona,
+    titulo: `${distrito} · ${t.etiqueta}`,
+    esperado: `SIMULADO S/${fila[t.col]}`,
+    entrada: mock({ servicio: `S91${String(n).padStart(2, '0')}${t.sufijo}`, zona, destino: acreditado(distrito), ...t.over }),
+  }))
+})
+
 export const CASOS_DEMO: CasoDemo[] = [
-  { prueba: 'P1', titulo: 'Zona 4 · Ate · carga general', esperado: 'SIMULADO S/80',
-    entrada: mock({ servicio: 'S90001', destino: acreditado('Ate') }) },
-  { prueba: 'P1', titulo: 'Zona 4 · San Juan de Lurigancho · carga general', esperado: 'SIMULADO S/90 (misma zona, distinto destino)',
-    entrada: mock({ servicio: 'S90002', destino: acreditado('San Juan de Lurigancho') }) },
-  { prueba: 'P1', titulo: 'Zona 4 sin dirección acreditada', esperado: 'REQUIERE REVISIÓN',
-    entrada: mock({ servicio: 'S90003' }) },
-  { prueba: 'P2', titulo: 'Crosland · A hace el integral', esperado: 'SIMULADO A S/90 (CR-01)',
-    entrada: mock({ servicio: 'S90011', ...CROSLAND, retorno: { ...A(I12), almacen: 'Depósito ordinario' } }) },
-  { prueba: 'P2', titulo: 'Crosland · A principal + B devolución ordinaria', esperado: 'SIMULADO A S/70 + B S/20',
-    entrada: mock({ servicio: 'S90012', ...CROSLAND, retorno: B('Depósito ordinario') }) },
-  { prueba: 'P2', titulo: 'Crosland · B devuelve en DPW', esperado: 'SIMULADO A S/70 + B S/30',
-    entrada: mock({ servicio: 'S90013', ...CROSLAND, retorno: B('DPW Callao') }) },
-  { prueba: 'P2', titulo: 'Crosland · B sin I12', esperado: 'REQUIERE REVISIÓN, sin pago a A ni B',
-    entrada: mock({ servicio: 'S90014', ...CROSLAND, retorno: B('DPW Callao', null) }) },
-  { prueba: 'P3', titulo: 'Zona 7 · Lurín · contenedor general', esperado: 'SIMULADO S/100',
-    entrada: mock({ servicio: 'S90021', zona: 'Zona 7', destino: acreditado('Lurín') }) },
-  { prueba: 'P3', titulo: 'Zona 7 · Lurín · IMO', esperado: 'SIMULADO S/110 (cambia por carga)',
-    entrada: mock({ servicio: 'S90022', zona: 'Zona 7', tipoCarga: 'IMO', destino: acreditado('Lurín') }) },
-  { prueba: 'P3', titulo: 'Zona 7 · Lurín · servicio de diciembre 2025', esperado: 'REQUIERE REVISIÓN: antes de la vigencia (enero 2026)',
-    entrada: mock({ servicio: 'S90023', zona: 'Zona 7', fecha: '2025-12-15', destino: acreditado('Lurín') }) },
-  { prueba: 'P3', titulo: 'Zona 7 · Pachacamac', esperado: 'REQUIERE REVISIÓN: Lurín no se traslada a toda la Zona 7',
-    entrada: mock({ servicio: 'S90024', zona: 'Zona 7', destino: acreditado('Pachacamac') }) },
-  { prueba: 'Ruta', titulo: 'Provincia · ruta exacta CALLAO - MELCHORITA', esperado: 'SIMULADO S/200 (RT08, «match exacto / por aprobar»)',
+  ...CASOS_ZONA,
+  { grupo: 'ruta', etiqueta: 'RT08', titulo: 'Callao – Melchorita · contenedor carga general', esperado: 'SIMULADO S/200',
     entrada: mock({ servicio: 'S90033', zona: 'Provincia', itinerario: 'CALLAO - MELCHORITA' }) },
-  { prueba: 'Ruta', titulo: 'Provincia · ruta exacta CALLAO - HUACHO', esperado: 'REQUIERE REVISIÓN: el Excel la marca «no activar»',
-    entrada: mock({ servicio: 'S90034', zona: 'Provincia', tipoServicio: 'Despacho', modalidad: 'Carga Suelta', itinerario: 'CALLAO - HUACHO', principal: A(D10) }) },
-  { prueba: 'Bloqueo', titulo: 'Tarea en Zona 1 con destino Lurín', esperado: 'REQUIERE REVISIÓN: zona y destino discordantes',
+  { grupo: 'ruta', etiqueta: 'RT10', titulo: 'Callao – Chancay – Pucusana · despacho carga suelta', esperado: 'SIMULADO S/130',
+    entrada: mock({ servicio: 'S90037', zona: 'Provincia', tipoServicio: 'Despacho', modalidad: 'Carga Suelta', itinerario: 'CALLAO - CHANCAY - PUCUSANA', principal: A(D10) }) },
+  { grupo: 'ruta', etiqueta: 'RT11', titulo: 'Lurín – Chancay · despacho carga suelta', esperado: 'SIMULADO S/180',
+    entrada: mock({ servicio: 'S90038', zona: 'Provincia', tipoServicio: 'Despacho', modalidad: 'Carga Suelta', itinerario: 'LURÍN - CHANCAY', principal: A(D10) }) },
+  { grupo: 'crosland', etiqueta: 'CR-01', titulo: 'A hace el integral (descarga y devolución)', esperado: 'SIMULADO A S/90',
+    entrada: mock({ servicio: 'S90011', ...CROSLAND, retorno: { ...A(I12), almacen: 'Depósito ordinario' } }) },
+  { grupo: 'crosland', etiqueta: 'CR-02/03', titulo: 'A principal + B devuelve en depósito ordinario', esperado: 'SIMULADO A S/70 + B S/20',
+    entrada: mock({ servicio: 'S90012', ...CROSLAND, retorno: B('Depósito ordinario') }) },
+  { grupo: 'crosland', etiqueta: 'CR-02/04', titulo: 'A principal + B devuelve en DPW', esperado: 'SIMULADO A S/70 + B S/30',
+    entrada: mock({ servicio: 'S90013', ...CROSLAND, retorno: B('DPW Callao') }) },
+  { grupo: 'crosland', etiqueta: 'CR', titulo: 'B sin I12 (devolución sin acreditar)', esperado: 'REQUIERE REVISIÓN, sin pago a A ni B',
+    entrada: mock({ servicio: 'S90014', ...CROSLAND, retorno: B('DPW Callao', null) }) },
+  { grupo: 'control', etiqueta: 'Control', titulo: 'Zona 4 sin distrito acreditado', esperado: 'REQUIERE REVISIÓN: la zona sola no define el importe',
+    entrada: mock({ servicio: 'S90003' }) },
+  { grupo: 'control', etiqueta: 'Control', titulo: 'Tarea en Zona 1 con destino Lurín', esperado: 'REQUIERE REVISIÓN: zona y distrito no coinciden',
     entrada: mock({ servicio: 'S90031', zona: 'Zona 1', destino: acreditado('Lurín') }) },
-  { prueba: 'Bloqueo', titulo: 'Provincia sin itinerario', esperado: 'REQUIERE REVISIÓN: Provincia ≠ Zona 0',
+  { grupo: 'control', etiqueta: 'Control', titulo: 'Zona 7 · Pachacámac (sin tarifa propia)', esperado: 'REQUIERE REVISIÓN: Lurín no se extiende a toda la Zona 7',
+    entrada: mock({ servicio: 'S90024', zona: 'Zona 7', destino: acreditado('Pachacamac') }) },
+  { grupo: 'control', etiqueta: 'Control', titulo: 'Lurín · servicio de diciembre 2025', esperado: 'REQUIERE REVISIÓN: antes de la vigencia (enero 2026)',
+    entrada: mock({ servicio: 'S90023', zona: 'Zona 7', fecha: '2025-12-15', destino: acreditado('Lurín') }) },
+  { grupo: 'control', etiqueta: 'Control', titulo: 'Provincia sin ruta', esperado: 'REQUIERE REVISIÓN: Provincia no es Zona 0',
     entrada: mock({ servicio: 'S90032', zona: 'Provincia', tipoServicio: 'Despacho', modalidad: 'Carga Suelta', principal: A(D10) }) },
-  { prueba: 'Bloqueo', titulo: 'Ate sin hito operativo (solo cierre administrativo)', esperado: 'REQUIERE REVISIÓN',
+  { grupo: 'control', etiqueta: 'Control', titulo: 'Ruta no activa · Callao – Huacho (RT05)', esperado: 'REQUIERE REVISIÓN: se mantiene sin activar',
+    entrada: mock({ servicio: 'S90034', zona: 'Provincia', tipoServicio: 'Despacho', modalidad: 'Carga Suelta', itinerario: 'CALLAO - HUACHO', principal: A(D10) }) },
+  { grupo: 'control', etiqueta: 'Control', titulo: 'Ate sin hito operativo (solo cierre administrativo)', esperado: 'REQUIERE REVISIÓN',
     entrada: mock({ servicio: 'S90035', destino: acreditado('Ate'), principal: A(null) }) },
-  { prueba: 'Bloqueo', titulo: 'Servicio sin variante en Odoo', esperado: 'REQUIERE REVISIÓN: campos nulos',
+  { grupo: 'control', etiqueta: 'Control', titulo: 'Servicio sin variante en Odoo', esperado: 'REQUIERE REVISIÓN: campos nulos',
     entrada: mock({ servicio: 'S90036', zona: null, modalidad: null, tipoCarga: null }) },
 ]
