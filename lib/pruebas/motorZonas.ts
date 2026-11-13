@@ -210,8 +210,8 @@ export interface EntradaMotor {
   principal: TramoEntrada
   /** Devolución del vacío (importación); null si no hay tramo de retorno */
   retorno: TramoEntrada | null
-  /** Distrito físico económico acreditado por Operaciones; null si no hay */
-  destino: { distrito: string; acreditado: boolean; fuente: string } | null
+  /** Distrito físico económico; null si no hay. `alerta` se muestra cuando la fuente aún está por confirmar */
+  destino: { distrito: string; acreditado: boolean; fuente: string; alerta?: string } | null
   /** Itinerario completo acreditado (rutas especiales); null si no hay */
   itinerario: string | null
   origen: 'odoo' | 'mock'
@@ -428,6 +428,7 @@ export function simularTarifa(e: EntradaMotor): ResultadoMotor {
   }
   c.candidatos = enZona.map(r => r.id)
   c.paso('B', true, `Destino acreditado: ${e.destino.distrito} (${e.destino.fuente})`)
+  if (e.destino.alerta) c.alertas.push(e.destino.alerta)
 
   const exactas = enZona.filter(r =>
     r.operaciones.includes(e.tipoServicio as TipoServicioOdoo)
@@ -563,11 +564,22 @@ function hitoDe(s: ServicioPago, opciones: [string, string][]): HitoMarca | null
   return null
 }
 
+export const ALERTA_FUENTE_DESTINO = 'Distrito tomado del «Almacén de Destino» de Odoo: fuente por confirmar con Operaciones (ficha §2)'
+
 /**
- * Servicio de /api/pruebas/pagos-conductores → entrada del motor. El destino
- * físico y el itinerario no son datos estructurados en Odoo: quedan null y el
- * motor pide revisión (salvo el contrato Crosland, que no depende del distrito).
+ * Servicio de /api/pruebas/pagos-conductores → entrada del motor. El distrito
+ * sale del «Almacén de Destino» de la tarea (dirección de entrega del cliente,
+ * con su distrito en Odoo), con alerta hasta que Operaciones confirme la
+ * fuente. Exportación queda sin destino: falta confirmar qué campo es la planta
+ * del cliente. El itinerario no es un dato estructurado en Odoo: queda null.
  */
+function destinoDesdeOdoo(s: ServicioPago): EntradaMotor['destino'] {
+  const a = s.almacenDestino
+  if (!a || s.atributos.tipoServicio === 'Exportación') return null
+  if (!a.distrito) return { distrito: a.nombre, acreditado: false, fuente: 'Almacén de Destino sin distrito en Odoo' }
+  return { distrito: a.distrito, acreditado: true, fuente: `Almacén de Destino: ${a.nombre}`, alerta: ALERTA_FUENTE_DESTINO }
+}
+
 export function entradaDesdeOdoo(s: ServicioPago, devoluciones: DevolucionPago[]): EntradaMotor {
   const [d] = devoluciones.filter(x => x.padreId === s.id)
   let retorno: TramoEntrada | null = null
@@ -584,7 +596,7 @@ export function entradaDesdeOdoo(s: ServicioPago, devoluciones: DevolucionPago[]
     zona: s.atributos.zona, tipoServicio: s.atributos.tipoServicio, modalidad: s.atributos.modalidad,
     tipoCarga: s.atributos.tipoCarga, fecha: s.fecha || null,
     principal: { conductorId: s.conductorId, conductor: s.conductor, hito: hitoDe(s, HITOS_PRINCIPAL[s.flujo] ?? []) },
-    retorno, destino: null, itinerario: null, origen: 'odoo',
+    retorno, destino: destinoDesdeOdoo(s), itinerario: null, origen: 'odoo',
   }
 }
 

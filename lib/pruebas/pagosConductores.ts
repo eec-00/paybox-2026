@@ -41,6 +41,8 @@ export interface ServicioPago {
   /** Importación cuya devolución de vacío queda a cargo de otro conductor */
   devolucionOtroConductor: boolean
   horarios: HorariosServicio
+  /** «Almacén de Destino» de la tarea en Odoo (dirección de entrega del cliente) con su distrito */
+  almacenDestino?: { id: number; nombre: string; distrito: string | null } | null
 }
 
 /** Horarios marcados por el conductor, en minutos desde la medianoche del
