@@ -1,17 +1,20 @@
-# Citas de retiro y devolución con fecha y hora
+# Citas de retiro y devolución
 
-Hola equipo, les cuento cómo vamos a trabajar las citas de retiro y devolución en Odoo.
+Hola equipo, les cuento cómo quedan las citas en Odoo.
 
-**Por qué cambia:** "Hora de cita" y "Hora de Devolución" guardan solo la hora, no el día. Cuando la cita es al día siguiente o pasa de medianoche, el sistema no sabe de qué día es.
+**Por qué cambia:** al crear "Hora de Devolución" nos dimos cuenta de que guarda solo la hora, no el día. La cita de retiro ya funciona bien (día + hora), así que la devolución queda igual.
 
-**Qué ya está hecho:** en Odoo se crearon dos campos nuevos con fecha y hora en la misma casilla:
-- **Fecha y hora de cita de retiro**
-- **Fecha y hora de cita de devolución**
+**Qué ya está hecho:** en Odoo se creó el campo **"Fecha de Devolucion"** (solo fecha), junto a "Hora de Devolucion".
+
+| | Día | Hora |
+|---|---|---|
+| **Retiro** | Fecha de Recojo | Hora de Recojo |
+| **Devolución** | Fecha de Devolucion | Hora de Devolucion |
 
 **Qué hacer desde ahora:**
-1. Seguir llenando **"Hora de cita"** como siempre. La app del conductor y los geoenlaces todavía la usan.
-2. Llenar **también** los dos campos nuevos al programar cada servicio. Pagos conductores ya los usa para calcular el pago.
+1. **Retiro:** se sigue cargando como hoy, desde el Excel.
+2. **Devolución:** llenar **"Fecha de Devolucion"** y **"Hora de Devolucion"**. Si falta la fecha, se toma el mismo día del recojo.
 
-**Más adelante (fecha por definir):** un sábado en la noche o un domingo en la tarde se pasa todo Paybox a los campos nuevos. Ese día se copian los datos anteriores, se prueba con el equipo y la programación del lunes se hace el domingo en la noche, después de las pruebas. Desde ahí solo se llenan los campos nuevos.
+Por ahora solo Pruebas > Pagos conductores usa la fecha de devolución (para el adicional de devolución tardía). Nada más cambia.
 
-No modificar ni borrar "Hora de cita", "Hora de Devolución" ni "Fecha Máxima de Devolución".
+No borrar ni renombrar estos campos por dentro (solo se puede cambiar lo que se ve en pantalla).

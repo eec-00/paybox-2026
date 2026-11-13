@@ -79,27 +79,26 @@ describe('02 · ADHT (regla de Margiory, confirmada 12/11)', () => {
     expect(a.motivo).toMatch(/cita de devolución/)
   })
 
-  it('cita ≥ 17:00 pero sin SSEE acreditada → revisión', () => {
-    const [a] = de(calc([servicio({ citaDevolucion: H(18, 30), horas: completo(tarde) })]), 'adht')
-    expect(a.motivo).toMatch(/SSEE/)
+  it('devolución con otro conductor → no es SSEE, no hay ADHT', () => {
+    expect(de(calc([servicio({ citaDevolucion: H(18, 30), devolucionOtroConductor: true, horas: completo(tarde) })]), 'adht')).toHaveLength(0)
   })
 
   it('cita SSEE 18:30 e ingreso 18:40 → S/30', () => {
-    const [a] = de(calc([servicio({ citaDevolucion: H(18, 30), citaDevolucionSsee: true, horas: completo(tarde) })]), 'adht')
+    const [a] = de(calc([servicio({ citaDevolucion: H(18, 30), horas: completo(tarde) })]), 'adht')
     expect(a).toMatchObject({ estado: 'simulado', monto: 30 })
   })
 
   it('ingresó antes de la cita → no corresponde (lo cubre la máquina)', () => {
     const horas = completo({ ...tarde, ingreso_devolucion: H(18) })
-    expect(de(calc([servicio({ citaDevolucion: H(18, 30), citaDevolucionSsee: true, horas })]), 'adht')).toHaveLength(0)
+    expect(de(calc([servicio({ citaDevolucion: H(18, 30), horas })]), 'adht')).toHaveLength(0)
   })
 
   it('cita antes de las 17:00 → no corresponde', () => {
-    expect(de(calc([servicio({ citaDevolucion: H(16), citaDevolucionSsee: true, horas: completo(tarde) })]), 'adht')).toHaveLength(0)
+    expect(de(calc([servicio({ citaDevolucion: H(16), horas: completo(tarde) })]), 'adht')).toHaveLength(0)
   })
 
   it('Crosland: el ADHT reemplaza a la cena', () => {
-    const lista = calc([servicio({ cliente: 'CROSLAND MOTOS', clienteId: 308, citaDevolucion: H(18, 30), citaDevolucionSsee: true,
+    const lista = calc([servicio({ cliente: 'CROSLAND MOTOS', clienteId: 308, citaDevolucion: H(18, 30),
       horas: completo({ ...tarde, fin_descarga: H(17), salida_cliente: H(17, 20) }) })])
     expect(lista.filter(a => a.estado === 'simulado').map(a => [a.concepto, a.monto])).toEqual([['adht', 30]])
   })

@@ -8,7 +8,7 @@ import {
 } from '@/lib/servicios/hitos'
 import { fechaLima, registrosPorStep, sumarDias, tiemposHitos } from '@/lib/servicios/fechasHitos'
 import { consultarSerieTcSbs, tipoCambioDelDia } from '@/lib/pruebas/tipoCambioSbs'
-import { CAMPOS_CITA, CAMPO_CITA_DEVOLUCION, aplicarCitasNuevas, citaLima, diasEntre } from '@/lib/servicios/citas'
+import { CAMPO_FECHA_DEVOLUCION, citaDevolucionMin } from '@/lib/servicios/citas'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -35,7 +35,7 @@ const BASE_FIELDS = ['name', 'stage_id', 'partner_id', 'sale_line_id', 'x_studio
 // conductor, tipo de flujo) — se validan con fields_get por si alguno no
 // existe en Odoo.
 const ADICIONAL_FIELDS = [
-  'x_studio_hora_de_cita', 'x_studio_hora_de_devolucion', ...CAMPOS_CITA, 'x_studio_almacen_de_devolucion', 'x_studio_almacen_de_destino',
+  'x_studio_hora_de_cita', 'x_studio_hora_de_devolucion', CAMPO_FECHA_DEVOLUCION,'x_studio_almacen_de_devolucion', 'x_studio_almacen_de_destino',
   MODALIDAD_DEVOLUCION_FIELD, MODALIDAD_RETIRO_FIELD,
   ...TIPO_SERVICIO_BOOL_FIELDS, ...ALL_HITO_FIELDS,
 ]
@@ -44,18 +44,6 @@ const ADICIONAL_FIELDS = [
 const CAMPO_I12 = 'x_studio_contenedor_vacio_devuelto'
 
 const SUBTAREA_DEVOLUCION_DOMAIN = ['|', ['x_studio_es_tarea_de_devolucion_de_vacio', '=', true], ['name', 'ilike', 'devoluci']]
-
-/** Cita de devolución en minutos desde la medianoche del día de programación
- * (> 1440 si es otro día). Con «Fecha y hora de cita de devolución» el día es
- * exacto; con la «Hora de Devolución» antigua se asume el día de programación. */
-function citaDevolucionMin(t: TaskRow): number | null {
-  const nueva = citaLima(t[CAMPO_CITA_DEVOLUCION])
-  if (nueva && t.x_studio_fecha_de_la_programacin) {
-    return diasEntre(t.x_studio_fecha_de_la_programacin, nueva.fecha) * 1440 + Math.round(nueva.hora * 60)
-  }
-  const h = t.x_studio_hora_de_devolucion
-  return typeof h === 'number' && h !== 0 ? Math.round(h * 60) : null
-}
 
 function m2oName(v: unknown): string | null {
   return Array.isArray(v) && typeof v[1] === 'string' ? v[1] : null
@@ -208,7 +196,6 @@ export async function GET(request: Request) {
     }
 
     const vacio: AtributosServicio = { tipoServicio: null, modalidad: null, tipoCarga: null, zona: null }
-    tasks.forEach(aplicarCitasNuevas)
     const servicios: ServicioPago[] = tasks.map(t => {
       const dest = Array.isArray(t.x_studio_almacen_de_destino) ? t.x_studio_almacen_de_destino as [number, string] : null
       const productId = t.sale_line_id ? productBySaleLine.get(t.sale_line_id[0]) : null
@@ -228,7 +215,7 @@ export async function GET(request: Request) {
         flujo: detectTipoServicio(t),
         devolucionOtroConductor: t[MODALIDAD_DEVOLUCION_FIELD] === MODALIDAD_OTRO_CONDUCTOR,
         horarios: calcularHorarios(t, registrosPorTask.get(t.id) ?? {}),
-        citaDevolucion: citaDevolucionMin(t),
+        citaDevolucion: citaDevolucionMin(t.x_studio_fecha_de_la_programacin, t[CAMPO_FECHA_DEVOLUCION], t.x_studio_hora_de_devolucion),
         almacenDestino: dest ? { id: dest[0], nombre: dest[1], distrito: distritoDe.get(dest[0]) ?? null } : null,
       }
     })
