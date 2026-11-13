@@ -147,7 +147,7 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
         className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-semibold"
       >
         <ChevronDown className={`h-4 w-4 transition-transform ${abierto ? '' : '-rotate-90'}`} />
-        Motor de tarifas por zona Odoo · demo PMO-69
+        Motor de tarifas · casos de prueba
         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Simulación</span>
       </button>
       {abierto && (
