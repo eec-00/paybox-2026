@@ -6,6 +6,10 @@
 // de devolución» (datetime). Mientras conviven, se lee primero el campo nuevo y,
 // si está vacío, el antiguo: así nada que lea «Hora de cita» se rompe.
 //
+// Por ahora SOLO lo usa Pruebas > Pagos conductores. El resto de Paybox (app
+// del conductor, geoenlaces, Servicios, Excel) sigue con los campos antiguos
+// hasta que se decida migrar (docs/PROPUESTA_CITAS_FECHA_HORA.md).
+//
 // Odoo guarda los datetime en UTC («YYYY-MM-DD HH:MM:SS»). Perú es UTC−5 todo
 // el año (sin horario de verano).
 // ============================================================================

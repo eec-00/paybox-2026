@@ -1,4 +1,3 @@
-import { CAMPO_CITA_RETIRO, instanteOdoo } from '@/lib/servicios/citas'
 import { exigirPersonal } from '@/lib/supabase/permisos'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -129,7 +128,7 @@ interface OdooTaskRow {
 }
 
 const CANDIDATE_FIELDS = [
-  'x_studio_fecha_de_la_programacin', 'x_studio_hora_de_cita', CAMPO_CITA_RETIRO,
+  'x_studio_fecha_de_la_programacin', 'x_studio_hora_de_cita',
   'x_studio_placa', 'x_studio_placa_carreta', 'x_studio_modalidad_de_devolucion',
   'x_studio_modalidad_de_retiro', 'x_studio_almacen_de_devolucion', 'x_studio_referenciabooking',
   ...TIPO_SERVICIO_BOOL_FIELDS, ...ALL_HITO_FIELDS,
@@ -144,12 +143,6 @@ const HORAS_DURACION_MAX = 12
  * usa la de su servicio padre. null = sin fecha programada en ningún lado. */
 function ventanaDe(task: OdooTaskRow, byId: Map<number, OdooTaskRow>): { inicio: number; fin: number } | null {
   const fuente = !task.x_studio_fecha_de_la_programacin && task.parent_id ? byId.get(task.parent_id[0]) ?? task : task
-  // «Fecha y hora de cita de retiro» (datetime) manda: trae su propio día
-  const citaNueva = instanteOdoo(fuente[CAMPO_CITA_RETIRO])
-  if (citaNueva) {
-    const inicio = citaNueva.getTime() - HORAS_ANTICIPACION * HORA_MS
-    return { inicio, fin: inicio + HORAS_DURACION_MAX * HORA_MS }
-  }
   const fecha = fuente.x_studio_fecha_de_la_programacin
   if (!fecha) return null
   const hora = typeof fuente.x_studio_hora_de_cita === 'number' ? fuente.x_studio_hora_de_cita : 0

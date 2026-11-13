@@ -5,7 +5,6 @@ import {
 } from '@/lib/servicios/hitos'
 import { fechaCorte } from '@/lib/servicios/rango'
 import { createClient } from '@/lib/supabase/server'
-import { CAMPOS_CITA, aplicarCitasNuevas } from '@/lib/servicios/citas'
 import { odooAuth, odooCall } from '@/lib/odoo'
 import { etapaFinalizadoDe } from '@/lib/servicios/etapas'
 import { puedeEditarServicios, puedeVerServicios, SIN_PERMISO_EDITAR } from '@/lib/servicios/permisos'
@@ -64,8 +63,6 @@ const CANDIDATE_X_FIELDS = [
   // OPERATIVA TRANSPORTE
   'x_studio_fecha_de_la_programacin',
   'x_studio_hora_de_cita',
-  'x_studio_hora_de_devolucion',
-  ...CAMPOS_CITA,
   'x_studio_placa',
   'x_studio_placa_carreta',
   'x_studio_conductor',
@@ -149,7 +146,7 @@ export async function GET(request: Request) {
       if (!tasks.length) {
         return NextResponse.json({ error: 'Servicio no encontrado' }, { status: 404 })
       }
-      const task = aplicarCitasNuevas(tasks[0])
+      const task = tasks[0]
 
       let conductor: Record<string, unknown> | null = null
       const conductorRef = task.x_studio_conductor
@@ -265,7 +262,7 @@ export async function GET(request: Request) {
       )
     }
 
-    const tasks = (await odooCall<any[]>(
+    const tasks = await odooCall<any[]>(
       uid,
       'project.task',
       'search_read',
@@ -275,7 +272,7 @@ export async function GET(request: Request) {
         order: 'name desc',
         limit: limitParam,
       }
-    )).map(aplicarCitasNuevas)
+    )
 
     // Las subtareas (ej. "Devolución de vacío", "Retiro de vacío –
     // Exportación") se crean duplicando una plantilla en blanco (ver
