@@ -79,7 +79,7 @@ export interface Adicional {
 
 export const REGLAS: Record<ConceptoAdicional, string> = {
   cena: 'Guía §3.01 · S/20. Importación: I08 (Fin descarga) después de las 19:00; despacho: D10. Crosland: también si el mismo conductor devuelve (I12) después de las 19:00, porque la devolución va en su tarifa (Rosario, 12/11/2026). En otros clientes, si I08/D10 fue antes de las 19:00 pero el conductor siguió trabajando después (I09/D11, I10–I12), requiere revisión. Nunca I13/D12 ni hora de regreso a cochera.',
-  adht: 'Guía §3.02 · S/30 histórico. Hitos I10 → I11 → I12. No existe umbral general homologado: se muestran los horarios y queda en revisión. SSEE del depósito, cita ≥17:00, fin de cita 23:00 y tolerancia de 35 min NO activan el bono. Crosland: si corresponde ADHT se pagan S/30 en lugar de la cena (Rosario, 12/11/2026).',
+  adht: 'S/30. Regla de Margiory (10/11/2026), confirmada el 12/11/2026 en lugar de la guía §3.02: I10 (Llegada a depósito) a las 17:00 o después, con cita de devolución a las 17:00 o después acreditada como SSEE. Si el conductor ingresa (I11) antes de la cita, no corresponde: ya lo cubre la máquina. Crosland: el ADHT reemplaza a la cena (Rosario, 12/11/2026).',
   crosland_nocturno: 'Guía §3.03 · S/30 ref. Crosland, atención desde I06 (Ingreso cliente). Hito decisivo: I09 (Salida cliente) después de las 22:00, definido por Margiory el 10/11/2026. No usar I12 ni I13; no duplicar con ADHT.',
   crosland_medianoche: 'Guía §3.04 · S/50 ref. Crosland, atención desde I06. Hito decisivo: I09 (Salida cliente) después de las 00:00, igual que el nocturno (Margiory, 12/11/2026). Sustituye los S/30 nocturnos; no se suman (Rosario, 12/11/2026).',
   tdc: 'Guía §3.06 · Otros clientes: el conductor B que devuelve el contenedor de otro cobra S/30 si lo devuelve en APM o DPW y S/20 en cualquier otro almacén (Rosario, 12/11/2026). Basta I12 en la subtarea asignada. Crosland va en la tarifa base (CR-03/CR-04).',
@@ -93,6 +93,7 @@ export const REGLAS: Record<ConceptoAdicional, string> = {
 
 const ETAPA_FINALIZADA = 'Servicio Finalizado'
 const MIN_19 = 19 * 60
+const MIN_17 = 17 * 60
 const MIN_22 = 22 * 60
 const MIN_24 = 24 * 60
 const CITA_0300 = 3 * 60
@@ -213,12 +214,22 @@ function cenaDe(s: ServicioPago): Adicional | null {
 
 function adhtDe(s: ServicioPago): Adicional | null {
   if (s.flujo !== 'importacion' || s.devolucionOtroConductor) return null
-  if (hora(s, 'contenedor_devuelto') === null) return null
-  const txt = RECONSTRUCCION.slice(1).map(([k, c]) => marca(s, k, c)).join(' → ')
-  return rev({
-    concepto: 'adht', fecha: s.fecha || null, servicio: servicioCodigo(s.name), detalle: txt, regla: REGLAS.adht,
-    hitos: ['I10', 'I11', 'I12'], servicioIds: [s.id], claves: ['llegada_devolucion', 'ingreso_devolucion', 'contenedor_devuelto'],
-  }, 'Sin umbral aprobado: Margiory propone I10 + cita ≥17:00 acreditada como SSEE, pero la guía y el piloto prohíben usar SSEE como disparador automático. Decisión pendiente de PMO')
+  const i10 = hora(s, 'llegada_devolucion')
+  if (i10 === null || i10 < MIN_17) return null
+  const cita = s.citaDevolucion ?? null
+  // Cita sin día en Odoo: se asume el día de programación hasta tener «Cita de devolución» con fecha y hora
+  if (cita !== null && cita < MIN_17) return null
+  const i11 = hora(s, 'ingreso_devolucion')
+  if (cita !== null && i11 !== null && i11 < cita) return null
+  const linea = {
+    concepto: 'adht' as const, fecha: s.fecha || null, servicio: servicioCodigo(s.name), regla: REGLAS.adht,
+    detalle: `Cita ${cita === null ? 'sin hora en Odoo' : horaLabel(cita)} · ${RECONSTRUCCION.slice(1).map(([k, c]) => marca(s, k, c)).join(' → ')}`,
+    hitos: ['Cita', 'I10', 'I11', 'I12'], servicioIds: [s.id], claves: ['llegada_devolucion', 'ingreso_devolucion', 'contenedor_devuelto'],
+    umbral: { min: MIN_17, label: 'Límite 17:00' },
+  }
+  if (cita === null) return rev(linea, 'Falta la hora de la cita de devolución en Odoo (hoy la cita solo se adjunta como archivo)')
+  if (s.citaDevolucionSsee !== true) return rev(linea, 'Falta acreditar que la cita de devolución es SSEE: Odoo todavía no tiene dónde registrarlo')
+  return sim({ ...linea, monto: 30 })
 }
 
 // ── 03/04 · Crosland ─────────────────────────────────────────────────
@@ -447,8 +458,16 @@ export function calcularAdicionales(e: EntradaAdicionales): Adicional[] {
   for (const s of ordenados) {
     const crosland = croslandDe(s)
     if (crosland) out.push(crosland)
-    // No reconocer dos veces el mismo trabajo como ADHT y Crosland
-    if (!crosland) { const a = adhtDe(s); if (a) out.push(a) }
+    // No reconocer dos veces el mismo trabajo como ADHT y Crosland nocturno/medianoche
+    if (!crosland) {
+      const a = adhtDe(s)
+      if (a) out.push(a)
+      // Crosland: el ADHT (S/30) reemplaza a la cena (Rosario, 12/11/2026)
+      if (a?.estado === 'simulado' && esCrosland(s.clienteId)) {
+        const i = out.findIndex(x => x.concepto === 'cena' && x.servicioIds.includes(s.id) && x.estado === 'simulado')
+        if (i >= 0) out.splice(i, 1)
+      }
+    }
     const r = retiroDe(s); if (r) out.push(r)
     const v = viaticoDe(s); if (v) out.push(v)
     const n = noDevolucionDe(s, e.devoluciones); if (n) out.push(n)

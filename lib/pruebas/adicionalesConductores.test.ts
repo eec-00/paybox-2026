@@ -66,11 +66,42 @@ describe('01 · Cena', () => {
   })
 })
 
-describe('02 · ADHT', () => {
-  it('siempre en revisión, mostrando I10 → I12', () => {
-    const [a] = de(calc([servicio({ horas: completo() })]), 'adht')
+describe('02 · ADHT (regla de Margiory, confirmada 12/11)', () => {
+  const tarde = { llegada_devolucion: H(18), ingreso_devolucion: H(18, 40), contenedor_devuelto: H(19, 30) }
+
+  it('I10 antes de las 17:00 → no hay ADHT', () => {
+    expect(de(calc([servicio({ horas: completo() })]), 'adht')).toHaveLength(0)
+  })
+
+  it('I10 ≥ 17:00 sin hora de cita → revisión, pide la cita', () => {
+    const [a] = de(calc([servicio({ horas: completo(tarde) })]), 'adht')
     expect(a).toMatchObject({ estado: 'requiere_revision', monto: null })
-    expect(a.detalle).toMatch(/I10 .* → I11 .* → I12/)
+    expect(a.motivo).toMatch(/cita de devolución/)
+  })
+
+  it('cita ≥ 17:00 pero sin SSEE acreditada → revisión', () => {
+    const [a] = de(calc([servicio({ citaDevolucion: H(18, 30), horas: completo(tarde) })]), 'adht')
+    expect(a.motivo).toMatch(/SSEE/)
+  })
+
+  it('cita SSEE 18:30 e ingreso 18:40 → S/30', () => {
+    const [a] = de(calc([servicio({ citaDevolucion: H(18, 30), citaDevolucionSsee: true, horas: completo(tarde) })]), 'adht')
+    expect(a).toMatchObject({ estado: 'simulado', monto: 30 })
+  })
+
+  it('ingresó antes de la cita → no corresponde (lo cubre la máquina)', () => {
+    const horas = completo({ ...tarde, ingreso_devolucion: H(18) })
+    expect(de(calc([servicio({ citaDevolucion: H(18, 30), citaDevolucionSsee: true, horas })]), 'adht')).toHaveLength(0)
+  })
+
+  it('cita antes de las 17:00 → no corresponde', () => {
+    expect(de(calc([servicio({ citaDevolucion: H(16), citaDevolucionSsee: true, horas: completo(tarde) })]), 'adht')).toHaveLength(0)
+  })
+
+  it('Crosland: el ADHT reemplaza a la cena', () => {
+    const lista = calc([servicio({ cliente: 'CROSLAND MOTOS', clienteId: 308, citaDevolucion: H(18, 30), citaDevolucionSsee: true,
+      horas: completo({ ...tarde, fin_descarga: H(17), salida_cliente: H(17, 20) }) })])
+    expect(lista.filter(a => a.estado === 'simulado').map(a => [a.concepto, a.monto])).toEqual([['adht', 30]])
   })
 })
 
@@ -94,10 +125,10 @@ describe('03/04/05 · Crosland', () => {
     expect(de(lista, 'cena')[0]).toMatchObject({ monto: 20 })
   })
 
-  it('Rosario 12/11: I08 21:30 → I12 23:20, la devolución va en la tarifa: solo cena S/20 (+ ADHT en revisión)', () => {
+  it('Rosario 12/11: I08 21:30 → I12 23:20, la devolución va en la tarifa: solo cena S/20 (I10 14:00, sin ADHT)', () => {
     const lista = calc([crosland({ fin_descarga: H(21, 30), contenedor_devuelto: H(23, 20) })])
     expect(lista.filter(a => a.estado === 'simulado').map(a => [a.concepto, a.monto])).toEqual([['cena', 20]])
-    expect(de(lista, 'adht')[0].estado).toBe('requiere_revision')
+    expect(de(lista, 'adht')).toHaveLength(0)
   })
 
   it('Rosario 12/11: descarga 18:00 y devuelve después de las 19:00 → cena S/20, sin noche', () => {

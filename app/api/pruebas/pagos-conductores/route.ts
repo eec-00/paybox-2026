@@ -34,7 +34,7 @@ const BASE_FIELDS = ['name', 'stage_id', 'partner_id', 'sale_line_id', 'x_studio
 // conductor, tipo de flujo) — se validan con fields_get por si alguno no
 // existe en Odoo.
 const ADICIONAL_FIELDS = [
-  'x_studio_hora_de_cita', 'x_studio_almacen_de_devolucion', 'x_studio_almacen_de_destino',
+  'x_studio_hora_de_cita', 'x_studio_hora_de_devolucion', 'x_studio_almacen_de_devolucion', 'x_studio_almacen_de_destino',
   MODALIDAD_DEVOLUCION_FIELD, MODALIDAD_RETIRO_FIELD,
   ...TIPO_SERVICIO_BOOL_FIELDS, ...ALL_HITO_FIELDS,
 ]
@@ -214,6 +214,8 @@ export async function GET(request: Request) {
         flujo: detectTipoServicio(t),
         devolucionOtroConductor: t[MODALIDAD_DEVOLUCION_FIELD] === MODALIDAD_OTRO_CONDUCTOR,
         horarios: calcularHorarios(t, registrosPorTask.get(t.id) ?? {}),
+        citaDevolucion: typeof t.x_studio_hora_de_devolucion === 'number' && t.x_studio_hora_de_devolucion !== 0
+          ? Math.round(t.x_studio_hora_de_devolucion * 60) : null,
         almacenDestino: dest ? { id: dest[0], nombre: dest[1], distrito: distritoDe.get(dest[0]) ?? null } : null,
       }
     })
