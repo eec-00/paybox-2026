@@ -234,7 +234,7 @@ export function SunatSection() {
       // Style header row
       const headerRow = ws.getRow(1)
       headerRow.eachCell((cell) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2332' } }
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: false }
         cell.border = { ...blackBorder, bottom: { style: 'medium', color: { argb: 'FF000000' } } }

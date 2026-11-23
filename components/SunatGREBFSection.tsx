@@ -209,8 +209,6 @@ export function SunatGREBFSection() {
     vehiculo: string
     carreta: string
     conductor: string
-    _debug?: string
-    _debugRow?: string
   }
 
   const BF_EXCEL_COLS: [keyof BFExcelRow, string][] = [
@@ -225,8 +223,6 @@ export function SunatGREBFSection() {
     ['conductor', 'CONDUCTOR'],
     ['puntoPartida', 'PUNTO DE PARTIDA'],
     ['puntoLlegada', 'PUNTO DE LLEGADA'],
-    ['_debug', '_DEBUG (temporal)'],
-    ['_debugRow', '_DEBUG_ROW (temporal)'],
   ]
 
   async function exportarExcel() {
@@ -256,8 +252,6 @@ export function SunatGREBFSection() {
             vehiculo: detalle.placas[0] ?? '',
             carreta: detalle.placas[1] ?? '',
             conductor: detalle.conductor,
-            _debug: detalle.debug,
-            _debugRow: JSON.stringify(r),
           }
           done++
           setExportProgress(`Extrayendo datos operativos ${done}/${rows.length}...`)
@@ -284,7 +278,7 @@ export function SunatGREBFSection() {
 
       const headerRow = worksheet.getRow(1)
       headerRow.eachCell((cell) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2332' } }
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: false }
         cell.border = { ...blackBorder, bottom: { style: 'medium', color: { argb: 'FF000000' } } }
@@ -305,6 +299,8 @@ export function SunatGREBFSection() {
 
       const buffer = await workbook.xlsx.writeBuffer()
       saveAs(new Blob([buffer]), `GRE-BF-${tipConsulta}-${periodoDesde}-${periodoHasta}.xlsx`)
+    } catch (e) {
+      toast.error('No se pudo generar el Excel', { description: e instanceof Error ? e.message : 'Inténtalo de nuevo en unos minutos.' })
     } finally {
       setExportingExcel(false)
       setExportProgress('')

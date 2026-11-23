@@ -410,7 +410,7 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
         {/* Campos Dinámicos */}
         {selectedCategoria && selectedCategoria.ejes_obligatorios && selectedCategoria.ejes_obligatorios.filter((eje) => !isHiddenAxis(eje)).length > 0 && (
           <div className="space-y-4 border-t pt-4">
-            <h3 className="font-semibold text-base text-secondary">Datos Específicos de la Categoría</h3>
+            <h3 className="font-semibold text-base text-primary">Datos Específicos de la Categoría</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {selectedCategoria.ejes_obligatorios
                 .filter((eje) => !isHiddenAxis(eje))

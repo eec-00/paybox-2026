@@ -26,6 +26,18 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-ink: var(--destructive-ink);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-ink: var(--success-ink);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-ink: var(--warning-ink);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-ink: var(--info-ink);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -58,13 +70,29 @@
   --secondary: #f5a623; /* Dorado */
   --secondary-foreground: #1a2332;
   --muted: #ECF0F1;
-  --muted-foreground: #7F8C8D;
+  /* Texto secundario: #7F8C8D no llegaba a 4.5:1 sobre el fondo; este da ~5.2:1 */
+  --muted-foreground: #5F6B6D;
   --accent: #f5a623; /* Dorado */
   --accent-foreground: #1a2332;
-  --destructive: #E74C3C;
+  --destructive: #D63A2B;
+  --destructive-foreground: #FFFFFF;
+  /* Estados (fondo suave + texto oscuro del mismo tono, ≥4.5:1) */
+  --destructive-soft: #FDECEA;
+  --destructive-ink: #9B2318;
+  --success: #1E8A55;
+  --success-soft: #E7F5EE;
+  --success-ink: #14603B;
+  --warning: #D18A12;
+  --warning-soft: #FDF3E1;
+  --warning-ink: #7A4B05;
+  --info: #2D6CB5;
+  --info-soft: #EAF1FA;
+  --info-ink: #1D4677;
   --border: #BDC3C7;
-  --input: #ECF0F1;
-  --ring: #f5a623; /* Dorado for focus ring */
+  /* Borde de campos: #ECF0F1 se perdía contra el fondo; este marca el control (~3:1) */
+  --input: #858F91;
+  /* Foco: dorado oscuro, visible sobre blanco (~3.8:1). El dorado de marca sigue en --secondary */
+  --ring: #B87400;
   --chart-1: #f5a623;
   --chart-2: #1a2332;
   --chart-3: #fdb44b;
@@ -116,10 +144,18 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--secondary) 35%, transparent);
+    color: var(--foreground);
+  }
+  /* Números de tablas y montos alineados en columna */
+  table {
+    font-variant-numeric: tabular-nums;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-montserrat), var(--font-geist-sans), sans-serif;
@@ -187,16 +223,4 @@
 .sidebar-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
-}
-
-/* Gradiente animado para botones principales */
-.btn-eemerson {
-  background: linear-gradient(135deg, #f5a623 0%, #fdb44b 100%);
-  transition: all 0.3s ease;
-}
-
-.btn-eemerson:hover {
-  background: linear-gradient(135deg, #fdb44b 0%, #f5a623 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(245, 166, 35, 0.3);
 }

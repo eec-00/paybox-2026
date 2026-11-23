@@ -746,7 +746,7 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
           </div>
           {/* Selector de Categoría con filtros en cascada */}
           <div className="space-y-4 border-t pt-4">
-            <p className="text-sm font-semibold text-secondary">Categoría *</p>
+            <p className="text-sm font-semibold text-primary">Categoría *</p>
 
             {/* Paso 1 y 2: Filtros opcionales */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -830,7 +830,7 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
               </div>
               {selectedCategoria && (
                 <p className="text-xs text-muted-foreground pt-1">
-                  <span className="font-medium text-secondary">{selectedCategoria.naturaleza}</span>
+                  <span className="font-medium text-primary">{selectedCategoria.naturaleza}</span>
                   {' · '}
                   {selectedCategoria.subgrupo}
                 </p>
@@ -841,7 +841,7 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
           {/* Campos Dinámicos según Categoría */}
           {selectedCategoria && selectedCategoria.ejes_obligatorios.filter((eje) => !isHiddenAxis(eje)).length > 0 && (
             <div className="space-y-4 border-t pt-4">
-              <h3 className="font-semibold text-secondary">Datos Específicos de la Categoría</h3>
+              <h3 className="font-semibold text-primary">Datos Específicos de la Categoría</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {selectedCategoria.ejes_obligatorios
                   .filter((eje) => !isHiddenAxis(eje))

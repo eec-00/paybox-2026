@@ -16,6 +16,7 @@ import {
   CONCEPTO_LABEL, calcularAdicionales, esFinalizado, horaLabel, totalAdicionales, type Adicional, type EstadoAdicional,
 } from '@/lib/pruebas/adicionalesConductores'
 import { VERSION_TARIFARIO, entradaDesdeOdoo, simularTarifa, type LineaMotor } from '@/lib/pruebas/motorZonas'
+import { ErrorCarga } from '@/components/ui/alert'
 import { MotorZonasPanel } from '@/components/MotorZonasPanel'
 
 const VERSION_NUEVAS = VIGENCIA_REGLAS_NOV.split('-').reverse().join('/')
@@ -235,9 +236,7 @@ export function PagosConductoresSection() {
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
-      )}
+      {error && <ErrorCarga titulo="No se pudo cargar la semana" mensaje={error} onRetry={() => fetchData(semana)} />}
 
       <MotorZonasPanel
         servicios={visibles}
@@ -268,7 +267,7 @@ export function PagosConductoresSection() {
             ) : resumen.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                  No hay servicios en esta semana.
+                  {error ? 'Sin datos: la semana no se pudo cargar.' : 'No hay servicios en esta semana.'}
                 </TableCell>
               </TableRow>
             ) : (

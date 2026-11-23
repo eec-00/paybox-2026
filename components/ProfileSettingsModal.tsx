@@ -104,7 +104,7 @@ export function ProfileSettingsModal({
             onClick={() => setActiveTab('perfil')}
             className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'perfil'
-                ? 'border-secondary text-secondary'
+                ? 'border-secondary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -115,7 +115,7 @@ export function ProfileSettingsModal({
             onClick={() => setActiveTab('seguridad')}
             className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'seguridad'
-                ? 'border-secondary text-secondary'
+                ? 'border-secondary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >

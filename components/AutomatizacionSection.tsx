@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -163,16 +164,20 @@ export function AutomatizacionSection({ tipo }: Props) {
   const saveConfig = async () => {
     setSavingConfig(true)
     try {
-      await fetch('/api/automatizacion/config', {
+      const res = await fetch('/api/automatizacion/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editConfig),
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `El servidor respondió ${res.status}`)
+      }
       setConfig(editConfig)
       setConfigSaved(true)
       setTimeout(() => setConfigSaved(false), 2500)
-    } catch {
-      /* noop */
+    } catch (e) {
+      toast.error('No se guardó la configuración', { description: e instanceof Error ? e.message : 'Revisa tu conexión e inténtalo de nuevo.' })
     } finally {
       setSavingConfig(false)
     }
