@@ -571,7 +571,7 @@ export function VehiclesList() {
             </div>
           ) : (
             <div className="space-y-4 py-1">
-              <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-800">
+              <div className="flex items-center gap-2 p-3 bg-success-soft dark:bg-emerald-950/30 text-success-ink dark:text-emerald-400 rounded-lg border border-success/30 dark:border-emerald-800">
                 <CheckCircle className="h-4 w-4 shrink-0" />
                 <span className="text-sm font-medium">Geoenlace creado exitosamente</span>
               </div>
@@ -613,7 +613,7 @@ export function VehiclesList() {
                         title="Copiar"
                       >
                         {copiedId === geoLinkResult.id
-                          ? <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                          ? <CheckCircle className="h-3.5 w-3.5 text-success-ink" />
                           : <Copy className="h-3.5 w-3.5" />}
                       </Button>
                       <Button
@@ -840,13 +840,13 @@ export function VehiclesList() {
                         )}
 
                         {!geolink.lifetime && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded text-xs">
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-success-soft dark:bg-emerald-950/30 text-success-ink dark:text-emerald-400 border border-success/30 dark:border-emerald-800 rounded text-xs">
                             ∞ Permanente
                           </span>
                         )}
                         {geolink.lifetime && !expired && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded text-xs">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-success-soft dark:bg-emerald-950/30 text-success-ink dark:text-emerald-400 border border-success/30 dark:border-emerald-800 rounded text-xs">
+                            <span className="h-1.5 w-1.5 rounded-full bg-success inline-block" />
                             Activo
                           </span>
                         )}
@@ -875,7 +875,7 @@ export function VehiclesList() {
                         title="Copiar enlace"
                       >
                         {copiedId === geolink.id
-                          ? <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                          ? <CheckCircle className="h-3.5 w-3.5 text-success-ink" />
                           : <Copy className="h-3.5 w-3.5" />}
                       </Button>
                       <Button

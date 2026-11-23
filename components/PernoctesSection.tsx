@@ -1,5 +1,7 @@
 'use client'
 
+import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/page-header'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -53,10 +55,10 @@ const FILTROS: { id: Filtro; label: string }[] = [
 ]
 
 const ESTADO_CLASE: Record<EstadoPernocte, string> = {
-  pendiente: 'bg-amber-100 text-amber-800',
-  escalado: 'bg-orange-100 text-orange-800',
-  aprobado: 'bg-emerald-100 text-emerald-800',
-  rechazado: 'bg-red-100 text-red-800',
+  pendiente: 'bg-warning-soft text-warning-ink',
+  escalado: 'bg-warning-soft text-warning-ink',
+  aprobado: 'bg-success-soft text-success-ink',
+  rechazado: 'bg-destructive-soft text-destructive-ink',
   anulado: 'bg-slate-200 text-slate-600',
 }
 
@@ -125,28 +127,20 @@ export function PernoctesSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Moon className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight flex items-center gap-2">
-              Pernoctes
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Prueba</span>
-            </h2>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              Solicitudes «Voy a pernoctar» de la app del conductor
-            </p>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={cargar} disabled={loading} className="h-8 gap-1.5">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
-      </div>
+      <PageHeader
+        icon={Moon}
+        title="Pernoctes"
+        badge={<Badge variant="warning">Prueba</Badge>}
+        description="Solicitudes «Voy a pernoctar» enviadas desde la app del conductor"
+        actions={
+          <Button variant="outline" size="sm" onClick={cargar} disabled={loading} className="h-8 gap-1.5">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
+        }
+      />
 
-      <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl text-sm">
+      <div className="flex items-start gap-2.5 bg-warning-soft border border-warning/40 text-warning-ink px-4 py-3 rounded-xl text-sm">
         <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
         <p>
           Pernocte = el conductor <strong>duerme en su camión</strong> por la operación. S/ {MONTO_PERNOCTE} por noche aprobada.
@@ -168,7 +162,7 @@ export function PernoctesSection() {
         </label>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl text-sm">{error}</div>}
+      {error && <div className="bg-destructive-soft border border-destructive/30 text-destructive-ink px-4 py-3 rounded-xl text-sm">{error}</div>}
 
       <div className="rounded-xl border bg-card overflow-x-auto">
         <Table>
@@ -202,7 +196,7 @@ export function PernoctesSection() {
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                   {p.evidencias.length ? `${p.evidencias.length} foto(s)` : 'Sin foto'}
-                  {p.lat === null && <span className="block text-amber-700">Sin ubicación</span>}
+                  {p.lat === null && <span className="block text-warning-ink">Sin ubicación</span>}
                 </TableCell>
                 <TableCell><EstadoBadge estado={p.estado} /></TableCell>
                 <TableCell><Button size="sm" variant="ghost" className="h-7">Revisar</Button></TableCell>
@@ -312,7 +306,7 @@ function RevisionDialog({ pernocte: p, esAdmin, onClose, onHecho }: {
                   <MapPin className="h-3.5 w-3.5" /> Ver en el mapa <ExternalLink className="h-3 w-3" />
                 </a>
               ) : (
-                <p className="text-amber-700">El celular no compartió la ubicación.</p>
+                <p className="text-warning-ink">El celular no compartió la ubicación.</p>
               )}
               {p.precision_m !== null && <p className="text-xs text-muted-foreground mt-1">Precisión ±{Math.round(p.precision_m)} m</p>}
             </div>
@@ -345,7 +339,7 @@ function RevisionDialog({ pernocte: p, esAdmin, onClose, onHecho }: {
                       key={label}
                       disabled={decidido && !esAdmin}
                       onClick={() => setChecklist(c => ({ ...c, [k]: v }))}
-                      className={`px-2.5 py-1 rounded-md border text-xs font-semibold ${checklist[k] === v ? (v ? 'bg-red-600 border-red-600 text-white' : 'bg-emerald-600 border-emerald-600 text-white') : 'bg-background'}`}
+                      className={`px-2.5 py-1 rounded-md border text-xs font-semibold ${checklist[k] === v ? (v ? 'bg-destructive border-destructive text-white' : 'bg-success border-success text-white') : 'bg-background'}`}
                     >
                       {label}
                     </button>
@@ -354,7 +348,7 @@ function RevisionDialog({ pernocte: p, esAdmin, onClose, onHecho }: {
               </div>
             ))}
             {excl.length > 0 && (
-              <p className="text-xs text-red-700 font-medium">No corresponde pernocte con estas respuestas: se puede rechazar.</p>
+              <p className="text-xs text-destructive-ink font-medium">No corresponde pernocte con estas respuestas: se puede rechazar.</p>
             )}
           </div>
 
@@ -373,7 +367,7 @@ function RevisionDialog({ pernocte: p, esAdmin, onClose, onHecho }: {
               <BotonAccion accion="comentar" label="Solo guardar observación" variant="secondary" />
             </div>
             {p.estado === 'escalado' && !esAdmin && (
-              <p className="text-xs text-orange-700">Escalado a Emerson: lo decide un administrador. Puedes dejar observaciones.</p>
+              <p className="text-xs text-warning-ink">Escalado a Emerson: lo decide un administrador. Puedes dejar observaciones.</p>
             )}
             {decidido && !esAdmin && p.estado !== 'anulado' && (
               <p className="text-xs text-muted-foreground">Ya decidido. Solo un administrador puede cambiarlo.</p>

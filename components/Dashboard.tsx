@@ -1,9 +1,10 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { AlertCircle, ArrowDownRight, ArrowUpRight, RefreshCw } from 'lucide-react'
+import { AlertCircle, BarChart3, ArrowDownRight, ArrowUpRight, RefreshCw } from 'lucide-react'
 import { fetchAllRows } from '@/lib/supabase/fetchAll'
 // Las fechas se guardan en UTC: sin pasarlas a Lima, un pago de las 8 p. m.
 // caía en el día (o mes) siguiente.
@@ -150,16 +151,15 @@ export function Dashboard() {
   // ─── Encabezado ──────────────────────────────────────────────────────────
   const header = (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">Resumen de pagos</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {loading && !actualizado
-            ? 'Cargando información…'
-            : actualizado
-              ? `Actualizado a las ${actualizado.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}`
-              : 'Registros de pagos del sistema'}
-        </p>
-      </div>
+      <PageHeader
+        icon={BarChart3}
+        title="Resumen de pagos"
+        description={loading && !actualizado
+          ? 'Cargando información…'
+          : actualizado
+            ? `Actualizado a las ${actualizado.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}`
+            : 'Registros de pagos del sistema'}
+      />
       <Button variant="outline" size="sm" onClick={fetchStats} disabled={loading} className="gap-1.5 self-start sm:self-auto">
         <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
         Actualizar
@@ -218,7 +218,7 @@ export function Dashboard() {
       >
         <Kpi etiqueta={`Este mes · ${nombreMes}`} valor={soles(r.mes.soles)} dolares={r.mes.dolares}>
           {variacion !== null ? (
-            <span className={`inline-flex items-center gap-0.5 font-medium ${variacion >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}>
+            <span className={`inline-flex items-center gap-0.5 font-medium ${variacion >= 0 ? 'text-success-ink dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400'}`}>
               {variacion >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
               {Math.abs(variacion).toLocaleString('es-PE', { maximumFractionDigits: 0 })}%
               <span className="font-normal text-muted-foreground">&nbsp;vs. {r.nombreMesAnt} a la fecha</span>

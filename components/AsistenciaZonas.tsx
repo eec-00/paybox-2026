@@ -165,7 +165,7 @@ export function AsistenciaZonas() {
                   <button
                     onClick={() => toggleActivo(z)}
                     className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium shrink-0 ${
-                      z.activo ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'
+                      z.activo ? 'bg-success-soft text-success-ink' : 'bg-muted text-muted-foreground'
                     }`}
                   >
                     {z.activo ? <CheckCircle2 className="h-3 w-3" /> : <CircleSlash className="h-3 w-3" />}
@@ -186,7 +186,7 @@ export function AsistenciaZonas() {
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleteZona(z)}>
-                  <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                  <Trash2 className="h-3.5 w-3.5 text-destructive-ink" />
                 </Button>
               </div>
             </div>

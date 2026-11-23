@@ -106,9 +106,9 @@ export function ConductoresList() {
           <CardTitle className="flex items-center gap-2"><Truck className="h-5 w-5" />Conductores</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <AlertCircle className="h-5 w-5 text-red-600" />
-            <p className="text-sm text-red-800">{error}</p>
+          <div className="flex items-center gap-2 p-4 bg-destructive-soft border border-destructive/30 rounded-lg">
+            <AlertCircle className="h-5 w-5 text-destructive-ink" />
+            <p className="text-sm text-destructive-ink">{error}</p>
           </div>
           <Button onClick={loadConductores} className="mt-4">Reintentar</Button>
         </CardContent>
@@ -163,7 +163,7 @@ export function ConductoresList() {
                       <TableCell>
                         {c.odoo_employee_name ? (
                           <div className="flex items-center gap-1.5">
-                            <Link2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                            <Link2 className="h-3.5 w-3.5 text-success-ink shrink-0" />
                             <span className="text-sm">{c.odoo_employee_name}</span>
                           </div>
                         ) : (
@@ -211,7 +211,7 @@ export function ConductoresList() {
             <AlertDialogAction
               onClick={handleConfirmDelete}
               disabled={deleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-red-700"
             >
               {deleting ? 'Eliminando...' : 'Eliminar conductor'}
             </AlertDialogAction>

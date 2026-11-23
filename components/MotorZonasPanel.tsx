@@ -3,7 +3,7 @@
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm'
 import { Fragment, useMemo, useState } from 'react'
-import { CheckCircle2, ChevronDown, ChevronRight, Loader2, ShieldAlert, Trash2 } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, Loader2, Info, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
@@ -18,9 +18,9 @@ function soles(n: number): string {
 
 function EstadoBadge({ r }: { r: ResultadoMotor }) {
   if (r.estado === 'requiere_revision') {
-    return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-red-800">Requiere revisión</span>
+    return <span className="rounded-full bg-destructive-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-destructive-ink">Requiere revisión</span>
   }
-  return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Simulado</span>
+  return <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-warning-ink">Simulado</span>
 }
 
 interface Fila {
@@ -44,7 +44,7 @@ function PropuestaBox({ p, onAprobar }: { p: PropuestaTarifa; onAprobar?: (p: Pr
     try { await onAprobar(p) } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setEnviando(false) }
   }
   return (
-    <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
+    <div className="rounded border border-warning/40 bg-warning-soft px-3 py-2 text-warning-ink">
       <p>
         <span className="font-semibold">Tarifa de zona propuesta:</span> {soles(p.monto)} para «{p.distrito}» ({p.zona} ·{' '}
         {PRODUCTO_LABEL[p.producto]}), igual que {p.base.join(', ')}. Una vez validada se usa para los siguientes servicios
@@ -56,7 +56,7 @@ function PropuestaBox({ p, onAprobar }: { p: PropuestaTarifa; onAprobar?: (p: Pr
             {enviando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
             Validar {soles(p.monto)}
           </Button>
-          {error && <span className="text-red-700">{error}</span>}
+          {error && <span className="text-destructive-ink">{error}</span>}
         </div>
       )}
     </div>
@@ -106,9 +106,9 @@ function TablaResultados({ filas, onAprobar }: { filas: Fila[]; onAprobar?: (p: 
                 <TableCell className="text-xs whitespace-nowrap">{r.ruleIds.length ? r.ruleIds.join(' + ') : '—'}</TableCell>
                 <TableCell className="text-xs whitespace-normal min-w-[260px] max-w-[420px]">
                   {r.motivos.length > 0
-                    ? <span className="text-red-800">{r.motivos[0]}</span>
+                    ? <span className="text-destructive-ink">{r.motivos[0]}</span>
                     : r.alertas.length > 0
-                      ? <span className="text-amber-800">{r.alertas[0]}{r.alertas.length > 1 && ` (+${r.alertas.length - 1} alertas)`}</span>
+                      ? <span className="text-warning-ink">{r.alertas[0]}{r.alertas.length > 1 && ` (+${r.alertas.length - 1} alertas)`}</span>
                       : '—'}
                 </TableCell>
               </TableRow>
@@ -141,7 +141,7 @@ function TablaResultados({ filas, onAprobar }: { filas: Fila[]; onAprobar?: (p: 
                       <p className="font-semibold mb-1">Traza del motor (ficha §3, pasos A–D)</p>
                       <ol className="space-y-0.5">
                         {r.traza.map((t, i) => (
-                          <li key={i} className={t.ok ? '' : 'text-red-700'}>
+                          <li key={i} className={t.ok ? '' : 'text-destructive-ink'}>
                             <span className="font-mono">{t.paso}</span> {t.ok ? '✓' : '✗'} {t.detalle}
                           </li>
                         ))}
@@ -226,12 +226,12 @@ export function MotorZonasPanel({ servicios, devoluciones, aprobadas, onAprobada
       >
         <ChevronDown className={`h-4 w-4 transition-transform ${abierto ? '' : '-rotate-90'}`} />
         Motor de tarifas · casos de prueba
-        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Simulación</span>
+        <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-warning-ink">Simulación</span>
       </button>
       {abierto && (
         <div className="border-t border-primary/20 space-y-3 pb-3">
-          <div className="mx-4 mt-3 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
-            <ShieldAlert className="h-4 w-4 shrink-0" />
+          <div className="mx-4 mt-3 flex items-start gap-2.5 rounded-lg border border-info/30 bg-info-soft px-3 py-2 text-xs text-info-ink">
+            <Info className="h-4 w-4 shrink-0" />
             <p>
               <strong>No es monto de pago.</strong> Importes históricos del {VERSION_TARIFARIO}, vigentes desde enero 2026
               según Margiory; se simulan hasta el cierre del piloto (Rosario contrasta liquidaciones). No paga, no descuenta
@@ -263,14 +263,14 @@ export function MotorZonasPanel({ servicios, devoluciones, aprobadas, onAprobada
                       <span className="text-muted-foreground">{t.zona} · {PRODUCTO_LABEL[t.producto]}</span>
                       <span className="font-semibold">{soles(t.monto)}</span>
                       <span className="text-muted-foreground">validada por {t.aprobadoPor ?? '—'} el {t.aprobadoAt.slice(0, 10).split('-').reverse().join('/')}</span>
-                      <button type="button" onClick={() => quitar(t)} className="ml-auto text-muted-foreground hover:text-red-700" aria-label={`Quitar tarifa de ${t.distrito}`}>
+                      <button type="button" onClick={() => quitar(t)} className="ml-auto text-muted-foreground hover:text-destructive-ink" aria-label={`Quitar tarifa de ${t.distrito}`}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </li>
                   ))}
                 </ul>
               )}
-            {errorQuitar && <p className="mt-1 text-red-700">{errorQuitar}</p>}
+            {errorQuitar && <p className="mt-1 text-destructive-ink">{errorQuitar}</p>}
           </div>
 
           <div className="overflow-x-auto">

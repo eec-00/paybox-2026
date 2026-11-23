@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUserProfile } from '@/lib/utils/auth'
@@ -179,42 +180,36 @@ export function AsistenciaSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Fingerprint className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Asistencia</h2>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              {esModoDia
+      <PageHeader
+        icon={Fingerprint}
+        title="Asistencia"
+        description={esModoDia
                 ? `${marcaronDia} de ${rosterDelDia.length} conductor${rosterDelDia.length !== 1 ? 'es' : ''} marcaron ${esHoySeleccionado ? 'hoy' : 'ese día'}`
                 : `${marcasFiltradas.length} marca${marcasFiltradas.length !== 1 ? 's' : ''}`}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={showEstadisticas ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setShowEstadisticas((v) => !v)}
-            className="h-8 gap-1.5"
-          >
-            <BarChart3 className="h-3.5 w-3.5" />
-            Estadísticas
-          </Button>
-          {canDelete && (
-            <Button variant="outline" size="sm" onClick={() => setShowZonas((v) => !v)} className="h-8 gap-1.5">
-              <Settings2 className="h-3.5 w-3.5" />
-              Zonas permitidas
+        actions={
+          <>
+            <Button
+              variant={showEstadisticas ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setShowEstadisticas((v) => !v)}
+              className="h-8 gap-1.5"
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              Estadísticas
             </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={fetchMarcas} disabled={loading} className="h-8 gap-1.5">
-            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
-            Actualizar
-          </Button>
-        </div>
-      </div>
+            {canDelete && (
+              <Button variant="outline" size="sm" onClick={() => setShowZonas((v) => !v)} className="h-8 gap-1.5">
+                <Settings2 className="h-3.5 w-3.5" />
+                Zonas permitidas
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={fetchMarcas} disabled={loading} className="h-8 gap-1.5">
+              <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
+              Actualizar
+            </Button>
+          </>
+        }
+      />
 
       {showEstadisticas && <AsistenciaEstadisticas conductores={conductores} />}
       {canDelete && showZonas && <AsistenciaZonas />}
@@ -307,22 +302,22 @@ export function AsistenciaSection() {
                 </TableHeader>
                 <TableBody>
                   {rosterDelDia.map(({ conductor, marca }) => (
-                    <TableRow key={conductor.id} className={cn(!marca && 'bg-amber-50/40')}>
+                    <TableRow key={conductor.id} className={cn(!marca && 'bg-warning-soft/40')}>
                       <TableCell>
                         <div className="font-medium">{conductor.full_name || conductor.odoo_employee_name || 'Sin nombre'}</div>
                         <div className="text-xs text-muted-foreground font-mono">{conductor.dni || '—'}</div>
                       </TableCell>
                       <TableCell className="text-center">
                         {!marca ? (
-                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-800">
+                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-warning-soft text-warning-ink">
                             <CircleDashed className="h-3 w-3" /> No marcó
                           </span>
                         ) : !marca.salida_at ? (
-                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
+                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-info-soft text-info-ink">
                             <CheckCircle2 className="h-3 w-3" /> Entrada {fmtHora(marca.created_at)}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-700">
+                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-success-soft text-success-ink">
                             <CheckCircle2 className="h-3 w-3" /> {fmtHora(marca.created_at)} – {fmtHora(marca.salida_at)}
                           </span>
                         )}
@@ -354,7 +349,7 @@ export function AsistenciaSection() {
                       <TableCell className="text-right">
                         {canDelete && marca && (
                           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDeleteMarca(marca)}>
-                            <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                            <Trash2 className="h-3.5 w-3.5 text-destructive-ink" />
                           </Button>
                         )}
                       </TableCell>
@@ -423,7 +418,7 @@ export function AsistenciaSection() {
                     <TableCell className="text-right">
                       {canDelete && (
                         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDeleteMarca(m)}>
-                          <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                          <Trash2 className="h-3.5 w-3.5 text-destructive-ink" />
                         </Button>
                       )}
                     </TableCell>

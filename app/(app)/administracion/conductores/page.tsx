@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useApp } from '@/lib/context/app-context'
 import { ConductoresList } from '@/components/ConductoresList'
 import { ConductorForm } from '@/components/UserManagement'
@@ -20,13 +21,7 @@ export default function AdminConductoresPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Truck className="h-6 w-6 text-secondary" />
-        <div>
-          <h2 className="text-2xl font-bold text-primary">Conductores</h2>
-          <p className="text-muted-foreground">Choferes con acceso al Portal del Conductor</p>
-        </div>
-      </div>
+      <PageHeader icon={Truck} title="Conductores" description="Choferes con acceso al Portal del Conductor" />
       <ConductoresList />
       <ConductorForm />
     </div>

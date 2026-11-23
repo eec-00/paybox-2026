@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useConfirm } from '@/components/ui/confirm'
 import { toast } from 'sonner'
 import { urlArchivo } from '@/lib/archivos'
@@ -122,10 +123,10 @@ function m2oName(value: [number, string] | false | undefined): string {
 }
 
 const STAGE_DOT_COLORS: Record<string, string> = {
-  'nueva solicitud': 'bg-blue-500',
-  'pre-operativo': 'bg-amber-500',
-  'en ruta': 'bg-orange-500',
-  'en cliente': 'bg-green-500',
+  'nueva solicitud': 'bg-info',
+  'pre-operativo': 'bg-warning',
+  'en ruta': 'bg-warning',
+  'en cliente': 'bg-success',
   'cargando': 'bg-yellow-400',
   'finalizó carga': 'bg-cyan-500',
   'finalizo carga': 'bg-cyan-500',
@@ -300,22 +301,16 @@ export default function ServicioDetailPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Truck className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
-              {loading ? 'Cargando...' : `Servicio ${code}`}
-            </h2>
-            {stageName && (
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${stageDotColor(stageName)}`} />
-                {stageName}
-              </p>
-            )}
-          </div>
-        </div>
+        <PageHeader
+          icon={Truck}
+          title={loading ? 'Cargando…' : `Servicio ${code}`}
+          description={stageName && (
+            <span className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${stageDotColor(stageName)}`} aria-hidden />
+              Etapa: {stageName}
+            </span>
+          )}
+        />
         <div className="flex items-center gap-1.5">
         {vecinos && (
           <>
@@ -417,8 +412,8 @@ export default function ServicioDetailPage() {
                         </span>
                       ))}
                       {g.expiraAt && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded text-xs">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-success-soft dark:bg-emerald-950/30 text-success-ink dark:text-emerald-400 border border-success/30 dark:border-emerald-800 rounded text-xs">
+                          <span className="h-1.5 w-1.5 rounded-full bg-success inline-block" />
                           Activo hasta {formatOdooDateTime(g.expiraAt)}
                         </span>
                       )}
@@ -429,7 +424,7 @@ export default function ServicioDetailPage() {
                         title="Copiar enlace"
                         className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md border hover:bg-muted/50 transition-colors"
                       >
-                        {copied ? <CheckCircle className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                        {copied ? <CheckCircle className="h-3.5 w-3.5 text-success-ink" /> : <Copy className="h-3.5 w-3.5" />}
                       </button>
                       <a
                         href={g.url}

@@ -1,5 +1,6 @@
 'use client'
 
+import { formatMoney } from '@/lib/format'
 import { toast } from 'sonner'
 import { useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -359,8 +360,8 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
                 <div className="flex items-center justify-between gap-3 border-t pt-4 mt-2 flex-wrap">
                     <div className="text-xs">
                         <span className="font-semibold">{seleccion.length}</span> gasto(s)
-                        {totalSoles > 0 && <> · <span className="font-semibold">S/ {totalSoles.toFixed(2)}</span></>}
-                        {totalDolares > 0 && <> · <span className="font-semibold">US$ {totalDolares.toFixed(2)}</span></>}
+                        {totalSoles > 0 && <> · <span className="font-semibold">{formatMoney(totalSoles, 'soles')}</span></>}
+                        {totalDolares > 0 && <> · <span className="font-semibold">{formatMoney(totalDolares, 'dolares')}</span></>}
                     </div>
                     <Button onClick={handleExport} disabled={exporting || seleccion.length === 0} className="gap-2">
                         {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}

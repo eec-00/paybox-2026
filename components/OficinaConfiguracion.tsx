@@ -316,7 +316,7 @@ function HorarioDialog({ trabajador, config, puedeBorrar, onClose, onGuardado }:
 
         <DialogFooter className="gap-2 sm:justify-between">
           {puedeBorrar ? (
-            <Button variant="ghost" size="sm" className="text-red-600" onClick={quitar}><Trash2 className="h-4 w-4 mr-1" />Quitar</Button>
+            <Button variant="ghost" size="sm" className="text-destructive-ink" onClick={quitar}><Trash2 className="h-4 w-4 mr-1" />Quitar</Button>
           ) : <span />}
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose}>Cancelar</Button>
@@ -374,7 +374,7 @@ function Stickers({ permisos }: { permisos: PermisosOficina }) {
                 </div>
                 {permisos.canEdit && <Button variant="ghost" size="sm" onClick={() => toggle(s)}>{s.activo ? 'Desactivar' : 'Activar'}</Button>}
                 {permisos.canDelete && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={() => borrar(s)}><Trash2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive-ink" onClick={() => borrar(s)}><Trash2 className="h-4 w-4" /></Button>
                 )}
               </div>
             ))}

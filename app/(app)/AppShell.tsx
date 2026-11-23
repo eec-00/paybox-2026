@@ -122,7 +122,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Image src="/logo.png" alt="Logo" fill className="object-contain" />
               </div>
               <div>
-                <h1 className="font-bold text-lg sm:text-2xl text-white font-(family-name:--font-montserrat)">PayBox</h1>
+                <p className="font-heading font-bold text-lg sm:text-2xl text-white tracking-tight">PayBox</p>
                 <p className="text-[11px] sm:text-sm text-white/70 leading-tight">Eemerson SAC</p>
               </div>
             </div>

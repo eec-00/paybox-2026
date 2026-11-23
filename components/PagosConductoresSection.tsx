@@ -1,5 +1,7 @@
 'use client'
 
+import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/page-header'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -160,26 +162,18 @@ export function PagosConductoresSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Wallet className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight flex items-center gap-2">
-              Pagos a conductores
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Prueba</span>
-            </h2>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              Liquidación simulada · tarifa base y adicionales
-            </p>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => fetchData(semana)} disabled={loading} className="h-8 gap-1.5">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
-      </div>
+      <PageHeader
+        icon={Wallet}
+        title="Pagos a conductores"
+        badge={<Badge variant="warning">Prueba</Badge>}
+        description="Liquidación simulada · tarifa base y adicionales"
+        actions={
+          <Button variant="outline" size="sm" onClick={() => fetchData(semana)} disabled={loading} className="h-8 gap-1.5">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
+        }
+      />
 
       <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl text-sm">
         <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />

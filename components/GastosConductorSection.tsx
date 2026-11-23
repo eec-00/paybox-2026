@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { toast } from 'sonner'
 import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect } from 'react'
@@ -160,26 +161,20 @@ export function GastosConductorSection() {
     return (
         <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                        <Receipt className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Gastos de Conductores</h2>
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                            {pendientes} pendiente{pendientes !== 1 ? 's' : ''} · {totalPendiente} por pagar
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <GastosConductorExportModal gastos={gastos} datosServicio={datosServicio} />
-                    <Button variant="outline" size="sm" onClick={fetchGastos} disabled={loading} className="h-8 gap-1.5">
-                        <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-                        Actualizar
-                    </Button>
-                </div>
-            </div>
+            <PageHeader
+              icon={Receipt}
+              title="Gastos de Conductores"
+              description={<>{pendientes} pendiente{pendientes !== 1 ? 's' : ''} · {totalPendiente} por pagar</>}
+              actions={
+                <>
+                  <GastosConductorExportModal gastos={gastos} datosServicio={datosServicio} />
+                  <Button variant="outline" size="sm" onClick={fetchGastos} disabled={loading} className="h-8 gap-1.5">
+                      <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                      Actualizar
+                  </Button>
+                </>
+              }
+            />
 
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-2 bg-card/40 p-3 rounded-xl border border-border/50 shadow-sm">
@@ -259,11 +254,11 @@ export function GastosConductorSection() {
                                             </TableCell>
                                             <TableCell className="text-center">
                                                 {gasto.estado === 'pagado' ? (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">
+                                                    <span className="inline-flex items-center gap-1 text-[10px] bg-success-soft text-success-ink px-2 py-0.5 rounded-full font-semibold">
                                                         <CheckCircle2 className="w-3 h-3" /> Pagado
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">
+                                                    <span className="inline-flex items-center gap-1 text-[10px] bg-warning-soft text-warning-ink px-2 py-0.5 rounded-full font-semibold">
                                                         <AlertCircle className="w-3 h-3" /> Pendiente
                                                     </span>
                                                 )}
@@ -398,7 +393,7 @@ export function GastosConductorSection() {
                             <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Conductor</p><p className="font-semibold">{detailGasto.conductor_nombre}</p></div>
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Estado</p>
-                                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${detailGasto.estado === 'pagado' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${detailGasto.estado === 'pagado' ? 'bg-success-soft text-success-ink' : 'bg-warning-soft text-warning-ink'}`}>
                                         {detailGasto.estado === 'pagado' ? <><CheckCircle2 className="w-3 h-3" />Pagado</> : <><AlertCircle className="w-3 h-3" />Pendiente</>}
                                     </span>
                                 </div>
@@ -429,7 +424,7 @@ export function GastosConductorSection() {
                                 <div>
                                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Voucher de pago</p>
                                     <a href={urlArchivo(detailGasto.foto_pago)} target="_blank" rel="noopener noreferrer">
-                                        <img src={urlArchivo(detailGasto.foto_pago)} alt="voucher pago" className="w-24 h-24 object-cover rounded-lg border border-green-200 hover:opacity-80 transition-opacity" />
+                                        <img src={urlArchivo(detailGasto.foto_pago)} alt="voucher pago" className="w-24 h-24 object-cover rounded-lg border border-success/30 hover:opacity-80 transition-opacity" />
                                     </a>
                                 </div>
                             )}

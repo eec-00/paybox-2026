@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useState, useEffect, useMemo, useDeferredValue } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -133,10 +134,10 @@ function matchesDateRange(t: OdooTask, start: string, end: string): boolean {
 
 
 const STAGE_DOT_COLORS: Record<string, string> = {
-  'nueva solicitud': 'bg-blue-500',
-  'pre-operativo': 'bg-amber-500',
-  'en ruta': 'bg-orange-500',
-  'en cliente': 'bg-green-500',
+  'nueva solicitud': 'bg-info',
+  'pre-operativo': 'bg-warning',
+  'en ruta': 'bg-warning',
+  'en cliente': 'bg-success',
   'cargando': 'bg-yellow-400',
   'finalizó carga': 'bg-cyan-500',
   'finalizo carga': 'bg-cyan-500',
@@ -274,7 +275,7 @@ const COLUMNS: ColumnDef[] = [
     key: 'conductor', label: 'Conductor', headClass: 'min-w-[180px]',
     sortValue: (t) => m2oName(t.x_studio_conductor),
     render: (t) => faltaConductor(t) ? (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 text-[11px] font-semibold whitespace-nowrap dark:bg-red-950/50 dark:text-red-300 dark:border-red-900">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive-soft text-destructive-ink border border-destructive/30 text-[11px] font-semibold whitespace-nowrap dark:bg-red-950/50 dark:text-red-300 dark:border-red-900">
         <AlertTriangle className="h-3 w-3" />
         Falta asignar conductor
       </span>
@@ -727,7 +728,7 @@ export function ServiciosSection() {
           <AlertDialogAction
             onClick={handleConfirmReset}
             disabled={resetting || !resetTask || resetConfirmCode.trim().toUpperCase() !== servicioCodigo(resetTask).toUpperCase()}
-            className="bg-amber-600 hover:bg-amber-700"
+            className="bg-warning hover:bg-amber-700"
           >
             {resetting ? <span className="flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />Reiniciando...</span> : 'Sí, reiniciar'}
           </AlertDialogAction>
@@ -761,7 +762,7 @@ export function ServiciosSection() {
           <AlertDialogAction
             onClick={handleConfirmFinalize}
             disabled={finalizing || !finalizeTask || finalizeConfirmCode.trim().toUpperCase() !== servicioCodigo(finalizeTask).toUpperCase()}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-success hover:bg-emerald-700"
           >
             {finalizing ? <span className="flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />Finalizando...</span> : 'Sí, finalizar'}
           </AlertDialogAction>
@@ -868,123 +869,117 @@ export function ServiciosSection() {
     </Dialog>
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Truck className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Servicios de Transporte</h2>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              Proyecto Odoo · {historico ? 'Histórico completo' : `Últimos ${DIAS_RECIENTES} días`} · {loading ? '...' : `${sorted.length} de ${tasks.length} registros`}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Móvil: botón para mostrar/ocultar los filtros */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setMobileFiltersOpen((v) => !v)}
-            className="h-8 gap-1.5 sm:hidden"
-          >
-            <Filter className="h-3.5 w-3.5" />
-            Filtros
-            {activeFilterCount > 0 && (
-              <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
-                {activeFilterCount}
-              </span>
-            )}
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5"
-            onClick={() => setResumenOpen(true)}
-            disabled={loading}
-            title="Reporte PDF de cumplimiento de conductores por semana o rango de fechas"
-          >
-            <FileText className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Exportar resumen</span>
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5" disabled={!!exportingFormat}>
-                {exportingFormat ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                <span className="hidden sm:inline">Exportar</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setCustomExportOpen(true)} disabled={!!exportingFormat} className="gap-2">
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                Personalizado (semana, conductor…)
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Exportar Excel por cliente</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {(Object.keys(EXPORT_FORMATS) as ExportClientFormat[]).map((key) => (
-                <DropdownMenuItem key={key} onClick={() => openExportDialog(key)} disabled={!!exportingFormat} className="gap-2">
-                  <FileSpreadsheet className="h-3.5 w-3.5" />
-                  Formato {EXPORT_FORMATS[key].label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5">
-                <Columns className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Columnas</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="max-h-[70vh] overflow-y-auto">
-              <DropdownMenuLabel>Mostrar/ocultar columnas</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {COLUMNS.map((c) => (
-                <DropdownMenuCheckboxItem
-                  key={c.key}
-                  checked={!hiddenColumns.has(c.key)}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={() => toggleColumn(c.key)}
-                >
-                  {c.label}
-                </DropdownMenuCheckboxItem>
-              ))}
-              {hiddenColumns.size > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <button
-                    onClick={() => setHiddenColumns(new Set())}
-                    className="w-full text-left px-2 py-1.5 text-xs text-primary hover:underline"
-                  >
-                    Mostrar todas
-                  </button>
-                </>
+      <PageHeader
+        icon={Truck}
+        title="Servicios de Transporte"
+        description={<>{historico ? 'Histórico completo' : `Últimos ${DIAS_RECIENTES} días`} · {loading ? '...' : `${sorted.length} de ${tasks.length} registros`}</>}
+        actions={
+          <>
+            {/* Móvil: botón para mostrar/ocultar los filtros */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMobileFiltersOpen((v) => !v)}
+              className="h-8 gap-1.5 sm:hidden"
+            >
+              <Filter className="h-3.5 w-3.5" />
+              Filtros
+              {activeFilterCount > 0 && (
+                <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                  {activeFilterCount}
+                </span>
               )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </Button>
 
-          <Button
-            variant={historico ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => { setHistorico((v) => !v); setPage(1) }}
-            disabled={loading}
-            className="h-8 gap-1.5"
-            title={historico ? `Volver a mostrar solo los últimos ${DIAS_RECIENTES} días` : 'Cargar también los servicios más antiguos (tarda más)'}
-          >
-            <History className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{historico ? `Últimos ${DIAS_RECIENTES} días` : 'Ver histórico'}</span>
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => setResumenOpen(true)}
+              disabled={loading}
+              title="Reporte PDF de cumplimiento de conductores por semana o rango de fechas"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Exportar resumen</span>
+            </Button>
 
-          <Button variant="outline" size="sm" onClick={fetchData} disabled={refrescando} className="h-8 gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${refrescando ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Actualizar</span>
-          </Button>
-        </div>
-      </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5" disabled={!!exportingFormat}>
+                  {exportingFormat ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                  <span className="hidden sm:inline">Exportar</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setCustomExportOpen(true)} disabled={!!exportingFormat} className="gap-2">
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  Personalizado (semana, conductor…)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Exportar Excel por cliente</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {(Object.keys(EXPORT_FORMATS) as ExportClientFormat[]).map((key) => (
+                  <DropdownMenuItem key={key} onClick={() => openExportDialog(key)} disabled={!!exportingFormat} className="gap-2">
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    Formato {EXPORT_FORMATS[key].label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                  <Columns className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Columnas</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-[70vh] overflow-y-auto">
+                <DropdownMenuLabel>Mostrar/ocultar columnas</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {COLUMNS.map((c) => (
+                  <DropdownMenuCheckboxItem
+                    key={c.key}
+                    checked={!hiddenColumns.has(c.key)}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={() => toggleColumn(c.key)}
+                  >
+                    {c.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                {hiddenColumns.size > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <button
+                      onClick={() => setHiddenColumns(new Set())}
+                      className="w-full text-left px-2 py-1.5 text-xs text-primary hover:underline"
+                    >
+                      Mostrar todas
+                    </button>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button
+              variant={historico ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => { setHistorico((v) => !v); setPage(1) }}
+              disabled={loading}
+              className="h-8 gap-1.5"
+              title={historico ? `Volver a mostrar solo los últimos ${DIAS_RECIENTES} días` : 'Cargar también los servicios más antiguos (tarda más)'}
+            >
+              <History className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{historico ? `Últimos ${DIAS_RECIENTES} días` : 'Ver histórico'}</span>
+            </Button>
+
+            <Button variant="outline" size="sm" onClick={fetchData} disabled={refrescando} className="h-8 gap-1.5">
+              <RefreshCw className={`h-3.5 w-3.5 ${refrescando ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Actualizar</span>
+            </Button>
+          </>
+        }
+      />
 
       {/* Buscador — siempre visible, es el control más usado */}
       <div className="flex items-center gap-1.5 bg-background border rounded-lg px-3 h-9 shadow-sm">
@@ -1062,7 +1057,7 @@ export function ServiciosSection() {
 
       {/* Aviso: subtareas de devolución/retiro sin conductor responsable */}
       {!loading && sinConductorCount > 0 && (
-        <div className="flex items-center justify-between gap-3 flex-wrap bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 dark:bg-red-950/40 dark:border-red-900 dark:text-red-200">
+        <div className="flex items-center justify-between gap-3 flex-wrap bg-destructive-soft border border-destructive/30 text-destructive-ink rounded-xl px-4 py-3 dark:bg-red-950/40 dark:border-red-900 dark:text-red-200">
           <div className="flex items-center gap-2 text-sm">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>
@@ -1072,7 +1067,7 @@ export function ServiciosSection() {
           <Button
             size="sm"
             variant={soloSinConductor ? 'default' : 'outline'}
-            className="h-8 border-red-300 dark:border-red-800"
+            className="h-8 border-destructive/30 dark:border-red-800"
             onClick={() => { setSoloSinConductor((v) => !v); setPage(1) }}
           >
             {soloSinConductor ? 'Ver todos los servicios' : 'Ver solo estas'}
@@ -1181,7 +1176,7 @@ export function ServiciosSection() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-amber-600"
+                              className="h-7 w-7 text-muted-foreground hover:text-warning-ink"
                               onClick={() => { setResetTask(task); setResetConfirmCode('') }}
                               title="Reiniciar servicio (borra las horas marcadas por el conductor)"
                             >
@@ -1192,7 +1187,7 @@ export function ServiciosSection() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-emerald-600"
+                              className="h-7 w-7 text-muted-foreground hover:text-success-ink"
                               onClick={() => { setFinalizeTask(task); setFinalizeConfirmCode('') }}
                               title="Finalizar servicio directamente (sin pasar por el conductor)"
                             >
@@ -1203,7 +1198,7 @@ export function ServiciosSection() {
                           <TableCell className="font-medium whitespace-nowrap" title={task.name}>
                             {code}
                             {task.parent_id && (
-                              <div className="flex items-center gap-1 text-[10px] font-normal text-amber-600" title={`Subtarea vinculada a ${code}`}>
+                              <div className="flex items-center gap-1 text-[10px] font-normal text-warning-ink" title={`Subtarea vinculada a ${code}`}>
                                 <CornerDownRight className="h-2.5 w-2.5 shrink-0" />
                                 <span className="truncate max-w-[140px]">{task.name}</span>
                               </div>

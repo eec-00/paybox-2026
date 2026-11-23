@@ -122,14 +122,14 @@ function getPlacaDisplay(val: unknown): string {
 }
 
 const STAGE_COLORS: Record<string, string> = {
-  'nueva solicitud': 'bg-blue-100 text-blue-800 border-blue-200',
-  'pre-operativo': 'bg-amber-100 text-amber-800 border-amber-200',
-  'en ruta': 'bg-orange-100 text-orange-800 border-orange-200',
-  'en cliente': 'bg-green-100 text-green-800 border-green-200',
-  'cargando': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  'nueva solicitud': 'bg-info-soft text-info-ink border-info/30',
+  'pre-operativo': 'bg-warning-soft text-warning-ink border-warning/40',
+  'en ruta': 'bg-warning-soft text-warning-ink border-warning/40',
+  'en cliente': 'bg-success-soft text-success-ink border-success/30',
+  'cargando': 'bg-warning-soft text-warning-ink border-warning/40',
   'finalizó carga': 'bg-cyan-100 text-cyan-800 border-cyan-200',
   'finalizo carga': 'bg-cyan-100 text-cyan-800 border-cyan-200',
-  'servicio finalizado': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  'servicio finalizado': 'bg-success-soft text-success-ink border-success/30',
   'facturac': 'bg-indigo-100 text-indigo-800 border-indigo-200',
   'cerrado': 'bg-gray-200 text-gray-700 border-gray-300',
 }
@@ -296,7 +296,7 @@ function PartnerSelect({
         )}
       </div>
       {sinElegir && !open && (
-        <p className="text-[10px] text-amber-600">Elige un almacén de la lista para que se guarde.</p>
+        <p className="text-[10px] text-warning-ink">Elige un almacén de la lista para que se guarde.</p>
       )}
       {puedeAtajo && shortcut && (
         <button type="button" onClick={() => elegir(shortcut.value)} className="text-[10px] text-primary hover:underline">
@@ -620,7 +620,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                     </p>
                   )}
                   {modalidad === MODALIDAD_MISMO_CONDUCTOR && origModalidad === MODALIDAD_OTRO_CONDUCTOR && subtareaCreada && (
-                    <p className="text-[11px] text-amber-600 leading-snug">
+                    <p className="text-[11px] text-warning-ink leading-snug">
                       La subtarea de devolución que ya se creó no se borra sola — elimínala en Odoo si ya no corresponde.
                     </p>
                   )}
@@ -697,7 +697,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
           </div>
 
           {/* ④ TIEMPOS OPERATIVOS — fondo diferenciado */}
-          <div className="bg-background rounded-xl border border-blue-100 dark:border-blue-900/40 p-4">
+          <div className="bg-background rounded-xl border border-info/30 dark:border-blue-900/40 p-4">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
               ④ Tiempos Operativos · {tipoServicioLabelFor(task as TaskTypeFlags)}
             </p>
@@ -712,7 +712,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                     className="h-9 text-sm font-mono text-center"
                   />
                   {h.foto !== 'no' && (
-                    <p className="text-[9px] text-amber-600 font-medium uppercase tracking-wide">Foto: {h.foto}</p>
+                    <p className="text-[9px] text-warning-ink font-medium uppercase tracking-wide">Foto: {h.foto}</p>
                   )}
                 </div>
               ))}

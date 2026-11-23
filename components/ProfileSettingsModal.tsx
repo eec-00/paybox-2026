@@ -140,7 +140,7 @@ export function ProfileSettingsModal({
               />
             </div>
             {nameMsg && (
-              <div className={`flex items-center gap-2 text-sm ${nameMsg.type === 'success' ? 'text-green-600' : 'text-destructive'}`}>
+              <div className={`flex items-center gap-2 text-sm ${nameMsg.type === 'success' ? 'text-success-ink' : 'text-destructive'}`}>
                 {nameMsg.type === 'success' ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                 {nameMsg.text}
               </div>
@@ -174,7 +174,7 @@ export function ProfileSettingsModal({
               />
             </div>
             {passMsg && (
-              <div className={`flex items-center gap-2 text-sm ${passMsg.type === 'success' ? 'text-green-600' : 'text-destructive'}`}>
+              <div className={`flex items-center gap-2 text-sm ${passMsg.type === 'success' ? 'text-success-ink' : 'text-destructive'}`}>
                 {passMsg.type === 'success' ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                 {passMsg.text}
               </div>

@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUserProfile } from '@/lib/utils/auth'
@@ -330,26 +331,22 @@ export function VacacionesSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <CalendarClock className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Vacaciones</h2>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              Control de vacaciones del personal
-            </p>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={fetchEmpleados} disabled={loading} className="h-8 gap-1.5">
-          <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
-          Actualizar
-        </Button>
-      </div>
+      <PageHeader
+        icon={CalendarClock}
+        title="Vacaciones"
+        description="Control de vacaciones del personal"
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={fetchEmpleados} disabled={loading} className="h-8 gap-1.5">
+              <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
+              Actualizar
+            </Button>
+          </>
+        }
+      />
 
       {alertas > 0 && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+        <div className="flex items-center gap-2 p-3 bg-destructive-soft border border-destructive/30 rounded-lg text-sm text-destructive-ink">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {alertas} trabajador{alertas !== 1 ? 'es' : ''} con vacaciones pendientes o con aviso vencido.
         </div>
@@ -476,7 +473,7 @@ export function VacacionesSection() {
                           )}
                           {canEdit && (
                             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setBajaEmpleado(e)}>
-                              {e.activo ? <UserX className="h-3.5 w-3.5 text-red-600" /> : <UserCheck className="h-3.5 w-3.5 text-green-600" />}
+                              {e.activo ? <UserX className="h-3.5 w-3.5 text-destructive-ink" /> : <UserCheck className="h-3.5 w-3.5 text-success-ink" />}
                             </Button>
                           )}
                         </div>

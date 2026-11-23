@@ -225,7 +225,7 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
   return (
     <>
       {ocrToast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-9999 bg-green-500 text-white px-5 py-2.5 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 animate-fade-in pointer-events-none">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-9999 bg-success text-white px-5 py-2.5 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 animate-fade-in pointer-events-none">
           <CheckCircle2 className="w-4 h-4" />
           Datos obtenidos
         </div>

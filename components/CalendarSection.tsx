@@ -1,5 +1,7 @@
 'use client'
 
+import { formatMoney } from '@/lib/format'
+import { PageHeader } from '@/components/ui/page-header'
 import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -231,25 +233,20 @@ export function CalendarSection() {
     }
 
     const gastoPagoColor = (pago: CalendarioPago) => {
-        if (pago.estado === 'pagado') return 'bg-green-100/50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+        if (pago.estado === 'pagado') return 'bg-success-soft/50 text-success-ink dark:bg-green-900/20 dark:text-green-400'
         if (pago.tipo === 'gasto_conductor') return 'bg-primary/10 text-primary dark:bg-primary/20'
-        return 'bg-blue-100/50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+        return 'bg-info-soft/50 text-info-ink dark:bg-blue-900/20 dark:text-blue-400'
     }
 
     const gastoPagoBorder = (pago: CalendarioPago) => {
-        if (pago.estado === 'pagado') return 'bg-green-50/50 border-green-200 dark:bg-green-900/10 dark:border-green-800'
+        if (pago.estado === 'pagado') return 'bg-success-soft/50 border-success/30 dark:bg-green-900/10 dark:border-green-800'
         if (pago.tipo === 'gasto_conductor') return 'bg-primary/5 border-primary/20 dark:bg-primary/10'
-        return 'bg-blue-50/50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800'
+        return 'bg-info-soft/50 border-info/30 dark:bg-blue-900/10 dark:border-blue-800'
     }
 
     // Helper functions for Calendar
     const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate()
     const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay()
-
-    const formatter = new Intl.NumberFormat('es-PE', {
-        style: 'currency',
-        currency: 'PEN'
-    })
 
     const renderCalendar = () => {
         const year = currentDate.getFullYear()
@@ -293,7 +290,7 @@ export function CalendarSection() {
                                 <div
                                     key={pago.id}
                                     className={`text-[10px] px-1 py-0.5 rounded-sm flex items-center gap-1 cursor-pointer hover:opacity-80 ${gastoPagoColor(pago)}`}
-                                    title={`${pago.nombre_pago} — ${pago.monto_variable ? 'Variable' : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`}${esGasto && pago.fecha_limite ? ` — Pagar hasta ${fechaCorta(pago.fecha_limite)}` : ''}`}
+                                    title={`${pago.nombre_pago} — ${pago.monto_variable ? 'Variable' : formatMoney(pago.monto, pago.moneda)}${esGasto && pago.fecha_limite ? ` — Pagar hasta ${fechaCorta(pago.fecha_limite)}` : ''}`}
                                     onClick={() => {
                                         if (esGasto && pago.gasto_conductor) {
                                             setDetailGasto(pago.gasto_conductor)
@@ -303,7 +300,7 @@ export function CalendarSection() {
                                     {esGasto && <Receipt className="w-3 h-3 shrink-0 opacity-70" />}
                                     <span className="font-semibold truncate flex-1 min-w-0">{etiqueta}</span>
                                     <span className="shrink-0 font-medium">
-                                        {pago.monto_variable ? 'Variable' : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`}
+                                        {pago.monto_variable ? 'Variable' : formatMoney(pago.monto, pago.moneda)}
                                     </span>
                                     {pago.frecuencia !== 'unica' && <RefreshCw className="w-2.5 h-2.5 shrink-0 text-muted-foreground" />}
                                     {pago.estado === 'pagado' && <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />}
@@ -341,14 +338,14 @@ export function CalendarSection() {
                                                 )}
                                                 <div className="flex justify-between items-center mt-1 pt-1 border-t border-border/50">
                                                     <span className="font-medium text-foreground">
-                                                        {pago.monto_variable ? 'Monto Variable' : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`}
+                                                        {pago.monto_variable ? 'Monto Variable' : formatMoney(pago.monto, pago.moneda)}
                                                     </span>
                                                     <div className="flex gap-2 items-center">
                                                         {pago.frecuencia !== 'unica' && <span className="flex items-center gap-1 text-[11px] text-muted-foreground" title={pago.frecuencia}><RefreshCw className="w-3 h-3" /> Repetitivo</span>}
                                                         {pago.estado === 'pagado' ? (
-                                                            <span className="flex items-center gap-1 text-[11px] text-green-600 font-semibold"><CheckCircle2 className="w-3 h-3" /> Pagado</span>
+                                                            <span className="flex items-center gap-1 text-[11px] text-success-ink font-semibold"><CheckCircle2 className="w-3 h-3" /> Pagado</span>
                                                         ) : (
-                                                            <span className="flex items-center gap-1 text-[11px] text-amber-600 font-semibold"><AlertCircle className="w-3 h-3" /> Pendiente</span>
+                                                            <span className="flex items-center gap-1 text-[11px] text-warning-ink font-semibold"><AlertCircle className="w-3 h-3" /> Pendiente</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -471,18 +468,18 @@ export function CalendarSection() {
                                             )}
                                         </TableCell>
                                         <TableCell className="text-sm whitespace-nowrap font-semibold">
-                                            {pago.monto_variable ? <span className="text-muted-foreground italic text-xs">A definir</span> : `${pago.moneda === 'soles' ? 'S/' : '$'} ${pago.monto}`}
+                                            {pago.monto_variable ? <span className="text-muted-foreground italic text-xs">A definir</span> : formatMoney(pago.monto, pago.moneda)}
                                         </TableCell>
                                         {listTab === 'fijos' && (
                                             <TableCell className="hidden md:table-cell text-sm">{pago.numero_factura || '-'}</TableCell>
                                         )}
                                         <TableCell>
                                             {pago.estado === 'pagado' ? (
-                                                <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                                                <span className="flex items-center gap-1 text-xs text-success-ink font-medium">
                                                     <CheckCircle2 className="w-4 h-4" /> Pagado
                                                 </span>
                                             ) : (
-                                                <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
+                                                <span className="flex items-center gap-1 text-xs text-warning-ink font-medium">
                                                     <AlertCircle className="w-4 h-4" /> Pendiente
                                                 </span>
                                             )}
@@ -524,13 +521,7 @@ export function CalendarSection() {
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                    <CalendarIcon className="h-6 w-6 text-primary shrink-0" />
-                    <div className="min-w-0">
-                        <h2 className="text-xl sm:text-2xl font-bold text-primary">Calendario de Pagos</h2>
-                        <p className="text-muted-foreground text-sm hidden sm:block">Gestiona los pagos recurrentes y programados</p>
-                    </div>
-                </div>
+                <PageHeader icon={CalendarIcon} title="Calendario de pagos" description="Pagos recurrentes y programados" />
 
                 <div className="flex items-center gap-2 shrink-0">
                     <div className="bg-muted p-1 rounded-md flex">
@@ -667,7 +658,7 @@ export function CalendarSection() {
                                         </div>
 
                                         {formData.frecuencia !== 'unica' && (
-                                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 rounded-md border border-blue-200 dark:border-blue-800 flex items-start gap-2">
+                                            <div className="p-3 bg-info-soft dark:bg-blue-900/20 text-info-ink dark:text-blue-300 rounded-md border border-info/30 dark:border-blue-800 flex items-start gap-2">
                                                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                                                 <div className="space-y-2 w-full">
                                                     <p className="text-xs">
@@ -678,7 +669,7 @@ export function CalendarSection() {
                                                         <Input
                                                             id="fecha_limite"
                                                             type="date"
-                                                            className="h-8 mt-1 border-blue-300 dark:border-blue-700 bg-white dark:bg-background"
+                                                            className="h-8 mt-1 border-info/30 dark:border-blue-700 bg-white dark:bg-background"
                                                             value={formData.fecha_limite}
                                                             onChange={e => setFormData({ ...formData, fecha_limite: e.target.value })}
                                                         />
@@ -760,13 +751,13 @@ export function CalendarSection() {
                             <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Conductor</p><p className="font-semibold">{detailGasto.conductor_nombre}</p></div>
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Estado</p>
-                                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${detailGasto.estado === 'pagado' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${detailGasto.estado === 'pagado' ? 'bg-success-soft text-success-ink' : 'bg-warning-soft text-warning-ink'}`}>
                                         {detailGasto.estado === 'pagado' ? <><CheckCircle2 className="w-3 h-3" />Pagado</> : <><AlertCircle className="w-3 h-3" />Pendiente</>}
                                     </span>
                                 </div>
                                 <div className="col-span-2"><p className="text-xs text-muted-foreground uppercase tracking-wide">Servicio</p><p className="font-semibold">{detailGasto.servicio_nombre}</p></div>
                                 <div className="col-span-2"><p className="text-xs text-muted-foreground uppercase tracking-wide">Descripción</p><p className="font-medium">{detailGasto.descripcion}</p></div>
-                                <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Monto</p><p className="font-bold text-xl text-primary">{detailGasto.moneda === 'soles' ? 'S/' : '$'} {detailGasto.monto}</p></div>
+                                <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Monto</p><p className="font-bold text-xl text-primary">{formatMoney(detailGasto.monto, detailGasto.moneda)}</p></div>
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Fecha</p><p className="font-semibold">{new Date(detailGasto.created_at).toLocaleDateString('es-PE')}</p></div>
                                 {limiteDetalle && <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Pagar hasta</p><p className="font-semibold">{fechaCorta(limiteDetalle)}</p></div>}
                             </div>
@@ -786,7 +777,7 @@ export function CalendarSection() {
                                 <div>
                                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Voucher de pago</p>
                                     <a href={urlArchivo(detailGasto.foto_pago)} target="_blank" rel="noopener noreferrer">
-                                        <img src={urlArchivo(detailGasto.foto_pago)} alt="voucher pago" className="w-24 h-24 object-cover rounded-lg border border-green-200 hover:opacity-80 transition-opacity" />
+                                        <img src={urlArchivo(detailGasto.foto_pago)} alt="voucher pago" className="w-24 h-24 object-cover rounded-lg border border-success/30 hover:opacity-80 transition-opacity" />
                                     </a>
                                 </div>
                             )}

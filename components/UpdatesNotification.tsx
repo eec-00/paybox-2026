@@ -151,7 +151,7 @@ export function UpdatesNotification() {
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <Badge 
-              className="absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center p-0 px-1.5 bg-red-500 hover:bg-red-600 text-white border-2 border-primary text-xs font-bold shadow-lg animate-pulse"
+              className="absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center p-0 px-1.5 bg-destructive hover:bg-destructive text-white border-2 border-primary text-xs font-bold shadow-lg animate-pulse"
             >
               {unreadCount > 9 ? '9+' : unreadCount}
             </Badge>
@@ -193,7 +193,7 @@ export function UpdatesNotification() {
               >
                 <div className="flex items-start gap-3 w-full">
                   <span
-                    className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${noLeida ? 'bg-orange-500' : 'bg-transparent'}`}
+                    className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${noLeida ? 'bg-warning' : 'bg-transparent'}`}
                     title={noLeida ? 'Nueva' : undefined}
                   />
                   <div className="flex-1 min-w-0">

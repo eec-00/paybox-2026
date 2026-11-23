@@ -512,7 +512,7 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
   return (
     <>
       {ocrToast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-9999 bg-green-500 text-white px-5 py-2.5 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 animate-fade-in pointer-events-none">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-9999 bg-success text-white px-5 py-2.5 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 animate-fade-in pointer-events-none">
           <CheckCircle2 className="w-4 h-4" />
           Datos obtenidos
         </div>
@@ -534,12 +534,12 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
               maxImages={4}
             />
             {faltaFotoPago && (
-              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-md">
+              <p className="text-sm text-warning-ink bg-warning-soft border border-warning/40 p-3 rounded-md">
                 Sube primero la foto del pago para continuar con los demás datos.
               </p>
             )}
             {avisoVoucher && (
-              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-md">
+              <p className="text-sm text-warning-ink bg-warning-soft border border-warning/40 p-3 rounded-md">
                 {avisoVoucher}
               </p>
             )}

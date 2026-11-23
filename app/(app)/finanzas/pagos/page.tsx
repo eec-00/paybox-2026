@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useApp } from '@/lib/context/app-context'
@@ -88,19 +89,11 @@ export default function PagosPage() {
       <div className="flex flex-col gap-3 bg-card/40 p-3 sm:p-4 rounded-xl border border-border/50 shadow-sm">
         {/* Título + Acciones */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg">
-              <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Pagos</h2>
-              <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">Historial y gestión de registros</p>
-            </div>
-          </div>
+          <PageHeader icon={FileText} title="Pagos" description="Historial y gestión de registros" />
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <ExportExcelModal buttonVariant="outline" buttonSize="sm" buttonClass="h-8 sm:h-9 px-2 sm:px-4 bg-emerald-50 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 border-emerald-200 shadow-sm font-semibold text-xs rounded-lg" />
+            <ExportExcelModal buttonVariant="outline" buttonSize="sm" buttonClass="h-8 sm:h-9 px-2 sm:px-4 text-xs" />
             {canCreate && !showNewPaymentForm && (
-              <Button onClick={() => setShowNewPaymentForm(true)} size="sm" className="h-8 sm:h-9 px-3 sm:px-5 shadow-md hover:shadow-lg transition-all font-bold text-xs rounded-lg bg-[#1a2332] hover:bg-[#2c3a4f]">
+              <Button onClick={() => setShowNewPaymentForm(true)} size="sm" className="h-8 sm:h-9 px-3 sm:px-5 text-xs font-semibold">
                 <PlusCircle className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Nuevo pago</span>
               </Button>

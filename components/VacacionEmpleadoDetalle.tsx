@@ -210,7 +210,7 @@ export function VacacionEmpleadoDetalle({ empleado, open, onClose, onChanged, ca
                             </span>
                             {canDelete && (
                               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleteRecordId(r.id)}>
-                                <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                                <Trash2 className="h-3.5 w-3.5 text-destructive-ink" />
                               </Button>
                             )}
                           </div>
@@ -222,7 +222,7 @@ export function VacacionEmpleadoDetalle({ empleado, open, onClose, onChanged, ca
                           <div>Saldo: <span className="text-foreground font-medium">{saldo}</span></div>
                         </div>
                         {estado === 'pendiente' && (
-                          <p className="mt-2 text-xs text-yellow-800">
+                          <p className="mt-2 text-xs text-warning-ink">
                             Límite legal para programar: {fmt(avisos.limite.toISOString().slice(0, 10))}
                           </p>
                         )}

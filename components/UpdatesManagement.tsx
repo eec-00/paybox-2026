@@ -199,9 +199,9 @@ export function UpdatesManagement() {
   if (error) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
-          <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-          <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+        <div className="flex items-center gap-2 p-4 bg-destructive-soft dark:bg-red-950 border border-destructive/30 dark:border-red-800 rounded-lg">
+          <AlertCircle className="h-5 w-5 text-destructive-ink dark:text-red-400" />
+          <p className="text-sm text-destructive-ink dark:text-red-200">{error}</p>
         </div>
         <Button onClick={loadUpdates}>
           Reintentar
@@ -348,9 +348,9 @@ export function UpdatesManagement() {
             </div>
 
             {saveError && (
-              <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
-                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <p className="text-sm text-red-800 dark:text-red-200">{saveError}</p>
+              <div className="flex items-center gap-2 p-3 bg-destructive-soft dark:bg-red-950 border border-destructive/30 dark:border-red-800 rounded-lg">
+                <AlertCircle className="h-4 w-4 text-destructive-ink dark:text-red-400" />
+                <p className="text-sm text-destructive-ink dark:text-red-200">{saveError}</p>
               </div>
             )}
 

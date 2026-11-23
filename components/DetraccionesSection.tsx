@@ -1,5 +1,7 @@
 'use client'
 
+import { formatMoney } from '@/lib/format'
+import { PageHeader } from '@/components/ui/page-header'
 import { useCallback, useMemo, useRef, useState } from 'react'
 // Solo tipos: la librería (~900 KB) se carga recién al exportar
 import type ExcelJS from 'exceljs'
@@ -17,6 +19,7 @@ import {
   FileWarning,
   Loader2,
   Trash2,
+  Scale,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -42,7 +45,7 @@ function normSearch(v: unknown): string {
 }
 
 function fmtMoney(n: number): string {
-  return n.toFixed(2)
+  return formatMoney(n, 'soles')
 }
 
 async function readWorkbookRows(file: File): Promise<SheetRow[]> {
@@ -314,12 +317,11 @@ export function DetraccionesSection() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Detracciones — Conciliación con Banco de la Nación</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Cruza el reporte SUNAT de detracciones con el estado de cuenta del BN, por RUC del proveedor + monto depositado.
-        </p>
-      </div>
+      <PageHeader
+        icon={Scale}
+        title="Detracciones"
+        description="Conciliación del reporte SUNAT con el estado de cuenta del Banco de la Nación, por RUC del proveedor y monto depositado"
+      />
 
       <Card>
         <CardHeader className="pb-3">
