@@ -442,13 +442,13 @@ export function SunatSection() {
                           <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
                             <td className="px-2 py-2">
                               <div className="flex items-center gap-1.5">
-                                <button onClick={() => verXML(r)} disabled={!!loadingDetalle} title="Ver datos XML" className="text-muted-foreground hover:text-primary transition-colors">
+                                <button aria-label="Ver datos XML" onClick={() => verXML(r)} disabled={!!loadingDetalle} title="Ver datos XML" className="text-muted-foreground hover:text-primary transition-colors">
                                   {loadingDetalle === `xml-${key}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
                                 </button>
-                                <button onClick={() => verPDF(r)} disabled={!!loadingDetalle} title="Ver PDF" className="text-muted-foreground hover:text-info-ink transition-colors">
+                                <button aria-label="Ver PDF" onClick={() => verPDF(r)} disabled={!!loadingDetalle} title="Ver PDF" className="text-muted-foreground hover:text-info-ink transition-colors">
                                   {loadingDetalle === `pdf-${key}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
                                 </button>
-                                <button onClick={() => descargarPDF(r)} disabled={!!loadingDetalle} title="Descargar PDF" className="text-muted-foreground hover:text-success-ink transition-colors">
+                                <button aria-label="Descargar PDF" onClick={() => descargarPDF(r)} disabled={!!loadingDetalle} title="Descargar PDF" className="text-muted-foreground hover:text-success-ink transition-colors">
                                   {loadingDetalle === `dl-${key}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                                 </button>
                               </div>
@@ -464,11 +464,11 @@ export function SunatSection() {
                     </table>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => consultar(page - 1)} disabled={page === 0 || loading}>
+                    <Button aria-label="Página anterior" variant="outline" size="sm" onClick={() => consultar(page - 1)} disabled={page === 0 || loading}>
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <span className="text-sm text-muted-foreground px-1">Página {page + 1} · offset {page * 100}</span>
-                    <Button variant="outline" size="sm" onClick={() => consultar(page + 1)} disabled={rows.length < 100 || loading}>
+                    <Button aria-label="Página siguiente" variant="outline" size="sm" onClick={() => consultar(page + 1)} disabled={rows.length < 100 || loading}>
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>

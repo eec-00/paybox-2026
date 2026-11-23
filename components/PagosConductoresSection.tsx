@@ -269,7 +269,7 @@ export function PagosConductoresSection() {
                 const abierto = abiertos.includes(r.key)
                 return (
                   <Fragment key={r.key}>
-                    <TableRow className="cursor-pointer hover:bg-muted/40" onClick={() => toggle(r.key)}>
+                    <TableRow className="cursor-pointer hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" tabIndex={0} aria-expanded={abierto} onClick={() => toggle(r.key)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(r.key) } }}>
                       <TableCell className="text-sm font-semibold">
                         <span className="inline-flex items-center gap-1.5">
                           {abierto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}

@@ -85,7 +85,7 @@ function TablaResultados({ filas, onAprobar }: { filas: Fila[]; onAprobar?: (p: 
           const abierto = abiertos.includes(key)
           return (
             <Fragment key={key}>
-              <TableRow className="cursor-pointer" onClick={() => toggle(key)}>
+              <TableRow className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" tabIndex={0} aria-expanded={abierto} onClick={() => toggle(key)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(key) } }}>
                 <TableCell>
                   {abierto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </TableCell>

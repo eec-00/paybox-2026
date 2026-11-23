@@ -185,7 +185,7 @@ export function AsistenciaZonas() {
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleteZona(z)}>
+                <Button aria-label="Eliminar zona" size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleteZona(z)}>
                   <Trash2 className="h-3.5 w-3.5 text-destructive-ink" />
                 </Button>
               </div>
@@ -203,7 +203,7 @@ export function AsistenciaZonas() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="col-span-2 sm:col-span-2">
             <Label className="text-xs text-muted-foreground">Nombre</Label>
-            <Input
+            <Input aria-label="Nombre de la zona"
               placeholder="Ej: Oficina Lima"
               value={form.nombre}
               onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
@@ -212,7 +212,7 @@ export function AsistenciaZonas() {
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Latitud</Label>
-            <Input
+            <Input aria-label="Latitud"
               placeholder="-12.0464"
               value={form.lat}
               onChange={(e) => setForm((f) => ({ ...f, lat: e.target.value }))}
@@ -222,7 +222,7 @@ export function AsistenciaZonas() {
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Longitud</Label>
-            <Input
+            <Input aria-label="Longitud"
               placeholder="-77.0428"
               value={form.lng}
               onChange={(e) => setForm((f) => ({ ...f, lng: e.target.value }))}

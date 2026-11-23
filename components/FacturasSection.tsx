@@ -339,7 +339,7 @@ export function FacturasSection() {
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <Settings className="h-4 w-4" /> Configuración de alertas — Facturas
             </h3>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowConfig(false)}>
+            <Button aria-label="Cerrar configuración" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowConfig(false)}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -386,7 +386,7 @@ export function FacturasSection() {
                 />
                 <span className="text-xs text-muted-foreground shrink-0">días antes</span>
                 <span className="text-xs font-medium text-info-ink flex-1">{diasANombre(alerta.dias)}</span>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeGlobal(i)}>
+                <Button aria-label="Quitar alerta" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeGlobal(i)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -411,7 +411,7 @@ export function FacturasSection() {
         <div className="flex items-center gap-2 p-3 bg-destructive-soft border border-destructive/30 rounded-lg text-sm text-destructive-ink">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {error}
-          <button className="ml-auto" onClick={() => setError(null)}><X className="h-4 w-4" /></button>
+          <button aria-label="Cerrar aviso" className="ml-auto" onClick={() => setError(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
@@ -432,7 +432,7 @@ export function FacturasSection() {
               ))}
             </div>
           )}
-          <button onClick={() => setSendResult(null)}><X className="h-4 w-4" /></button>
+          <button aria-label="Cerrar aviso" onClick={() => setSendResult(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
@@ -444,7 +444,7 @@ export function FacturasSection() {
               <Bell className="h-4 w-4 text-info-ink" />
               Vista previa — {preview.length} factura(s) pendientes de notificar
             </h3>
-            <button onClick={() => setShowPreview(false)}><X className="h-4 w-4" /></button>
+            <button aria-label="Cerrar vista previa" onClick={() => setShowPreview(false)}><X className="h-4 w-4" /></button>
           </div>
           {preview.length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">No hay facturas pendientes de notificar con los umbrales configurados.</p>
@@ -492,7 +492,7 @@ export function FacturasSection() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
+          <Input aria-label="Buscar número o cliente"
             placeholder="Buscar número o cliente…"
             value={busquedaInput}
             onChange={(e) => setBusquedaInput(e.target.value)}
@@ -500,7 +500,7 @@ export function FacturasSection() {
             className="pl-8 h-8 text-sm"
           />
           {busquedaInput && (
-            <button className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => { setBusquedaInput(''); setBusqueda(''); setPage(0) }}>
+            <button aria-label="Limpiar búsqueda" className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => { setBusquedaInput(''); setBusqueda(''); setPage(0) }}>
               <X className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
           )}

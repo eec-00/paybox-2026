@@ -180,7 +180,7 @@ export function GastosConductorSection() {
             <div className="flex flex-wrap items-center gap-2 bg-card/40 p-3 rounded-xl border border-border/50 shadow-sm">
                 <div className="flex items-center gap-1.5 flex-1 min-w-[180px] bg-background border rounded-lg px-3 h-9">
                     <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <input
+                    <input aria-label="Buscar conductor, servicio, placa, contenedor, guía"
                         type="text"
                         placeholder="Buscar conductor, servicio, placa, contenedor, guía..."
                         value={search}
@@ -199,7 +199,7 @@ export function GastosConductorSection() {
                     </SelectContent>
                 </Select>
                 {(search || estadoFilter !== 'all') && (
-                    <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setEstadoFilter('all') }} className="h-9 px-2 text-muted-foreground hover:text-destructive">
+                    <Button aria-label="Limpiar búsqueda" variant="ghost" size="sm" onClick={() => { setSearch(''); setEstadoFilter('all') }} className="h-9 px-2 text-muted-foreground hover:text-destructive">
                         <XCircle className="h-4 w-4" />
                     </Button>
                 )}
@@ -272,7 +272,7 @@ export function GastosConductorSection() {
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => setDetailGasto(gasto)} title="Ver detalle">
+                                                    <Button aria-label="Ver detalle" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => setDetailGasto(gasto)} title="Ver detalle">
                                                         <Eye className="h-3.5 w-3.5" />
                                                     </Button>
                                                     {gasto.estado === 'pendiente' && (
@@ -283,10 +283,10 @@ export function GastosConductorSection() {
                                                                     Pagar
                                                                 </Button>
                                                             )}
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openEdit(gasto)} title="Editar">
+                                                            <Button aria-label="Editar" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openEdit(gasto)} title="Editar">
                                                                 <Pencil className="h-3.5 w-3.5" />
                                                             </Button>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteGasto(gasto)} title="Eliminar">
+                                                            <Button aria-label="Eliminar" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteGasto(gasto)} title="Eliminar">
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </>

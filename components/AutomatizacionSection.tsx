@@ -483,7 +483,7 @@ export function AutomatizacionSection({ tipo }: Props) {
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <Settings className="h-4 w-4" /> Configuración de alertas
             </h3>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowConfig(false)}>
+            <Button aria-label="Cerrar configuración" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowConfig(false)}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -561,7 +561,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                 />
                 <span className="text-xs text-muted-foreground shrink-0">días antes</span>
                 <span className="text-xs font-medium text-info-ink flex-1">{diasANombre(alerta.dias)}</span>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeGlobal(i)}>
+                <Button aria-label="Quitar alerta" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeGlobal(i)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -608,7 +608,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                     <Badge variant="outline" className="text-2xs h-4 border-warning/40 text-warning-ink">
                       {alertas.length} alerta{alertas.length !== 1 ? 's' : ''}
                     </Badge>
-                    <Button
+                    <Button aria-label="Quitar alerta"
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 text-destructive"
@@ -635,7 +635,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                           />
                           <span className="text-xs text-muted-foreground shrink-0">días antes</span>
                           <span className="text-xs font-medium text-warning-ink flex-1">{diasANombre(alerta.dias)}</span>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeCampoAlerta(campoKey, i)}>
+                          <Button aria-label="Quitar alerta" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeCampoAlerta(campoKey, i)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -668,7 +668,7 @@ export function AutomatizacionSection({ tipo }: Props) {
         <div className="flex items-center gap-2 p-3 bg-destructive-soft border border-destructive/30 rounded-lg text-sm text-destructive-ink">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {error}
-          <button className="ml-auto" onClick={() => setError(null)}><X className="h-4 w-4" /></button>
+          <button aria-label="Cerrar aviso" className="ml-auto" onClick={() => setError(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
@@ -691,7 +691,7 @@ export function AutomatizacionSection({ tipo }: Props) {
               ))}
             </div>
           )}
-          <button onClick={() => setSendResult(null)}><X className="h-4 w-4" /></button>
+          <button aria-label="Cerrar aviso" onClick={() => setSendResult(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
@@ -703,7 +703,7 @@ export function AutomatizacionSection({ tipo }: Props) {
               <Bell className="h-4 w-4 text-info-ink" />
               Vista previa — {preview.length} {esVehiculo ? 'consolidado' : `${registroLabel} recibirán alertas`}
             </h3>
-            <button onClick={() => setShowPreview(false)}><X className="h-4 w-4" /></button>
+            <button aria-label="Cerrar vista previa" onClick={() => setShowPreview(false)}><X className="h-4 w-4" /></button>
           </div>
           {preview.length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">No hay alertas pendientes de envío.</p>
@@ -747,7 +747,7 @@ export function AutomatizacionSection({ tipo }: Props) {
             className="pl-8 h-8 text-sm"
           />
           {busqueda && (
-            <button className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setBusqueda('')}>
+            <button aria-label="Limpiar búsqueda" className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setBusqueda('')}>
               <X className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
           )}
@@ -814,7 +814,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                       <td className={`sticky left-40 z-20 px-3 py-2 border-r border-border/50 whitespace-nowrap max-w-[160px] ${stickyBg}`}>
                         <div className="flex items-center gap-1">
                           {!esVehiculo && reg.work_email && (
-                            <button
+                            <button aria-label="Copiar correo"
                               title="Copiar correo"
                               onClick={() => {
                                 navigator.clipboard.writeText(reg.work_email)

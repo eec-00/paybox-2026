@@ -85,7 +85,7 @@ export function OficinaDiario({ config, trabajadores, permisos, fechaInicial }: 
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setFecha(sumarDias(fecha, -1))}>
+          <Button aria-label="Día anterior" variant="outline" size="icon" className="h-9 w-9" onClick={() => setFecha(sumarDias(fecha, -1))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Input
@@ -95,7 +95,7 @@ export function OficinaDiario({ config, trabajadores, permisos, fechaInicial }: 
             onChange={(e) => e.target.value && setFecha(e.target.value)}
             className="h-9 w-40"
           />
-          <Button variant="outline" size="icon" className="h-9 w-9" disabled={fecha >= hoy} onClick={() => setFecha(sumarDias(fecha, 1))}>
+          <Button aria-label="Día siguiente" variant="outline" size="icon" className="h-9 w-9" disabled={fecha >= hoy} onClick={() => setFecha(sumarDias(fecha, 1))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
           {fecha !== hoy && (
@@ -106,7 +106,7 @@ export function OficinaDiario({ config, trabajadores, permisos, fechaInicial }: 
           <p className="text-sm text-muted-foreground">
             {fmtDiaLargo(fecha)} · <span className="font-medium text-foreground">{marcaron} de {filas.length}</span> marcaron entrada
           </p>
-          <Button variant="outline" size="sm" onClick={cargar} disabled={loading}>
+          <Button aria-label="Actualizar" variant="outline" size="sm" onClick={cargar} disabled={loading}>
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
           </Button>
         </div>

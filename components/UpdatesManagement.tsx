@@ -253,14 +253,14 @@ export function UpdatesManagement() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
+                        <Button aria-label="Editar actualización"
                           variant="outline"
                           size="sm"
                           onClick={() => handleOpenDialog(update)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button
+                        <Button aria-label="Eliminar actualización"
                           variant="destructive"
                           size="sm"
                           onClick={() => handleDelete(update.id)}

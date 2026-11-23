@@ -209,7 +209,7 @@ export function VacacionEmpleadoDetalle({ empleado, open, onClose, onChanged, ca
                               {getEstadoLabel(estado)}
                             </span>
                             {canDelete && (
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleteRecordId(r.id)}>
+                              <Button aria-label="Eliminar registro" size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleteRecordId(r.id)}>
                                 <Trash2 className="h-3.5 w-3.5 text-destructive-ink" />
                               </Button>
                             )}

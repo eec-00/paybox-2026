@@ -419,7 +419,7 @@ export default function ServicioDetailPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <button
+                      <button aria-label="Copiar enlace"
                         onClick={() => copyLink(g.url)}
                         title="Copiar enlace"
                         className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md border hover:bg-muted/50 transition-colors"
@@ -435,7 +435,7 @@ export default function ServicioDetailPage() {
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
-                      <button
+                      <button aria-label="Compartir"
                         onClick={() => shareLink(g.url, g.placas.join(', '))}
                         title="Compartir"
                         className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md border hover:bg-muted/50 transition-colors"

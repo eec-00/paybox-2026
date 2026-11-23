@@ -360,7 +360,7 @@ export function VehiclesList() {
             <div className="flex items-center gap-2 flex-wrap">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
+                <Input aria-label="Buscar placa"
                   placeholder="Buscar placa..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
@@ -396,7 +396,7 @@ export function VehiclesList() {
                 )}
               </Button>
 
-              <Button
+              <Button aria-label="Actualizar"
                 variant="outline"
                 size="sm"
                 className="h-8 w-8 p-0"
@@ -607,7 +607,7 @@ export function VehiclesList() {
                     <p className="text-xs text-muted-foreground mb-1.5">Enlace de seguimiento</p>
                     <div className="flex items-center gap-1.5">
                       <Input value={geoLinkResult.url} readOnly className="text-xs h-8 flex-1" />
-                      <Button
+                      <Button aria-label="Copiar"
                         variant="outline" size="icon" className="h-8 w-8 shrink-0"
                         onClick={() => copyToClipboard(geoLinkResult!.url, geoLinkResult!.id)}
                         title="Copiar"
@@ -616,14 +616,14 @@ export function VehiclesList() {
                           ? <CheckCircle className="h-3.5 w-3.5 text-success-ink" />
                           : <Copy className="h-3.5 w-3.5" />}
                       </Button>
-                      <Button
+                      <Button aria-label="Abrir"
                         variant="outline" size="icon" className="h-8 w-8 shrink-0"
                         onClick={() => window.open(geoLinkResult!.url, '_blank')}
                         title="Abrir"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
+                      <Button aria-label="Compartir"
                         variant="outline" size="icon" className="h-8 w-8 shrink-0"
                         onClick={() => shareLink(geoLinkResult!.url, geoLinkResult!.description)}
                         title="Compartir"
@@ -763,14 +763,14 @@ export function VehiclesList() {
                   Eliminar ({selectedGeolinkIds.size})
                 </Button>
               )}
-              <Button
+              <Button aria-label="Actualizar"
                 variant="outline" size="sm" className="h-8 w-8 p-0"
                 onClick={fetchGeolinks} disabled={loadingGeolinks}
                 title="Actualizar"
               >
                 <RefreshCw className={cn('h-3.5 w-3.5', loadingGeolinks && 'animate-spin')} />
               </Button>
-              <Button
+              <Button aria-label="Ver historial"
                 variant="outline" size="sm" className="h-8 w-8 p-0"
                 onClick={() => {
                   setHistorialOpen(true)
@@ -869,7 +869,7 @@ export function VehiclesList() {
                     </div>
 
                     <div className="flex items-center gap-0.5 ml-3 shrink-0">
-                      <Button
+                      <Button aria-label="Copiar enlace"
                         variant="ghost" size="icon" className="h-7 w-7"
                         onClick={() => copyToClipboard(geolink.url, geolink.id)}
                         title="Copiar enlace"
@@ -878,21 +878,21 @@ export function VehiclesList() {
                           ? <CheckCircle className="h-3.5 w-3.5 text-success-ink" />
                           : <Copy className="h-3.5 w-3.5" />}
                       </Button>
-                      <Button
+                      <Button aria-label="Abrir en web"
                         variant="ghost" size="icon" className="h-7 w-7"
                         onClick={() => window.open(geolink.url, '_blank')}
                         title="Abrir en web"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
+                      <Button aria-label="Compartir"
                         variant="ghost" size="icon" className="h-7 w-7"
                         onClick={() => shareLink(geolink.url, geolink.description || geolink.trackers?.[0]?.alias || 'Geoenlace')}
                         title="Compartir"
                       >
                         <Share2 className="h-3.5 w-3.5" />
                       </Button>
-                      <Button
+                      <Button aria-label="Eliminar geoenlace"
                         variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                         onClick={() => handleDeleteGeolink(geolink.id)}
                         disabled={deletingId === geolink.id}

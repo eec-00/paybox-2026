@@ -141,7 +141,7 @@ export function ServiciosResumenDialog({ open, onOpenChange, tasks, progresoMap,
 
           {mode === 'semana' ? (
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => setWeekOffset((w) => w - 1)} title="Semana anterior">
+              <Button aria-label="Semana anterior" variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => setWeekOffset((w) => w - 1)} title="Semana anterior">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <div className="flex-1 text-center">
@@ -150,7 +150,7 @@ export function ServiciosResumenDialog({ open, onOpenChange, tasks, progresoMap,
                 </p>
                 <p className="text-xs text-muted-foreground">Lunes a sábado · {periodoTexto(start, end)}</p>
               </div>
-              <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => setWeekOffset((w) => w + 1)} disabled={weekOffset >= 0} title="Semana siguiente">
+              <Button aria-label="Semana siguiente" variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => setWeekOffset((w) => w + 1)} disabled={weekOffset >= 0} title="Semana siguiente">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

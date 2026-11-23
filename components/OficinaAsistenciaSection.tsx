@@ -75,10 +75,13 @@ export function OficinaAsistenciaSection() {
         description="Marcas con sticker NFC y selfie"
       />
 
-      <div className="flex gap-1 border-b overflow-x-auto">
+      <div role="tablist" aria-label="Secciones de asistencia de oficina" className="flex gap-1 border-b overflow-x-auto">
         {TABS.map((t) => (
           <button
             key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
             className={cn(
               'flex items-center gap-1.5 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors',

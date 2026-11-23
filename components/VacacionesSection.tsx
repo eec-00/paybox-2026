@@ -353,10 +353,12 @@ export function VacacionesSection() {
       )}
 
       {/* Tabs por empresa (los 2 "libros" del Excel) */}
-      <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg w-fit">
+      <div role="group" aria-label="Empresa" className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg w-fit">
         {(['EESAC', 'EGARCIA'] as VacacionEmpresa[]).map((emp) => (
           <button
             key={emp}
+            type="button"
+            aria-pressed={empresaTab === emp}
             onClick={() => setEmpresaTab(emp)}
             className={cn(
               'px-4 py-1.5 rounded-md text-sm font-medium transition-colors',
@@ -372,7 +374,7 @@ export function VacacionesSection() {
       <div className="flex flex-wrap items-center gap-2 bg-card/40 p-3 rounded-xl border border-border/50 shadow-sm">
         <div className="flex items-center gap-1.5 flex-1 min-w-[180px] bg-background border rounded-lg px-3 h-9">
           <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <input
+          <input aria-label="Buscar por nombre o DNI"
             type="text"
             placeholder="Buscar por nombre o DNI..."
             value={search}
@@ -389,7 +391,7 @@ export function VacacionesSection() {
           {mostrarInactivos ? 'Ocultar inactivos' : 'Mostrar inactivos'}
         </Button>
         {search && (
-          <Button variant="ghost" size="sm" onClick={() => setSearch('')} className="h-9 px-2 text-muted-foreground hover:text-destructive">
+          <Button aria-label="Limpiar búsqueda" variant="ghost" size="sm" onClick={() => setSearch('')} className="h-9 px-2 text-muted-foreground hover:text-destructive">
             <XCircle className="h-4 w-4" />
           </Button>
         )}
@@ -467,12 +469,12 @@ export function VacacionesSection() {
                         <div className="flex items-center justify-end gap-1">
                           <Button size="sm" variant="outline" onClick={() => setDetalleEmpleado(e)}>Gestionar</Button>
                           {canEdit && (
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditar(e)}>
+                            <Button aria-label="Editar trabajador" size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditar(e)}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           )}
                           {canEdit && (
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setBajaEmpleado(e)}>
+                            <Button aria-label={e.activo ? 'Dar de baja' : 'Reactivar'} size="icon" variant="ghost" className="h-8 w-8" onClick={() => setBajaEmpleado(e)}>
                               {e.activo ? <UserX className="h-3.5 w-3.5 text-destructive-ink" /> : <UserCheck className="h-3.5 w-3.5 text-success-ink" />}
                             </Button>
                           )}

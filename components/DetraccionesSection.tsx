@@ -71,7 +71,16 @@ function Dropzone({ label, title, hint, fileName, onFile }: DropzoneProps) {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`${title}: ${fileName ? `cargado ${fileName}. Cambiar archivo` : 'elegir archivo Excel'}`}
       onClick={() => inputRef.current?.click()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          inputRef.current?.click()
+        }
+      }}
       onDragOver={(e) => {
         e.preventDefault()
         setDragOver(true)
@@ -83,7 +92,7 @@ function Dropzone({ label, title, hint, fileName, onFile }: DropzoneProps) {
         if (e.dataTransfer.files?.[0]) onFile(e.dataTransfer.files[0])
       }}
       className={cn(
-        'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
+        'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         fileName ? 'border-secondary bg-secondary/10' : 'border-input hover:border-secondary hover:bg-secondary/5',
         dragOver && 'border-secondary bg-secondary/10'
       )}

@@ -186,7 +186,7 @@ function Trabajadores({ config, trabajadores, permisos, onCambio }: {
                 {permisos.canEdit && (
                   <>
                     <Button variant="ghost" size="sm" onClick={() => toggleActivo(t)}>{t.activo ? 'Desactivar' : 'Activar'}</Button>
-                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setEditando(t)}><Pencil className="h-3.5 w-3.5" /></Button>
+                    <Button aria-label="Editar horario" variant="outline" size="icon" className="h-8 w-8" onClick={() => setEditando(t)}><Pencil className="h-3.5 w-3.5" /></Button>
                   </>
                 )}
               </div>
@@ -374,7 +374,7 @@ function Stickers({ permisos }: { permisos: PermisosOficina }) {
                 </div>
                 {permisos.canEdit && <Button variant="ghost" size="sm" onClick={() => toggle(s)}>{s.activo ? 'Desactivar' : 'Activar'}</Button>}
                 {permisos.canDelete && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive-ink" onClick={() => borrar(s)}><Trash2 className="h-4 w-4" /></Button>
+                  <Button aria-label="Eliminar sticker" variant="ghost" size="icon" className="h-8 w-8 text-destructive-ink" onClick={() => borrar(s)}><Trash2 className="h-4 w-4" /></Button>
                 )}
               </div>
             ))}
@@ -389,7 +389,7 @@ function Stickers({ permisos }: { permisos: PermisosOficina }) {
               En TagWriter: <i>Write tags → New dataset → Link</i> y pega este link:
               <span className="flex items-center gap-1 mt-1">
                 <code className="bg-white border rounded px-2 py-1 text-xs text-foreground break-all">{URL_STICKER}</code>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { navigator.clipboard.writeText(URL_STICKER); toast.success('Link copiado') }}>
+                <Button aria-label="Copiar link del sticker" variant="ghost" size="icon" className="h-7 w-7" onClick={() => { navigator.clipboard.writeText(URL_STICKER); toast.success('Link copiado') }}>
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
               </span>

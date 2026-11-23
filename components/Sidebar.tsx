@@ -388,6 +388,8 @@ export function Sidebar({
         key={item.id}
         href={item.href}
         title={collapsed ? item.label : undefined}
+        aria-label={collapsed ? item.label : undefined}
+        aria-current={isActive ? 'page' : undefined}
         className={cn(
           'w-full flex items-start gap-2.5 p-2.5 rounded-lg transition-all group relative',
           'hover:bg-primary-foreground/10',
@@ -436,7 +438,7 @@ export function Sidebar({
 
     return (
       <div key={item.id}>
-        <button
+        <button aria-label={collapsed ? item.label : undefined} aria-expanded={collapsed ? undefined : isExpanded}
           onClick={() => {
             if (!collapsed) toggleGroup(item.id)
             else {
@@ -494,23 +496,24 @@ export function Sidebar({
 
   return (
     <aside
+      aria-label="Menú principal"
       className={cn(
         'bg-primary text-primary-foreground border-r border-primary/20 shadow-2xl transition-all duration-300',
-        'fixed left-0 top-16 h-[calc(100vh-4rem)] z-40 w-72 flex flex-col',
-        'md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:z-auto',
+        'fixed left-0 top-16 h-[calc(100dvh-4rem)] sm:top-20 sm:h-[calc(100dvh-5rem)] z-40 w-72 flex flex-col',
+        'md:sticky md:z-auto',
         collapsed
           ? '-translate-x-full md:translate-x-0 md:w-20'
           : 'translate-x-0 md:w-64'
       )}
     >
-      <div className={cn('flex-1 overflow-y-auto p-3 space-y-1.5 sidebar-scrollbar', collapsed && 'px-2.5 py-3')}>
+      <nav aria-label="Módulos" className={cn('flex-1 overflow-y-auto p-3 space-y-1.5 sidebar-scrollbar', collapsed && 'px-2.5 py-3')}>
         {visibleItems.map((item) =>
           item.type === 'group' ? renderGroupItem(item) : renderFlatItem(item)
         )}
-      </div>
+      </nav>
 
       <div className="border-t border-primary-foreground/20 p-2 shrink-0">
-        <button
+        <button aria-label={collapsed ? (userName ?? userEmail ?? 'Perfil') : undefined}
           onClick={onProfileClick}
           title={collapsed ? (userName ?? userEmail ?? 'Perfil') : undefined}
           className={cn(

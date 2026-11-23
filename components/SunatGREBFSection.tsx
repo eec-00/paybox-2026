@@ -477,7 +477,7 @@ export function SunatGREBFSection() {
                           <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
                             <td className="px-2 py-2">
                               <div className="flex items-center gap-1.5">
-                                <button
+                                <button aria-label="Ver PDF"
                                   onClick={() => verPDF(r)}
                                   disabled={!!loadingPdf}
                                   title="Ver PDF"
@@ -485,7 +485,7 @@ export function SunatGREBFSection() {
                                 >
                                   {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
                                 </button>
-                                <button
+                                <button aria-label="Descargar PDF"
                                   onClick={() => descargarPDF(r)}
                                   disabled={!!loadingPdf}
                                   title="Descargar PDF"

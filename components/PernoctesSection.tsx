@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertTriangle, ExternalLink, ImageOff, Loader2, MapPin, Moon, RefreshCw } from 'lucide-react'
+import { AlertTriangle, ExternalLink, ImageOff, Loader2, MapPin, Moon, RefreshCw, Check } from 'lucide-react'
 import { urlArchivo } from '@/lib/archivos'
 import { servicioCodigo } from '@/lib/pruebas/pagosConductores'
 import {
@@ -199,7 +199,7 @@ export function PernoctesSection() {
                   {p.lat === null && <span className="block text-warning-ink">Sin ubicación</span>}
                 </TableCell>
                 <TableCell><EstadoBadge estado={p.estado} /></TableCell>
-                <TableCell><Button size="sm" variant="ghost" className="h-7">Revisar</Button></TableCell>
+                <TableCell><Button size="sm" variant="ghost" className="h-7" aria-label={`Revisar pernocte de ${p.conductor_nombre}`} onClick={e => { e.stopPropagation(); setAbiertoId(p.id) }}>Revisar</Button></TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -261,7 +261,7 @@ function RevisionDialog({ pernocte: p, esAdmin, onClose, onHecho }: {
     }
   }
 
-  const BotonAccion = ({ accion, label, variant }: { accion: AccionPernocte; label: string; variant: 'default' | 'outline' | 'destructive' | 'secondary' }) => {
+  const BotonAccion = ({ accion, label, variant }: { accion: AccionPernocte; label: string; variant: 'default' | 'outline' | 'destructive' | 'secondary' | 'ghost' }) => {
     const motivo = problema(accion)
     return (
       <Button variant={variant} size="sm" disabled={!!motivo || enviando !== null} title={motivo ?? undefined} onClick={() => ejecutar(accion)}>
@@ -329,19 +329,40 @@ function RevisionDialog({ pernocte: p, esAdmin, onClose, onHecho }: {
           </div>
 
           <div className="rounded-lg border p-3 space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Antes de aprobar</p>
+            <div className="flex items-center justify-between gap-3">
+              <p id={`checklist-${p.id}`} className="text-sm font-semibold">Antes de aprobar</p>
+              {!(decidido && !esAdmin) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setChecklist(Object.fromEntries(CLAVES_EXCLUSION.map(k => [k, false])) as Partial<ChecklistPernocte>)}
+                >
+                  Ninguna aplica
+                </Button>
+              )}
+            </div>
             {CLAVES_EXCLUSION.map(k => (
-              <div key={k} className="flex items-center justify-between gap-3">
-                <span>{EXCLUSIONES_PERNOCTE[k]}</span>
+              <div
+                key={k}
+                role="radiogroup"
+                aria-labelledby={`excl-${p.id}-${k}`}
+                className={`flex items-center justify-between gap-3 rounded-md px-1.5 py-1 ${checklist[k] === null || checklist[k] === undefined ? 'bg-warning-soft/50' : ''}`}
+              >
+                <span id={`excl-${p.id}-${k}`}>{EXCLUSIONES_PERNOCTE[k]}</span>
                 <div className="flex gap-1 shrink-0">
                   {([['Sí', true], ['No', false]] as const).map(([label, v]) => (
                     <button
                       key={label}
+                      type="button"
+                      role="radio"
+                      aria-checked={checklist[k] === v}
                       disabled={decidido && !esAdmin}
                       onClick={() => setChecklist(c => ({ ...c, [k]: v }))}
-                      className={`px-2.5 py-1 rounded-md border text-xs font-semibold ${checklist[k] === v ? (v ? 'bg-destructive border-destructive text-white' : 'bg-success border-success text-white') : 'bg-background'}`}
+                      className={`px-2.5 py-1 rounded-md border text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${checklist[k] === v ? (v ? 'bg-destructive border-destructive text-white' : 'bg-success border-success text-white') : 'bg-background hover:bg-muted'}`}
                     >
-                      {label}
+                      <span className="inline-flex items-center gap-1">{checklist[k] === v && <Check className="h-3 w-3" aria-hidden />}{label}</span>
                     </button>
                   ))}
                 </div>
@@ -364,8 +385,12 @@ function RevisionDialog({ pernocte: p, esAdmin, onClose, onHecho }: {
               <BotonAccion accion="aprobar" label={`Aprobar · S/ ${MONTO_PERNOCTE}`} variant="default" />
               <BotonAccion accion="rechazar" label="Rechazar" variant="destructive" />
               {p.estado !== 'escalado' && !decidido && <BotonAccion accion="escalar" label="Escalar a Emerson" variant="outline" />}
-              <BotonAccion accion="comentar" label="Solo guardar observación" variant="secondary" />
+              <BotonAccion accion="comentar" label="Solo guardar observación" variant="ghost" />
             </div>
+            {/* Por qué está deshabilitado Aprobar: antes solo estaba en un tooltip que no se mostraba */}
+            {!enviando && problema('aprobar') && !(decidido && !esAdmin) && p.estado !== 'escalado' && (
+              <p className="text-xs text-muted-foreground" role="status">Para aprobar: {problema('aprobar')}</p>
+            )}
             {p.estado === 'escalado' && !esAdmin && (
               <p className="text-xs text-warning-ink">Escalado a Emerson: lo decide un administrador. Puedes dejar observaciones.</p>
             )}

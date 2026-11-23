@@ -367,7 +367,7 @@ export function UsersList() {
                           Editar
                         </Button>
                         {(user.role !== 'admin' && user.role !== 'developer') && (
-                          <Button
+                          <Button aria-label="Eliminar usuario"
                             variant="destructive"
                             size="sm"
                             onClick={() => handleDeleteClick(user)}

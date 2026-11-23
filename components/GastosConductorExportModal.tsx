@@ -340,7 +340,7 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
                                 <button type="button" onClick={() => setConductoresSel([])} className={`text-2xs px-2 py-1 rounded ${conductoresSel.length === 0 ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted text-muted-foreground'}`}>Todos</button>
                             </div>
                         </div>
-                        <Input placeholder="Buscar conductor..." className="h-8 text-xs" value={buscarConductor} onChange={e => setBuscarConductor(e.target.value)} />
+                        <Input aria-label="Buscar conductor" placeholder="Buscar conductor..." className="h-8 text-xs" value={buscarConductor} onChange={e => setBuscarConductor(e.target.value)} />
                         <div className="border rounded-lg max-h-[300px] overflow-y-auto divide-y">
                             {conductoresVisibles.length === 0 ? (
                                 <p className="text-xs text-muted-foreground p-3 text-center">Sin conductores</p>

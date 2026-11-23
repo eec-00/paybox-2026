@@ -181,7 +181,7 @@ export function ConductoresList() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
+                        <Button aria-label="Eliminar conductor"
                           variant="destructive"
                           size="sm"
                           onClick={() => handleDeleteClick(c)}

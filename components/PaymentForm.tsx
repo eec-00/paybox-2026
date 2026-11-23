@@ -798,7 +798,7 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
                 )}
               </Label>
               <div className="relative">
-                <Input
+                <Input aria-label="Escribe para buscar"
                   placeholder="Escribe para buscar..."
                   value={categoriaSearch}
                   onChange={(e) => {

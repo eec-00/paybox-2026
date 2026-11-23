@@ -239,7 +239,7 @@ export function AsistenciaSection() {
           </SelectContent>
         </Select>
         {conductorFiltro !== '__todos__' && (
-          <Button variant="ghost" size="sm" onClick={() => setConductorFiltro('__todos__')} className="h-9 px-2 text-muted-foreground hover:text-destructive">
+          <Button aria-label="Limpiar filtro" variant="ghost" size="sm" onClick={() => setConductorFiltro('__todos__')} className="h-9 px-2 text-muted-foreground hover:text-destructive">
             <XCircle className="h-4 w-4" />
           </Button>
         )}
@@ -348,7 +348,7 @@ export function AsistenciaSection() {
                       </TableCell>
                       <TableCell className="text-right">
                         {canDelete && marca && (
-                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDeleteMarca(marca)}>
+                          <Button aria-label="Eliminar marca" size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDeleteMarca(marca)}>
                             <Trash2 className="h-3.5 w-3.5 text-destructive-ink" />
                           </Button>
                         )}
@@ -417,7 +417,7 @@ export function AsistenciaSection() {
                     </TableCell>
                     <TableCell className="text-right">
                       {canDelete && (
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDeleteMarca(m)}>
+                        <Button aria-label="Eliminar marca" size="icon" variant="ghost" className="h-8 w-8" onClick={() => setDeleteMarca(m)}>
                           <Trash2 className="h-3.5 w-3.5 text-destructive-ink" />
                         </Button>
                       )}

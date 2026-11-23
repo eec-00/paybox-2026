@@ -287,9 +287,10 @@ export function CalendarSection() {
                             // "Gasto conductor: Juan Pérez" → "Juan Pérez" (el ícono ya indica que es gasto)
                             const etiqueta = esGasto ? pago.nombre_pago.replace(/^gasto conductor:\s*/i, '') : pago.nombre_pago
                             return (
-                                <div
+                                <button
+                                    type="button"
                                     key={pago.id}
-                                    className={`text-2xs px-1 py-0.5 rounded-sm flex items-center gap-1 cursor-pointer hover:opacity-80 ${gastoPagoColor(pago)}`}
+                                    className={`w-full text-left text-2xs px-1 py-0.5 rounded-sm flex items-center gap-1 cursor-pointer hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${gastoPagoColor(pago)}`}
                                     title={`${pago.nombre_pago} — ${pago.monto_variable ? 'Variable' : formatMoney(pago.monto, pago.moneda)}${esGasto && pago.fecha_limite ? ` — Pagar hasta ${fechaCorta(pago.fecha_limite)}` : ''}`}
                                     onClick={() => {
                                         if (esGasto && pago.gasto_conductor) {
@@ -304,15 +305,15 @@ export function CalendarSection() {
                                     </span>
                                     {pago.frecuencia !== 'unica' && <RefreshCw className="w-2.5 h-2.5 shrink-0 text-muted-foreground" />}
                                     {pago.estado === 'pagado' && <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />}
-                                </div>
+                                </button>
                             )
                         })}
                         {dayPagos.length > visibles && (
                             <Dialog>
                                 <DialogTrigger asChild>
-                                    <div className="text-2xs font-bold text-center text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors py-0.5 cursor-pointer rounded-sm">
+                                    <button type="button" className="w-full text-2xs font-bold text-center text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors py-0.5 cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                         + {dayPagos.length - visibles} más
-                                    </div>
+                                    </button>
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-[425px]">
                                     <DialogHeader>
@@ -407,14 +408,18 @@ export function CalendarSection() {
         return (
             <div className="space-y-3">
                 {/* List tabs */}
-                <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
+                <div role="group" aria-label="Tipo de pago" className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
                     <button
+                        type="button"
+                        aria-pressed={listTab === 'fijos'}
                         onClick={() => setListTab('fijos')}
                         className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${listTab === 'fijos' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                         Gastos fijos ({fijosPagos.length})
                     </button>
                     <button
+                        type="button"
+                        aria-pressed={listTab === 'conductores'}
                         onClick={() => setListTab('conductores')}
                         className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${listTab === 'conductores' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                     >
@@ -487,7 +492,7 @@ export function CalendarSection() {
                                         <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-1">
                                                 {pago.tipo === 'gasto_conductor' && pago.gasto_conductor && (
-                                                    <Button
+                                                    <Button aria-label="Ver detalle"
                                                         variant="ghost"
                                                         size="sm"
                                                         className="text-muted-foreground"
@@ -497,7 +502,7 @@ export function CalendarSection() {
                                                     </Button>
                                                 )}
                                                 {canCreate && pago.tipo !== 'gasto_conductor' && (
-                                                    <Button
+                                                    <Button aria-label="Eliminar pago"
                                                         variant="ghost"
                                                         size="sm"
                                                         className="text-destructive hover:text-destructive hover:bg-destructive/10"

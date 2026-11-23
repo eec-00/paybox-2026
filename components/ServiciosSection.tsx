@@ -220,7 +220,7 @@ const COLUMNS: ColumnDef[] = [
     sortValue: (t) => (t.stage_id ? t.stage_id[1] : ''),
     render: (t) => {
       const stageName = t.stage_id ? t.stage_id[1] : ''
-      return stageName ? <span className={`inline-block w-3 h-3 rounded-full ${stageDotColor(stageName)}`} title={stageName} /> : '—'
+      return stageName ? <span className={`inline-block w-3 h-3 rounded-full ${stageDotColor(stageName)}`} title={stageName} role="img" aria-label={`Etapa: ${stageName}`} /> : '—'
     },
   },
   {
@@ -891,7 +891,7 @@ export function ServiciosSection() {
               )}
             </Button>
 
-            <Button
+            <Button aria-label="Exportar resumen"
               variant="outline"
               size="sm"
               className="h-8 gap-1.5"
@@ -961,7 +961,7 @@ export function ServiciosSection() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button
+            <Button aria-label={historico ? `Últimos ${DIAS_RECIENTES} días` : 'Ver histórico'}
               variant={historico ? 'default' : 'outline'}
               size="sm"
               onClick={() => { setHistorico((v) => !v); setPage(1) }}
@@ -984,7 +984,7 @@ export function ServiciosSection() {
       {/* Buscador — siempre visible, es el control más usado */}
       <div className="flex items-center gap-1.5 bg-background border rounded-lg px-3 h-9 shadow-sm">
         <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <input
+        <input aria-label="Buscar código, cliente, conductor, contenedor"
           type="text"
           placeholder="Buscar código, cliente, conductor, contenedor..."
           value={search}
@@ -1115,18 +1115,18 @@ export function ServiciosSection() {
                     {puedeEditar && <TableHead className="w-10" />}
                     {puedeEditar && <TableHead className="w-10" />}
                     <TableHead
-                      className="whitespace-nowrap font-bold text-xs min-w-[100px] cursor-pointer select-none hover:text-primary transition-colors"
-                      onClick={() => handleSort('codigo')}
+                      className="whitespace-nowrap font-bold text-xs min-w-[100px] select-none transition-colors"
+                      aria-sort={sortKey === 'codigo' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                     >
-                      <span className="inline-flex items-center gap-1">Código <SortIcon activo={sortKey === 'codigo'} dir={sortDir} /></span>
+                      <button type="button" onClick={() => handleSort('codigo')} className="inline-flex items-center gap-1 rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Código <SortIcon activo={sortKey === 'codigo'} dir={sortDir} /></button>
                     </TableHead>
                     {visibleColumns.map((c) => (
                       <TableHead
                         key={c.key}
-                        className={`whitespace-nowrap font-bold text-xs cursor-pointer select-none hover:text-primary transition-colors ${c.headClass || ''}`}
-                        onClick={() => handleSort(c.key)}
+                        className={`whitespace-nowrap font-bold text-xs select-none transition-colors ${c.headClass || ''}`}
+                        aria-sort={sortKey === c.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                       >
-                        <span className="inline-flex items-center gap-1">{c.label} <SortIcon activo={sortKey === c.key} dir={sortDir} /></span>
+                        <button type="button" onClick={() => handleSort(c.key)} className="inline-flex items-center gap-1 rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{c.label} <SortIcon activo={sortKey === c.key} dir={sortDir} /></button>
                       </TableHead>
                     ))}
                   </TableRow>
@@ -1145,7 +1145,7 @@ export function ServiciosSection() {
                         <TableRow key={task.id} className="hover:bg-muted/30 text-xs">
                           {puedeEditar && (
                           <TableCell className="p-1">
-                            <Button
+                            <Button aria-label="Editar"
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-muted-foreground hover:text-primary"
@@ -1161,7 +1161,7 @@ export function ServiciosSection() {
                               href={`/servicios/trailers/${task.id}`}
                               onClick={() => guardarListaNavegacion(sorted.map((t) => ({ id: t.id, codigo: servicioCodigo(t) })))}
                             >
-                              <Button
+                              <Button aria-label="Ver detalle"
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-muted-foreground hover:text-primary"
@@ -1173,7 +1173,7 @@ export function ServiciosSection() {
                           </TableCell>
                           {puedeEditar && (<>
                           <TableCell className="p-1">
-                            <Button
+                            <Button aria-label="Reiniciar servicio (borra las horas marcadas por el conductor)"
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-muted-foreground hover:text-warning-ink"
@@ -1184,7 +1184,7 @@ export function ServiciosSection() {
                             </Button>
                           </TableCell>
                           <TableCell className="p-1">
-                            <Button
+                            <Button aria-label="Finalizar servicio directamente (sin pasar por el conductor)"
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-muted-foreground hover:text-success-ink"
@@ -1225,11 +1225,11 @@ export function ServiciosSection() {
                 Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} de {sorted.length}
               </span>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(1)} disabled={page === 1}>«</Button>
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(p => p - 1)} disabled={page === 1}>‹</Button>
+                <Button aria-label="Primera página" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(1)} disabled={page === 1}>«</Button>
+                <Button aria-label="Página anterior" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(p => p - 1)} disabled={page === 1}>‹</Button>
                 <span className="px-2 font-medium">{page} / {totalPages}</span>
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(p => p + 1)} disabled={page === totalPages}>›</Button>
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(totalPages)} disabled={page === totalPages}>»</Button>
+                <Button aria-label="Página siguiente" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(p => p + 1)} disabled={page === totalPages}>›</Button>
+                <Button aria-label="Última página" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(totalPages)} disabled={page === totalPages}>»</Button>
               </div>
             </div>
           )}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useConfirm } from '@/components/ui/confirm'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useId } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -157,8 +157,18 @@ function SectionHeader({ icon: Icon, title }: { icon: React.FC<{ className?: str
   )
 }
 
+// La etiqueta se asocia sola al primer control de su grupo (input, select,
+// botón del selector), para que el lector de pantalla diga qué campo es.
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <Label className="text-2xs font-semibold text-muted-foreground uppercase tracking-wide">{children}</Label>
+  const id = useId()
+  const ref = useRef<HTMLLabelElement>(null)
+  useEffect(() => {
+    const ctrl = ref.current?.parentElement?.querySelector<HTMLElement>('input:not([type="hidden"]), select, textarea, button, [role="combobox"]')
+    if (ctrl && !ctrl.hasAttribute('aria-label') && !ctrl.hasAttribute('aria-labelledby')) {
+      ctrl.setAttribute('aria-labelledby', id)
+    }
+  })
+  return <Label ref={ref} id={id} className="text-2xs font-semibold text-muted-foreground uppercase tracking-wide">{children}</Label>
 }
 
 function ReadonlyField({ value }: { value: string }) {

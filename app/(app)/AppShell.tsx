@@ -85,6 +85,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <a
+        href="#contenido"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-md focus:bg-secondary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-secondary-foreground focus:shadow-lg"
+      >
+        Saltar al contenido
+      </a>
     <AppContext.Provider
       value={{ user, profileName, isAdminUser, isDeveloper, canCreate, allowedModules }}
     >
@@ -97,10 +103,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       />
 
       <header className="border-b bg-linear-to-r from-primary via-primary to-primary/95 shadow-lg sticky top-0 z-50">
-        <div className="px-3 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between gap-2">
+        <div className="px-3 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-6 min-w-0">
             <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-              <Button
+              <Button aria-label={sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}
                 variant="ghost"
                 size="icon"
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -137,15 +143,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Actualizaciones: botón en la barra (antes era un ítem del menú lateral) */}
-            <Link href="/updates" title="Actualizaciones del sistema">
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`hover:bg-white/20 text-white transition-all ${pathname === '/updates' ? 'bg-white/20' : ''}`}
-              >
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              className={`hover:bg-white/20 text-white transition-all ${pathname === '/updates' ? 'bg-white/20' : ''}`}
+            >
+              <Link href="/updates" title="Actualizaciones del sistema" aria-label="Actualizaciones del sistema" aria-current={pathname === '/updates' ? 'page' : undefined}>
                 <Megaphone className="h-5 w-5" />
-              </Button>
-            </Link>
+              </Link>
+            </Button>
             <UpdatesNotification />
             <Button
               variant="secondary"
@@ -162,7 +169,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1">
         {!sidebarCollapsed && (
           <div
-            className="fixed inset-0 top-16 bg-black/50 z-30 md:hidden"
+            className="fixed inset-0 top-16 sm:top-20 bg-black/50 z-30 md:hidden"
             onClick={() => setSidebarCollapsed(true)}
           />
         )}
@@ -177,7 +184,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onProfileClick={() => setShowProfileModal(true)}
         />
 
-        <main className="flex-1 p-2 sm:p-4 md:p-8 overflow-auto min-w-0">
+        <main id="contenido" tabIndex={-1} className="flex-1 p-2 sm:p-4 md:p-8 overflow-auto min-w-0 focus:outline-none">
           <div className="w-full max-w-[1600px] mx-auto min-w-0">
             {children}
           </div>

@@ -519,7 +519,7 @@ export function PaymentsTable({
                             if (!open) setEditingRegistro(null)
                           }}>
                             <DialogTrigger asChild>
-                              <Button
+                              <Button aria-label="Editar registro"
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setEditingRegistro(registro)}
@@ -545,7 +545,7 @@ export function PaymentsTable({
                         {canDeleteRegistro(registro) && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button
+                              <Button aria-label="Eliminar registro"
                                 variant="outline"
                                 size="sm"
                                 disabled={deleting === registro.id}

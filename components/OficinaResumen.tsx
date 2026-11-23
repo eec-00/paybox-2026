@@ -130,9 +130,9 @@ export function OficinaResumen({ modo, config, trabajadores, onVerDia }: {
               </button>
             ))}
           </div>
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => mover(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button aria-label="Periodo anterior" variant="outline" size="icon" className="h-9 w-9" onClick={() => mover(-1)}><ChevronLeft className="h-4 w-4" /></Button>
           <span className="text-sm font-medium px-2 min-w-48 text-center">{etiquetaPeriodo(periodo, desde, hasta)}</span>
-          <Button variant="outline" size="icon" className="h-9 w-9" disabled={hasta >= hoy} onClick={() => mover(1)}><ChevronRight className="h-4 w-4" /></Button>
+          <Button aria-label="Periodo siguiente" variant="outline" size="icon" className="h-9 w-9" disabled={hasta >= hoy} onClick={() => mover(1)}><ChevronRight className="h-4 w-4" /></Button>
         </div>
         {modo === 'resumen' && (
           <Button variant="outline" size="sm" onClick={exportar} disabled={exportando || loading}>

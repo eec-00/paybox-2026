@@ -127,7 +127,7 @@ export default function PagosPage() {
               {showAdvancedFilters ? <ChevronUp className="h-4 w-4 ml-0 sm:ml-1" /> : <ChevronDown className="h-4 w-4 ml-0 sm:ml-1" />}
             </Button>
             {hasActiveFilters && (
-              <Button onClick={handleClearFilters} variant="ghost" size="sm" className="h-8 sm:h-9 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5" title="Limpiar filtros">
+              <Button aria-label="Limpiar filtros" onClick={handleClearFilters} variant="ghost" size="sm" className="h-8 sm:h-9 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5" title="Limpiar filtros">
                 <XCircle className="h-4 w-4" />
               </Button>
             )}
@@ -141,9 +141,9 @@ export default function PagosPage() {
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Rango de Monto</label>
                 <div className="flex items-center gap-2">
-                  <Input placeholder="Mínimo" type="number" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} className="h-9 text-xs focus-visible:ring-1" />
+                  <Input aria-label="Monto mínimo" placeholder="Mínimo" type="number" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} className="h-9 text-xs focus-visible:ring-1" />
                   <span className="text-muted-foreground">-</span>
-                  <Input placeholder="Máximo" type="number" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} className="h-9 text-xs focus-visible:ring-1" />
+                  <Input aria-label="Monto máximo" placeholder="Máximo" type="number" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} className="h-9 text-xs focus-visible:ring-1" />
                 </div>
               </div>
 
@@ -204,9 +204,9 @@ export default function PagosPage() {
                         if (e.target.checked) setSelectedCategories([...selectedCategories, cat.id.toString()])
                         else setSelectedCategories(selectedCategories.filter(id => id !== cat.id.toString()))
                       }}
-                      className="hidden"
+                      className="peer sr-only"
                     />
-                    <div className={`w-4 h-4 rounded-sm border flex items-center justify-center ${selectedCategories.includes(cat.id.toString()) ? 'bg-primary border-primary text-white' : 'border-input bg-transparent'}`}>
+                    <div aria-hidden className={`w-4 h-4 rounded-sm border flex items-center justify-center peer-focus-visible:ring-2 peer-focus-visible:ring-ring ${selectedCategories.includes(cat.id.toString()) ? 'bg-primary border-primary text-white' : 'border-input bg-transparent'}`}>
                       {selectedCategories.includes(cat.id.toString()) && <svg width="10" height="10" viewBox="0 0 15 14" fill="none"><path d="M2 7L6 11L13 2" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                     </div>
                     <span className="text-xs font-medium">{cat.categoria_nombre}</span>
