@@ -1,12 +1,14 @@
 'use client'
 
 import { Fragment, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, ShieldAlert } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, Loader2, ShieldAlert, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
-  CASOS_DEMO, GRUPOS_CASO, VERSION_TARIFARIO, entradaDesdeOdoo, simularTarifa, type ResultadoMotor,
+  CASOS_DEMO, GRUPOS_CASO, PRODUCTO_LABEL, VERSION_TARIFARIO, entradaDesdeOdoo, simularTarifa,
+  type PropuestaTarifa, type ResultadoMotor,
 } from '@/lib/pruebas/motorZonas'
-import type { DevolucionPago, ServicioPago } from '@/lib/pruebas/pagosConductores'
+import type { DevolucionPago, ServicioPago, TarifaAprobada } from '@/lib/pruebas/pagosConductores'
 
 function soles(n: number): string {
   return `S/ ${n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -29,7 +31,37 @@ interface Fila {
   r: ResultadoMotor
 }
 
-function TablaResultados({ filas }: { filas: Fila[] }) {
+/** Distrito nuevo: tarifa de zona propuesta, con botón para validarla (solo servicios reales) */
+function PropuestaBox({ p, onAprobar }: { p: PropuestaTarifa; onAprobar?: (p: PropuestaTarifa) => Promise<void> }) {
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const aprobar = async () => {
+    if (!onAprobar) return
+    setEnviando(true)
+    setError(null)
+    try { await onAprobar(p) } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setEnviando(false) }
+  }
+  return (
+    <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
+      <p>
+        <span className="font-semibold">Tarifa de zona propuesta:</span> {soles(p.monto)} para «{p.distrito}» ({p.zona} ·{' '}
+        {PRODUCTO_LABEL[p.producto]}), igual que {p.base.join(', ')}. Una vez validada se usa para los siguientes servicios
+        de ese distrito con el mismo tipo de servicio.
+      </p>
+      {onAprobar && (
+        <div className="mt-1.5 flex items-center gap-2">
+          <Button size="sm" className="h-7 gap-1.5" onClick={e => { e.stopPropagation(); aprobar() }} disabled={enviando}>
+            {enviando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+            Validar {soles(p.monto)}
+          </Button>
+          {error && <span className="text-red-700">{error}</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TablaResultados({ filas, onAprobar }: { filas: Fila[]; onAprobar?: (p: PropuestaTarifa) => Promise<void> }) {
   const [abiertos, setAbiertos] = useState<string[]>([])
   const toggle = (k: string) => setAbiertos(p => p.includes(k) ? p.filter(x => x !== k) : [...p, k])
 
@@ -99,6 +131,7 @@ function TablaResultados({ filas }: { filas: Fila[] }) {
                         ))}
                       </ul>
                     </div>
+                    {r.propuesta && <PropuestaBox p={r.propuesta} onAprobar={onAprobar} />}
                     {r.candidatos.length > 0 && <p><span className="font-semibold">Reglas candidatas:</span> {r.candidatos.join(', ')}</p>}
                     {r.motivos.length > 0 && <p><span className="font-semibold">Requiere revisión porque:</span> {r.motivos.join(' · ')}</p>}
                     {r.alertas.length > 0 && <p><span className="font-semibold">Alertas:</span> {r.alertas.join(' · ')}</p>}
@@ -123,9 +156,38 @@ function TablaResultados({ filas }: { filas: Fila[] }) {
   )
 }
 
-export function MotorZonasPanel({ servicios, devoluciones }: { servicios: ServicioPago[]; devoluciones: DevolucionPago[] }) {
+interface PanelProps {
+  servicios: ServicioPago[]
+  devoluciones: DevolucionPago[]
+  /** Tarifas de distritos nuevos ya validadas (tabla pruebas_tarifas_distrito) */
+  aprobadas: TarifaAprobada[]
+  onAprobadas: (t: TarifaAprobada[]) => void
+}
+
+export function MotorZonasPanel({ servicios, devoluciones, aprobadas, onAprobadas }: PanelProps) {
   const [abierto, setAbierto] = useState(true)
   const [verSemana, setVerSemana] = useState(false)
+  const [errorQuitar, setErrorQuitar] = useState<string | null>(null)
+
+  const aprobar = async (p: PropuestaTarifa) => {
+    const res = await fetch('/api/pruebas/tarifas-distrito', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ zona: p.zona, distrito: p.distrito, producto: p.producto }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'No se pudo validar la tarifa')
+    const t = data.tarifa as TarifaAprobada
+    onAprobadas([...aprobadas.filter(a => a.id !== t.id), t])
+  }
+
+  const quitar = async (t: TarifaAprobada) => {
+    if (!confirm(`¿Quitar la tarifa validada de ${t.distrito} (${t.zona} · ${PRODUCTO_LABEL[t.producto]})? Sus servicios vuelven a quedar en revisión.`)) return
+    setErrorQuitar(null)
+    const res = await fetch(`/api/pruebas/tarifas-distrito?id=${t.id}`, { method: 'DELETE' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) { setErrorQuitar(data.error || 'No se pudo quitar la tarifa'); return }
+    onAprobadas(aprobadas.filter(a => a.id !== t.id))
+  }
 
   const demo = useMemo(() => (Object.keys(GRUPOS_CASO) as (keyof typeof GRUPOS_CASO)[]).map(grupo => ({
     grupo,
@@ -137,10 +199,10 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
   const reales: Fila[] = useMemo(() => servicios.map(s => {
     const a = s.atributos
     return {
-      key: `odoo-${s.id}`, etiqueta: null, esperado: null, r: simularTarifa(entradaDesdeOdoo(s, devoluciones)),
+      key: `odoo-${s.id}`, etiqueta: null, esperado: null, r: simularTarifa(entradaDesdeOdoo(s, devoluciones), aprobadas),
       titulo: `${s.cliente ?? 'Sin cliente'} · ${[a.zona, a.tipoServicio, a.modalidad, a.tipoCarga].filter(Boolean).join(' · ') || 'sin variante'}`,
     }
-  }), [servicios, devoluciones])
+  }), [servicios, devoluciones, aprobadas])
 
   const simulados = reales.filter(f => f.r.estado === 'simulado').length
 
@@ -177,6 +239,30 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
             </div>
           ))}
 
+          <div className="px-4 text-xs">
+            <p className="pb-1 font-semibold uppercase tracking-wider text-muted-foreground">
+              Distritos nuevos con tarifa de zona validada ({aprobadas.length})
+            </p>
+            {aprobadas.length === 0
+              ? <p className="text-muted-foreground">Ninguno todavía. Cuando un servicio real llega a un distrito sin tarifa propia, su detalle muestra la tarifa de la zona para validarla.</p>
+              : (
+                <ul className="space-y-1">
+                  {[...aprobadas].sort((a, b) => a.zona.localeCompare(b.zona) || a.distrito.localeCompare(b.distrito)).map(t => (
+                    <li key={t.id} className="flex flex-wrap items-center gap-2 rounded border border-border/50 bg-background/60 px-2 py-1">
+                      <span className="font-medium">{t.distrito}</span>
+                      <span className="text-muted-foreground">{t.zona} · {PRODUCTO_LABEL[t.producto]}</span>
+                      <span className="font-semibold">{soles(t.monto)}</span>
+                      <span className="text-muted-foreground">validada por {t.aprobadoPor ?? '—'} el {t.aprobadoAt.slice(0, 10).split('-').reverse().join('/')}</span>
+                      <button type="button" onClick={() => quitar(t)} className="ml-auto text-muted-foreground hover:text-red-700" aria-label={`Quitar tarifa de ${t.distrito}`}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            {errorQuitar && <p className="mt-1 text-red-700">{errorQuitar}</p>}
+          </div>
+
           <div className="overflow-x-auto">
             <button
               type="button"
@@ -196,7 +282,7 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
                   (I08/I09, I12, D10/D11), nunca con el cierre administrativo.
                 </p>
                 {reales.length > 0
-                  ? <TablaResultados filas={reales} />
+                  ? <TablaResultados filas={reales} onAprobar={aprobar} />
                   : <p className="px-4 py-4 text-sm text-muted-foreground">Sin servicios en la semana.</p>}
               </>
             )}

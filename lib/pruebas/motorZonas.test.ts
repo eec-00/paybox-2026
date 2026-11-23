@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CASOS_DEMO, RUTAS_ESPECIALES, TARIFARIO, entradaDesdeOdoo, lineasDuplicadas, simularTarifa, type EntradaMotor,
 } from './motorZonas'
-import type { DevolucionPago, ServicioPago } from './pagosConductores'
+import type { DevolucionPago, ServicioPago, TarifaAprobada } from './pagosConductores'
 
 const caso = (servicio: string): EntradaMotor => CASOS_DEMO.find(c => c.entrada.servicio === servicio)!.entrada
 const correr = (servicio: string) => simularTarifa(caso(servicio))
@@ -16,7 +16,8 @@ describe('catálogo = Excel v0.9', () => {
   })
 
   it('importes de la hoja 00_TARIFARIO_MICHAEL', () => {
-    expect(regla('Z4-ATE-GEN')).toMatchObject({ monto: 80, fuente: expect.stringContaining('fila 11') })
+    expect(regla('Z4-ATE-GEN')).toMatchObject({ monto: 90, montoAnterior: 80, fuente: expect.stringContaining('fila 11') })
+    expect(regla('Z4-ATE-DES')).toMatchObject({ monto: 100, montoAnterior: 90 })
     expect(regla('Z4-SAN-JUAN-DE-LURIGANCHO-GEN').monto).toBe(90)
     expect(regla('Z7-LURIN-GEN').monto).toBe(100)
     expect(regla('Z7-LURIN-IMO').monto).toBe(110)
@@ -55,8 +56,15 @@ describe('catálogo = Excel v0.9', () => {
 })
 
 describe('P1 · Zona 4: Ate frente a San Juan de Lurigancho', () => {
-  it('Ate → S/80', () => {
-    expect(correr('S91111')).toMatchObject({ estado: 'simulado', total: 80, ruleIds: ['Z4-ATE-GEN'] })
+  it('Ate → S/90, unificado con SJL (Margiory, nov. 2026)', () => {
+    expect(correr('S91111')).toMatchObject({ estado: 'simulado', total: 90, ruleIds: ['Z4-ATE-GEN'] })
+    expect(correr('S91113')).toMatchObject({ estado: 'simulado', total: 100, ruleIds: ['Z4-ATE-DES'] })
+  })
+
+  it('Ate antes de la vigencia de la unificación → conserva S/80', () => {
+    const r = correr('S90004')
+    expect(r).toMatchObject({ estado: 'simulado', total: 80, ruleIds: ['Z4-ATE-GEN'] })
+    expect(r.alertas.join(' ')).toMatch(/conserva la tarifa anterior/)
   })
 
   it('SJL → S/90, misma zona', () => {
@@ -74,19 +82,23 @@ describe('P1 · Zona 4: Ate frente a San Juan de Lurigancho', () => {
     expect(simularTarifa(e).estado).toBe('requiere_revision')
   })
 
-  it('distrito solo propuesto en el Excel (Bellavista) no hereda Callao', () => {
+  it('distrito nuevo (Bellavista) no hereda Callao solo: propone S/70 para validar', () => {
     const e = { ...caso('S91111'), zona: 'Zona 1', destino: { distrito: 'Bellavista', acreditado: true, fuente: 'x' } }
-    expect(simularTarifa(e)).toMatchObject({ estado: 'requiere_revision', total: null })
+    expect(simularTarifa(e)).toMatchObject({
+      estado: 'requiere_revision', total: null,
+      propuesta: { zona: 'Zona 1', distrito: 'Bellavista', producto: 'GEN', monto: 70 },
+    })
   })
 
   it('exportación y 20 pies pagan igual que importación 40 (Margiory, 10/11)', () => {
     const r = simularTarifa({ ...caso('S91111'), tipoServicio: 'Exportación', modalidad: 'Contenedor 20' })
-    expect(r).toMatchObject({ estado: 'simulado', total: 80 })
+    expect(r).toMatchObject({ estado: 'simulado', total: 90 })
     expect(r.alertas.join(' ')).not.toMatch(/por confirmar/)
   })
 
-  it('Ate figura como confirmado por Margiory; Callao no', () => {
-    expect(correr('S91111').alertas.join(' ')).toMatch(/CONFIRMADA POR MARGIORY/)
+  it('Ate figura como unificado por Margiory; Callao no aprobado', () => {
+    expect(correr('S91111').alertas.join(' ')).toMatch(/UNIFICADA CON SAN JUAN DE LURIGANCHO/)
+    expect(correr('S91121').alertas.join(' ')).toMatch(/CONFIRMADA POR MARGIORY/)
     const callao = simularTarifa({ ...caso('S91111'), zona: 'Zona 1', destino: { distrito: 'Callao', acreditado: true, fuente: 'x' } })
     expect(callao.alertas.join(' ')).toMatch(/NO APROBADA/)
   })
@@ -149,8 +161,23 @@ describe('P3 · Lurín', () => {
     expect(r.motivos[0]).toMatch(/retroactivo/)
   })
 
-  it('Pachacamac (Zona 7) no hereda Lurín', () => {
-    expect(correr('S90024')).toMatchObject({ estado: 'requiere_revision', total: null })
+  it('Pachacamac (Zona 7) no hereda Lurín sin validación: queda propuesta S/100', () => {
+    const r = correr('S90024')
+    expect(r).toMatchObject({ estado: 'requiere_revision', total: null, propuesta: { producto: 'GEN', monto: 100 } })
+    expect(r.motivos[0]).toMatch(/Administración debe validarla/)
+  })
+
+  it('Pachacamac validado por Administración → simula y se reutiliza', () => {
+    const ok: TarifaAprobada = { id: 'x', zona: 'Zona 7', distrito: 'PACHACÁMAC', producto: 'GEN', monto: 100, aprobadoPor: 'Rosario', aprobadoAt: '2026-11-20T10:00:00Z' }
+    const r = simularTarifa(caso('S90024'), [ok])
+    expect(r).toMatchObject({ estado: 'simulado', total: 100, ruleIds: ['Z7-PACHACAMAC-GEN'], propuesta: null })
+    // La aprobación es por producto: IMO sigue pendiente
+    expect(simularTarifa({ ...caso('S90024'), tipoCarga: 'IMO' }, [ok])).toMatchObject({ estado: 'requiere_revision', propuesta: { producto: 'IMO', monto: 110 } })
+  })
+
+  it('distrito nuevo antes de la vigencia → revisión sin propuesta', () => {
+    const r = simularTarifa({ ...caso('S90024'), fecha: '2026-11-13' })
+    expect(r).toMatchObject({ estado: 'requiere_revision', propuesta: null })
   })
 })
 

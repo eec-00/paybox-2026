@@ -28,6 +28,7 @@ import {
   Fingerprint,
   Timer,
   FlaskConical,
+  Moon,
   Building2,
 } from 'lucide-react'
 
@@ -328,6 +329,15 @@ export function Sidebar({
           label: 'Pagos Conductores',
           icon: Wallet,
           description: 'Pago por servicio según zona',
+          adminOnly: false,
+        },
+        {
+          type: 'item',
+          id: 'pruebas-pernoctes',
+          href: '/pruebas/pernoctes',
+          label: 'Pernoctes',
+          icon: Moon,
+          description: 'Aprobar pernoctes de conductores',
           adminOnly: false,
         },
       ],

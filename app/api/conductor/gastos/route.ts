@@ -1,34 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { hoyLima, sabadoDePago } from '@/lib/fechas'
-import { odooAuth, odooCall } from '@/lib/odoo'
+import { nombreServicioAsignado } from '@/lib/conductor/servicioAsignado'
 import { validarAltaGasto } from '@/lib/gastos/validaciones'
 
 const UNIQUE_VIOLATION = '23505'
-
-// Busca el servicio solo si está asignado al conductor, con el mismo criterio
-// que su lista en /api/conductor/servicios. Devuelve el nombre real en Odoo.
-async function nombreServicioAsignado(
-  servicioId: number,
-  employeeId: number | null,
-  employeeName: string,
-): Promise<string | null> {
-  const uid = await odooAuth()
-  const fieldsMeta = await odooCall<Record<string, { type: string }>>(
-    uid, 'project.task', 'fields_get', [['x_studio_conductor']], { attributes: ['type'] }
-  )
-  const conductorFilter =
-    fieldsMeta['x_studio_conductor']?.type === 'many2one' && employeeId
-      ? ['x_studio_conductor', '=', employeeId]
-      : ['x_studio_conductor', 'ilike', employeeName]
-
-  const tasks = await odooCall<{ name: string }[]>(
-    uid, 'project.task', 'search_read',
-    [[['id', '=', servicioId], conductorFilter]],
-    { fields: ['name'], limit: 1 }
-  )
-  return tasks[0]?.name ?? null
-}
 
 export async function POST(req: NextRequest) {
   try {

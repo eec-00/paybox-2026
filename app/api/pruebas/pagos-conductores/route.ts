@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import {
-  ATRIBUTOS_ODOO, type AsistenciaPago, type AtributosServicio, type DevolucionPago, type GastoPago, type HorariosServicio, type ServicioPago,
+  ATRIBUTOS_ODOO, type AsistenciaPago, type AtributosServicio, type DevolucionPago, type GastoPago, type HorariosServicio, type PernoctePago, type ServicioPago,
 } from '@/lib/pruebas/pagosConductores'
 import {
   ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS, MODALIDAD_DEVOLUCION_FIELD, MODALIDAD_RETIRO_FIELD, MODALIDAD_OTRO_CONDUCTOR,
@@ -10,6 +10,7 @@ import { fechaLima, registrosPorStep, sumarDias, tiemposHitos } from '@/lib/serv
 import { consultarSerieTcSbs, tipoCambioDelDia } from '@/lib/pruebas/tipoCambioSbs'
 import { CAMPO_FECHA_DEVOLUCION, citaDevolucionMin } from '@/lib/servicios/citas'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { COLUMNAS_TARIFA, aTarifa, type FilaTarifaDistrito } from '@/lib/pruebas/tarifasDistrito'
 import { createClient } from '@/lib/supabase/server'
 import { puedeVerModulo } from '@/lib/utils/modulos'
 
@@ -313,7 +314,33 @@ export async function GET(request: Request) {
       for (const g of gastos) if (g.moneda === 'dolares') g.tipoCambio = tipoCambioDelDia(serie, g.fecha)
     }
 
-    return NextResponse.json({ servicios, devoluciones, asistencias, gastos, rango: { start, end } })
+    // Tarifas de distritos nuevos ya validadas por Administración (motorZonas.ts).
+    // Si la tabla todavía no existe, el motor sigue sin ellas (todo queda en propuesta).
+    const { data: tarifasRaw, error: tarifasError } = await admin.from('pruebas_tarifas_distrito').select(COLUMNAS_TARIFA)
+    if (tarifasError) console.error('pruebas_tarifas_distrito:', tarifasError.message)
+    const tarifasAprobadas = ((tarifasRaw ?? []) as FilaTarifaDistrito[]).map(aTarifa)
+
+    // 08 · Pernocte: solicitudes de la app por noche de la semana (las anuladas no cuentan).
+    // Si la tabla todavía no existe, la simulación sigue sin pernoctes.
+    const { data: pernRaw, error: pernError } = await admin.from('pernoctes_conductor')
+      .select('id, servicio_id, servicio_nombre, odoo_employee_id, conductor_nombre, noche, estado, motivo, evidencias, revisado_por_nombre, volvio_a_casa, hotel_depositado, movilidad_depositada, es_provincia')
+      .gte('noche', start).lte('noche', end).neq('estado', 'anulado')
+    if (pernError) console.error('pernoctes_conductor:', pernError.message)
+    const pernoctes: PernoctePago[] = (pernRaw ?? []).map(p => ({
+      id: p.id as string,
+      servicioId: p.servicio_id as number,
+      servicio: p.servicio_nombre as string,
+      conductorId: (p.odoo_employee_id as number | null) ?? null,
+      conductor: p.conductor_nombre as string,
+      noche: p.noche as string,
+      estado: p.estado as string,
+      motivo: p.motivo as string,
+      exclusiones: (['volvio_a_casa', 'hotel_depositado', 'movilidad_depositada', 'es_provincia'] as const).filter(k => p[k] === true),
+      revisadoPor: (p.revisado_por_nombre as string | null) ?? null,
+      evidencias: Array.isArray(p.evidencias) ? p.evidencias.length : 0,
+    }))
+
+    return NextResponse.json({ servicios, devoluciones, asistencias, gastos, tarifasAprobadas, pernoctes, rango: { start, end } })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error)
     console.error('Error en /api/pruebas/pagos-conductores:', msg)
