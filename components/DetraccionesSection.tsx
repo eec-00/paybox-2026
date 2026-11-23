@@ -97,7 +97,7 @@ function Dropzone({ label, title, hint, fileName, onFile }: DropzoneProps) {
           if (e.target.files?.[0]) onFile(e.target.files[0])
         }}
       />
-      <span className="inline-block text-[11px] uppercase tracking-wide font-semibold text-secondary-foreground bg-secondary/20 px-2 py-0.5 rounded-full mb-2">
+      <span className="inline-block text-xs uppercase tracking-wide font-semibold text-secondary-foreground bg-secondary/20 px-2 py-0.5 rounded-full mb-2">
         {label}
       </span>
       <div className="flex items-center justify-center gap-2">

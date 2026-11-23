@@ -158,7 +158,7 @@ function SectionHeader({ icon: Icon, title }: { icon: React.FC<{ className?: str
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{children}</Label>
+  return <Label className="text-2xs font-semibold text-muted-foreground uppercase tracking-wide">{children}</Label>
 }
 
 function ReadonlyField({ value }: { value: string }) {
@@ -296,10 +296,10 @@ function PartnerSelect({
         )}
       </div>
       {sinElegir && !open && (
-        <p className="text-[10px] text-warning-ink">Elige un almacén de la lista para que se guarde.</p>
+        <p className="text-2xs text-warning-ink">Elige un almacén de la lista para que se guarde.</p>
       )}
       {puedeAtajo && shortcut && (
-        <button type="button" onClick={() => elegir(shortcut.value)} className="text-[10px] text-primary hover:underline">
+        <button type="button" onClick={() => elegir(shortcut.value)} className="text-2xs text-primary hover:underline">
           {shortcut.label}
         </button>
       )}
@@ -514,11 +514,11 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
             <Truck className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] text-white/50 uppercase tracking-widest">Editar Servicio</p>
+            <p className="text-2xs text-white/50 uppercase tracking-widest">Editar Servicio</p>
             <h2 className="text-sm font-semibold leading-tight truncate">{task.name as string}</h2>
           </div>
           {currentStage && (
-            <span className={`text-[11px] font-semibold px-3 py-1 rounded-full border shrink-0 ${stageColor(currentStage.name)}`}>
+            <span className={`text-xs font-semibold px-3 py-1 rounded-full border shrink-0 ${stageColor(currentStage.name)}`}>
               {currentStage.name}
             </span>
           )}
@@ -529,7 +529,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
 
           {/* ① PROGRAMACIÓN — banda prominente */}
           <div className="bg-background rounded-xl border p-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">① Programación</p>
+            <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground mb-3">① Programación</p>
             <div className="grid grid-cols-5 gap-3 items-end">
               <div className="space-y-1">
                 <FieldLabel>Etapa</FieldLabel>
@@ -574,7 +574,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
 
             {/* Vehículos */}
             <div className="bg-background rounded-xl border p-4 space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">② Vehículos y Conductor</p>
+              <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground">② Vehículos y Conductor</p>
               <div className="space-y-1">
                 <FieldLabel>Camión / Tracto</FieldLabel>
                 {loadingLookups
@@ -615,12 +615,12 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                     </SelectContent>
                   </Select>
                   {modalidad === MODALIDAD_OTRO_CONDUCTOR && !subtareaCreada && (
-                    <p className="text-[11px] text-muted-foreground leading-snug">
+                    <p className="text-xs text-muted-foreground leading-snug">
                       Al guardar se crea la subtarea &quot;Devolución de vacío&quot; con la misma fecha de este servicio, su almacén de devolución y su fecha máxima de devolución. Luego asígnale el conductor desde la tabla.
                     </p>
                   )}
                   {modalidad === MODALIDAD_MISMO_CONDUCTOR && origModalidad === MODALIDAD_OTRO_CONDUCTOR && subtareaCreada && (
-                    <p className="text-[11px] text-warning-ink leading-snug">
+                    <p className="text-xs text-warning-ink leading-snug">
                       La subtarea de devolución que ya se creó no se borra sola — elimínala en Odoo si ya no corresponde.
                     </p>
                   )}
@@ -630,7 +630,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
 
             {/* Detalles logísticos */}
             <div className="bg-background rounded-xl border p-4 space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">③ Detalles Logísticos</p>
+              <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground">③ Detalles Logísticos</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <FieldLabel>Referencia / Booking</FieldLabel>
@@ -670,7 +670,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                   ) : (
                     <>
                       <ReadonlyField value={m2oName(task[F.almDevolucion])} />
-                      <p className="text-[10px] text-muted-foreground">Se toma del servicio original — para cambiarlo, edita ese servicio.</p>
+                      <p className="text-2xs text-muted-foreground">Se toma del servicio original — para cambiarlo, edita ese servicio.</p>
                     </>
                   )}
                 </div>
@@ -686,7 +686,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                         onChange={e => setFechaMaxDev(e.target.value)}
                         className="h-9 text-sm"
                       />
-                      <p className="text-[10px] text-muted-foreground">Si la devuelve otro conductor, la subtarea toma esta fecha automáticamente.</p>
+                      <p className="text-2xs text-muted-foreground">Si la devuelve otro conductor, la subtarea toma esta fecha automáticamente.</p>
                     </>
                   ) : (
                     <ReadonlyField value={formatOdooDatetime(task[F.fechaMaxDevolucionPadre] || task[F.fechaMaxDevolucion])} />
@@ -698,7 +698,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
 
           {/* ④ TIEMPOS OPERATIVOS — fondo diferenciado */}
           <div className="bg-background rounded-xl border border-info/30 dark:border-blue-900/40 p-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+            <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
               ④ Tiempos Operativos · {tipoServicioLabelFor(task as TaskTypeFlags)}
             </p>
             <div className="grid grid-cols-6 gap-3">
@@ -712,7 +712,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                     className="h-9 text-sm font-mono text-center"
                   />
                   {h.foto !== 'no' && (
-                    <p className="text-[9px] text-warning-ink font-medium uppercase tracking-wide">Foto: {h.foto}</p>
+                    <p className="text-2xs text-warning-ink font-medium uppercase tracking-wide">Foto: {h.foto}</p>
                   )}
                 </div>
               ))}

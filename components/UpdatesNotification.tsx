@@ -198,7 +198,7 @@ export function UpdatesNotification() {
                   />
                   <div className="flex-1 min-w-0">
                     {modulo && (
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-primary/80 truncate">{modulo}</div>
+                      <div className="text-2xs font-semibold uppercase tracking-wide text-primary/80 truncate">{modulo}</div>
                     )}
                     <div className={`text-sm text-gray-800 dark:text-gray-100 ${noLeida ? 'font-bold' : 'font-semibold'}`}>{update.title}</div>
                     <div className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mt-1.5 leading-relaxed">

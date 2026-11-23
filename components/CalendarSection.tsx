@@ -274,11 +274,11 @@ export function CalendarSection() {
             days.push(
                 <div key={day} className={`h-16 sm:h-32 border border-muted/50 rounded-sm p-0.5 sm:p-1 overflow-hidden flex flex-col ${isToday ? 'bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}>
                     <div className="flex justify-between items-center mb-0.5 sm:mb-1 shrink-0">
-                        <span className={`text-[10px] sm:text-xs font-semibold w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+                        <span className={`text-2xs sm:text-xs font-semibold w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
                             {day}
                         </span>
                         {dayPagos.length > 0 && (
-                            <span className="sm:hidden text-[9px] font-bold text-blue-500">{dayPagos.length}</span>
+                            <span className="sm:hidden text-2xs font-bold text-info-ink">{dayPagos.length}</span>
                         )}
                     </div>
                     <div className="space-y-0.5 sm:space-y-1 flex-1 hidden sm:block">
@@ -289,7 +289,7 @@ export function CalendarSection() {
                             return (
                                 <div
                                     key={pago.id}
-                                    className={`text-[10px] px-1 py-0.5 rounded-sm flex items-center gap-1 cursor-pointer hover:opacity-80 ${gastoPagoColor(pago)}`}
+                                    className={`text-2xs px-1 py-0.5 rounded-sm flex items-center gap-1 cursor-pointer hover:opacity-80 ${gastoPagoColor(pago)}`}
                                     title={`${pago.nombre_pago} — ${pago.monto_variable ? 'Variable' : formatMoney(pago.monto, pago.moneda)}${esGasto && pago.fecha_limite ? ` — Pagar hasta ${fechaCorta(pago.fecha_limite)}` : ''}`}
                                     onClick={() => {
                                         if (esGasto && pago.gasto_conductor) {
@@ -310,7 +310,7 @@ export function CalendarSection() {
                         {dayPagos.length > visibles && (
                             <Dialog>
                                 <DialogTrigger asChild>
-                                    <div className="text-[10px] font-bold text-center text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors py-0.5 cursor-pointer rounded-sm">
+                                    <div className="text-2xs font-bold text-center text-muted-foreground hover:text-primary hover:bg-muted/50 transition-colors py-0.5 cursor-pointer rounded-sm">
                                         + {dayPagos.length - visibles} más
                                     </div>
                                 </DialogTrigger>
@@ -341,11 +341,11 @@ export function CalendarSection() {
                                                         {pago.monto_variable ? 'Monto Variable' : formatMoney(pago.monto, pago.moneda)}
                                                     </span>
                                                     <div className="flex gap-2 items-center">
-                                                        {pago.frecuencia !== 'unica' && <span className="flex items-center gap-1 text-[11px] text-muted-foreground" title={pago.frecuencia}><RefreshCw className="w-3 h-3" /> Repetitivo</span>}
+                                                        {pago.frecuencia !== 'unica' && <span className="flex items-center gap-1 text-xs text-muted-foreground" title={pago.frecuencia}><RefreshCw className="w-3 h-3" /> Repetitivo</span>}
                                                         {pago.estado === 'pagado' ? (
-                                                            <span className="flex items-center gap-1 text-[11px] text-success-ink font-semibold"><CheckCircle2 className="w-3 h-3" /> Pagado</span>
+                                                            <span className="flex items-center gap-1 text-xs text-success-ink font-semibold"><CheckCircle2 className="w-3 h-3" /> Pagado</span>
                                                         ) : (
-                                                            <span className="flex items-center gap-1 text-[11px] text-warning-ink font-semibold"><AlertCircle className="w-3 h-3" /> Pendiente</span>
+                                                            <span className="flex items-center gap-1 text-xs text-warning-ink font-semibold"><AlertCircle className="w-3 h-3" /> Pendiente</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -665,7 +665,7 @@ export function CalendarSection() {
                                                         Al elegir un pago repetitivo, lo agendaremos en tu calendario de forma sucesiva. Por defecto generamos pagos hasta **1 año**, a menos que especifiques una fecha límite:
                                                     </p>
                                                     <div>
-                                                        <Label htmlFor="fecha_limite" className="text-[11px] uppercase font-bold tracking-wider opacity-80">Fecha de Fin (Opcional)</Label>
+                                                        <Label htmlFor="fecha_limite" className="text-xs uppercase font-bold tracking-wider opacity-80">Fecha de Fin (Opcional)</Label>
                                                         <Input
                                                             id="fecha_limite"
                                                             type="date"

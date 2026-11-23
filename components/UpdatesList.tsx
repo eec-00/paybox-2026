@@ -396,10 +396,10 @@ export function UpdatesList({ headerAction }: UpdatesListProps) {
                         }`}
                       >
                         <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${st.soft}`}>{st.label}</span>
-                          {modulo && <span className="text-[11px] font-medium text-muted-foreground truncate max-w-[60%]">{modulo}</span>}
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${st.soft}`}>{st.label}</span>
+                          {modulo && <span className="text-xs font-medium text-muted-foreground truncate max-w-[60%]">{modulo}</span>}
                           {nueva && (
-                            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-warning px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-warning px-2 py-0.5 text-2xs font-bold uppercase tracking-wide text-white">
                               Nuevo
                             </span>
                           )}

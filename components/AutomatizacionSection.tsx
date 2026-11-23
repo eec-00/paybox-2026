@@ -509,7 +509,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                 className="h-7 text-xs w-64"
               />
               {!esVehiculo && (
-                <span className="text-[10px] text-muted-foreground">Separa múltiples puestos con coma</span>
+                <span className="text-2xs text-muted-foreground">Separa múltiples puestos con coma</span>
               )}
             </div>
             <div className="flex flex-col gap-1">
@@ -523,7 +523,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                 type="text"
                 className="h-7 text-xs w-72"
               />
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-2xs text-muted-foreground">
                 {esVehiculo
                   ? 'Separa múltiples correos con coma'
                   : 'Recibirán un resumen consolidado de todos los conductores'}
@@ -605,7 +605,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                   >
                     {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                     <span className="text-xs font-medium flex-1">{campo?.label ?? campoKey}</span>
-                    <Badge variant="outline" className="text-[10px] h-4 border-warning/40 text-warning-ink">
+                    <Badge variant="outline" className="text-2xs h-4 border-warning/40 text-warning-ink">
                       {alertas.length} alerta{alertas.length !== 1 ? 's' : ''}
                     </Badge>
                     <Button
@@ -717,7 +717,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                       <Badge
                         key={j}
                         variant="outline"
-                        className={`text-[10px] ${c.dias < 0 ? 'border-red-400 text-destructive-ink' : c.dias <= 30 ? 'border-orange-400 text-warning-ink' : 'border-yellow-400 text-warning-ink'}`}
+                        className={`text-2xs ${c.dias < 0 ? 'border-red-400 text-destructive-ink' : c.dias <= 30 ? 'border-orange-400 text-warning-ink' : 'border-yellow-400 text-warning-ink'}`}
                       >
                         {c.label}: {c.dias < 0 ? 'vencido' : `${c.dias}d`}
                       </Badge>
@@ -847,7 +847,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                             {fecha ? (
                               <div className="flex flex-col items-center">
                                 <span>{fecha as string}</span>
-                                <span className="text-[10px] opacity-75">{getStatusLabel(dias)}</span>
+                                <span className="text-2xs opacity-75">{getStatusLabel(dias)}</span>
                               </div>
                             ) : (
                               <span className="text-muted-foreground/40">—</span>

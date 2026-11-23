@@ -33,7 +33,7 @@ const ESTILO_AVISO: Record<Aviso['tipo'], string> = {
 
 export function AvisoBadge({ aviso }: { aviso: Aviso }) {
   return (
-    <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap', ESTILO_AVISO[aviso.tipo])}>
+    <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap', ESTILO_AVISO[aviso.tipo])}>
       {aviso.texto}
     </span>
   )

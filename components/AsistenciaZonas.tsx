@@ -164,7 +164,7 @@ export function AsistenciaZonas() {
                   <p className="text-sm font-medium truncate">{z.nombre}</p>
                   <button
                     onClick={() => toggleActivo(z)}
-                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium shrink-0 ${
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium shrink-0 ${
                       z.activo ? 'bg-success-soft text-success-ink' : 'bg-muted text-muted-foreground'
                     }`}
                   >
@@ -202,7 +202,7 @@ export function AsistenciaZonas() {
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Agregar zona</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="col-span-2 sm:col-span-2">
-            <Label className="text-[11px] text-muted-foreground">Nombre</Label>
+            <Label className="text-xs text-muted-foreground">Nombre</Label>
             <Input
               placeholder="Ej: Oficina Lima"
               value={form.nombre}
@@ -211,7 +211,7 @@ export function AsistenciaZonas() {
             />
           </div>
           <div>
-            <Label className="text-[11px] text-muted-foreground">Latitud</Label>
+            <Label className="text-xs text-muted-foreground">Latitud</Label>
             <Input
               placeholder="-12.0464"
               value={form.lat}
@@ -221,7 +221,7 @@ export function AsistenciaZonas() {
             />
           </div>
           <div>
-            <Label className="text-[11px] text-muted-foreground">Longitud</Label>
+            <Label className="text-xs text-muted-foreground">Longitud</Label>
             <Input
               placeholder="-77.0428"
               value={form.lng}
@@ -231,7 +231,7 @@ export function AsistenciaZonas() {
             />
           </div>
           <div>
-            <Label className="text-[11px] text-muted-foreground">Radio (metros)</Label>
+            <Label className="text-xs text-muted-foreground">Radio (metros)</Label>
             <Input
               value={form.radio}
               onChange={(e) => setForm((f) => ({ ...f, radio: e.target.value }))}
@@ -251,7 +251,7 @@ export function AsistenciaZonas() {
             </Button>
           </div>
         </div>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Para capturar las coordenadas exactas, párate en el centro del área permitida (ej. la puerta de la oficina) y pulsa &quot;Usar mi ubicación&quot;.
         </p>
         <Button onClick={handleAgregar} disabled={saving} size="sm" className="gap-1.5">

@@ -260,7 +260,7 @@ export function AsistenciaSection() {
             {!esHoySeleccionado && (
               <button
                 onClick={() => setDiaSeleccionado(todayLima())}
-                className="text-[11px] text-primary hover:underline"
+                className="text-xs text-primary hover:underline"
               >
                 Volver a hoy
               </button>
@@ -412,7 +412,7 @@ export function AsistenciaSection() {
                         )}
                       </div>
                       {m.accuracy != null && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5">±{Math.round(m.accuracy)}m</p>
+                        <p className="text-2xs text-muted-foreground mt-0.5">±{Math.round(m.accuracy)}m</p>
                       )}
                     </TableCell>
                     <TableCell className="text-right">

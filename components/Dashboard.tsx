@@ -386,7 +386,7 @@ function Semana({ dias, hoy, total }: { dias: ({ dia: string } & Totales)[]; hoy
               <div className="relative h-32 sm:h-40 flex items-end border-b border-border">
                 {/* Única etiqueta directa: el día con más monto */}
                 {esMax && (
-                  <span className="absolute inset-x-0 text-center text-[10px] sm:text-xs font-semibold tabular-nums text-foreground" style={{ bottom: `calc(${alto}% + 4px)` }}>
+                  <span className="absolute inset-x-0 text-center text-2xs sm:text-xs font-semibold tabular-nums text-foreground" style={{ bottom: `calc(${alto}% + 4px)` }}>
                     {d.soles >= 1000 ? `${(d.soles / 1000).toLocaleString('es-PE', { maximumFractionDigits: 1 })}k` : Math.round(d.soles)}
                   </span>
                 )}
@@ -397,7 +397,7 @@ function Semana({ dias, hoy, total }: { dias: ({ dia: string } & Totales)[]; hoy
                   />
                 )}
               </div>
-              <span className={`text-center text-[11px] sm:text-xs capitalize leading-tight ${esHoy ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+              <span className={`text-center text-xs sm:text-xs capitalize leading-tight ${esHoy ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
                 {esHoy ? 'Hoy' : nombre}
                 <span className="block tabular-nums">{f.getUTCDate()}</span>
               </span>

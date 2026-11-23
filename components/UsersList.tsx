@@ -65,7 +65,7 @@ function ModulePermsBadges({ user }: { user: UserProfile }) {
                 {CRUD_LABELS.map(({ key: ck, label }) => (
                   <span
                     key={ck}
-                    className={`w-4 h-4 text-[10px] font-bold flex items-center justify-center rounded ${
+                    className={`w-4 h-4 text-2xs font-bold flex items-center justify-center rounded ${
                       access[ck]
                         ? 'bg-success-soft text-success-ink dark:bg-green-900 dark:text-green-300'
                         : 'bg-gray-100 text-gray-400 dark:bg-gray-800 line-through'

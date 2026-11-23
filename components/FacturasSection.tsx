@@ -353,7 +353,7 @@ export function FacturasSection() {
               placeholder="admin@empresa.com, gerente@empresa.com"
               className="h-7 text-xs"
             />
-            <span className="text-[10px] text-muted-foreground">Separa múltiples correos con coma. Recibirán un resumen consolidado.</span>
+            <span className="text-2xs text-muted-foreground">Separa múltiples correos con coma. Recibirán un resumen consolidado.</span>
           </div>
 
           {/* Global alertas */}

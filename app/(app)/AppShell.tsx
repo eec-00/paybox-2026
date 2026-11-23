@@ -123,7 +123,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
               <div>
                 <p className="font-heading font-bold text-lg sm:text-2xl text-white tracking-tight">PayBox</p>
-                <p className="text-[11px] sm:text-sm text-white/70 leading-tight">Eemerson SAC</p>
+                <p className="text-xs sm:text-sm text-white/70 leading-tight">Eemerson SAC</p>
               </div>
             </div>
 

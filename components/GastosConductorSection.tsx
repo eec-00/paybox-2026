@@ -241,11 +241,11 @@ export function GastosConductorSection() {
                                             <TableCell className="whitespace-nowrap">{new Date(gasto.created_at).toLocaleDateString('es-PE')}</TableCell>
                                             <TableCell className="font-medium whitespace-nowrap">{gasto.conductor_nombre}</TableCell>
                                             <TableCell className="max-w-[160px]">
-                                                <span className="line-clamp-1 text-[11px]" title={gasto.servicio_nombre}>{gasto.servicio_nombre}</span>
+                                                <span className="line-clamp-1 text-xs" title={gasto.servicio_nombre}>{gasto.servicio_nombre}</span>
                                             </TableCell>
-                                            <TableCell className="whitespace-nowrap font-mono text-[11px]">{datoServicio(gasto, 'placa')}</TableCell>
-                                            <TableCell className="whitespace-nowrap font-mono text-[11px]">{datoServicio(gasto, 'contenedor')}</TableCell>
-                                            <TableCell className="whitespace-nowrap font-mono text-[11px]">{datoServicio(gasto, 'guia')}</TableCell>
+                                            <TableCell className="whitespace-nowrap font-mono text-xs">{datoServicio(gasto, 'placa')}</TableCell>
+                                            <TableCell className="whitespace-nowrap font-mono text-xs">{datoServicio(gasto, 'contenedor')}</TableCell>
+                                            <TableCell className="whitespace-nowrap font-mono text-xs">{datoServicio(gasto, 'guia')}</TableCell>
                                             <TableCell className="max-w-[200px]">
                                                 <span className="line-clamp-2" title={gasto.descripcion}>{gasto.descripcion}</span>
                                             </TableCell>
@@ -254,18 +254,18 @@ export function GastosConductorSection() {
                                             </TableCell>
                                             <TableCell className="text-center">
                                                 {gasto.estado === 'pagado' ? (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] bg-success-soft text-success-ink px-2 py-0.5 rounded-full font-semibold">
+                                                    <span className="inline-flex items-center gap-1 text-2xs bg-success-soft text-success-ink px-2 py-0.5 rounded-full font-semibold">
                                                         <CheckCircle2 className="w-3 h-3" /> Pagado
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] bg-warning-soft text-warning-ink px-2 py-0.5 rounded-full font-semibold">
+                                                    <span className="inline-flex items-center gap-1 text-2xs bg-warning-soft text-warning-ink px-2 py-0.5 rounded-full font-semibold">
                                                         <AlertCircle className="w-3 h-3" /> Pendiente
                                                     </span>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-center">
                                                 {gasto.fotos?.length > 0 ? (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] text-primary font-semibold">
+                                                    <span className="inline-flex items-center gap-1 text-2xs text-primary font-semibold">
                                                         <Camera className="w-3 h-3" /> {gasto.fotos.length}
                                                     </span>
                                                 ) : '—'}

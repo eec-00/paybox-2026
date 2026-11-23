@@ -181,7 +181,7 @@ export function ServiciosResumenDialog({ open, onOpenChange, tasks, progresoMap,
           <p className="text-xs font-medium text-foreground bg-muted/40 rounded-md px-3 py-2">
             {cantidad} servicio{cantidad !== 1 ? 's' : ''} en este periodo
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Se abrirá la ventana de impresión: elige &quot;Guardar como PDF&quot; como destino.
           </p>
         </div>

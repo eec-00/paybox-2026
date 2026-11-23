@@ -480,13 +480,13 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
                                         <div className="flex items-center space-x-1 bg-white rounded-md border border-border/50 p-0.5 shadow-sm">
                                             <button
                                                 onClick={() => handleSelectAllCategories(true)}
-                                                className={`text-[10px] font-medium px-2 py-1 rounded transition-colors ${selectedCategories.length === categories.length && categories.length > 0 ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-muted-foreground'}`}
+                                                className={`text-2xs font-medium px-2 py-1 rounded transition-colors ${selectedCategories.length === categories.length && categories.length > 0 ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-muted-foreground'}`}
                                             >
                                                 Todas
                                             </button>
                                             <button
                                                 onClick={() => handleSelectAllCategories(false)}
-                                                className={`text-[10px] font-medium px-2 py-1 rounded transition-colors ${selectedCategories.length === 0 ? 'bg-muted text-foreground' : 'hover:bg-muted text-muted-foreground'}`}
+                                                className={`text-2xs font-medium px-2 py-1 rounded transition-colors ${selectedCategories.length === 0 ? 'bg-muted text-foreground' : 'hover:bg-muted text-muted-foreground'}`}
                                             >
                                                 Ninguna
                                             </button>

@@ -50,6 +50,9 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* Tamaño mínimo para etiquetas pequeñas (11px). Datos y texto: text-xs (12px) o más */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

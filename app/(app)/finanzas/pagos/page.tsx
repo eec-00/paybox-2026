@@ -106,12 +106,12 @@ export default function PagosPage() {
           <div className="flex flex-1 min-w-0 flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-0 bg-background rounded-lg border border-border shadow-sm">
             <div className="flex items-center gap-1 px-2 py-1 flex-1 min-w-0">
               <CalendarIcon className="h-3 w-3 text-primary/70 shrink-0" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">Desde</span>
+              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground shrink-0">Desde</span>
               <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-7 flex-1 min-w-0 text-xs bg-transparent border-none shadow-none focus-visible:ring-0 p-0" />
             </div>
             <div className="hidden sm:block h-4 w-[1px] bg-border/60 shrink-0" />
             <div className="flex items-center gap-1 px-2 py-1 flex-1 min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">Hasta</span>
+              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground shrink-0">Hasta</span>
               <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-7 flex-1 min-w-0 text-xs bg-transparent border-none shadow-none focus-visible:ring-0 p-0" />
             </div>
           </div>

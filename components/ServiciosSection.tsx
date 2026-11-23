@@ -275,7 +275,7 @@ const COLUMNS: ColumnDef[] = [
     key: 'conductor', label: 'Conductor', headClass: 'min-w-[180px]',
     sortValue: (t) => m2oName(t.x_studio_conductor),
     render: (t) => faltaConductor(t) ? (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive-soft text-destructive-ink border border-destructive/30 text-[11px] font-semibold whitespace-nowrap dark:bg-red-950/50 dark:text-red-300 dark:border-red-900">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive-soft text-destructive-ink border border-destructive/30 text-xs font-semibold whitespace-nowrap dark:bg-red-950/50 dark:text-red-300 dark:border-red-900">
         <AlertTriangle className="h-3 w-3" />
         Falta asignar conductor
       </span>
@@ -300,7 +300,7 @@ const COLUMNS: ColumnDef[] = [
     key: 'almacenRetiro', label: 'Almacén Retiro', headClass: 'min-w-[200px]',
     sortValue: (t) => m2oName(t.x_studio_almacen_de_retiro),
     render: (t) => (
-      <span className="line-clamp-2 leading-snug text-[11px] max-w-[220px] block" title={m2oName(t.x_studio_almacen_de_retiro)}>
+      <span className="line-clamp-2 leading-snug text-xs max-w-[220px] block" title={m2oName(t.x_studio_almacen_de_retiro)}>
         {m2oName(t.x_studio_almacen_de_retiro)}
       </span>
     ),
@@ -309,7 +309,7 @@ const COLUMNS: ColumnDef[] = [
     key: 'almacenDestino', label: 'Almacén Destino', headClass: 'min-w-[200px]',
     sortValue: (t) => m2oName(t.x_studio_almacen_de_destino),
     render: (t) => (
-      <span className="line-clamp-2 leading-snug text-[11px] max-w-[220px] block" title={m2oName(t.x_studio_almacen_de_destino)}>
+      <span className="line-clamp-2 leading-snug text-xs max-w-[220px] block" title={m2oName(t.x_studio_almacen_de_destino)}>
         {m2oName(t.x_studio_almacen_de_destino)}
       </span>
     ),
@@ -885,7 +885,7 @@ export function ServiciosSection() {
               <Filter className="h-3.5 w-3.5" />
               Filtros
               {activeFilterCount > 0 && (
-                <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-2xs font-bold">
                   {activeFilterCount}
                 </span>
               )}
@@ -1095,7 +1095,7 @@ export function ServiciosSection() {
         <>
           {/* Stage legend */}
           {stages.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 pb-1 text-[11px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 pb-1 text-xs text-muted-foreground">
               {stages.map((s) => (
                 <span key={s.id} className="flex items-center gap-1.5">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${stageDotColor(s.name)}`} />
@@ -1198,7 +1198,7 @@ export function ServiciosSection() {
                           <TableCell className="font-medium whitespace-nowrap" title={task.name}>
                             {code}
                             {task.parent_id && (
-                              <div className="flex items-center gap-1 text-[10px] font-normal text-warning-ink" title={`Subtarea vinculada a ${code}`}>
+                              <div className="flex items-center gap-1 text-2xs font-normal text-warning-ink" title={`Subtarea vinculada a ${code}`}>
                                 <CornerDownRight className="h-2.5 w-2.5 shrink-0" />
                                 <span className="truncate max-w-[140px]">{task.name}</span>
                               </div>

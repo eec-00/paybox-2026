@@ -642,7 +642,7 @@ export function VacacionesSection() {
                         value={importFechaIngreso[u.id] || ''}
                         onChange={(e) => setImportFechaIngreso((s) => ({ ...s, [u.id]: e.target.value }))}
                       />
-                      {faltaFecha && <p className="text-[10px] text-red-500 mt-0.5">Falta fecha</p>}
+                      {faltaFecha && <p className="text-2xs text-destructive-ink mt-0.5">Falta fecha</p>}
                     </div>
                   </div>
                 )

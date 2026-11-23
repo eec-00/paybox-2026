@@ -18,9 +18,9 @@ function soles(n: number): string {
 
 function EstadoBadge({ r }: { r: ResultadoMotor }) {
   if (r.estado === 'requiere_revision') {
-    return <span className="rounded-full bg-destructive-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-destructive-ink">Requiere revisión</span>
+    return <span className="rounded-full bg-destructive-soft px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-destructive-ink">Requiere revisión</span>
   }
-  return <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-warning-ink">Simulado</span>
+  return <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-warning-ink">Simulado</span>
 }
 
 interface Fila {
@@ -90,14 +90,14 @@ function TablaResultados({ filas, onAprobar }: { filas: Fila[]; onAprobar?: (p: 
                   {abierto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </TableCell>
                 <TableCell className="font-medium whitespace-nowrap">
-                  {prueba && <span className="mr-1 rounded bg-primary px-1.5 py-0.5 text-[11px] font-bold text-primary-foreground" title="Prueba obligatoria de la ficha de ejecución">{prueba}</span>}
-                  {etiqueta && <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-[11px] font-bold">{etiqueta}</span>}
+                  {prueba && <span className="mr-1 rounded bg-primary px-1.5 py-0.5 text-xs font-bold text-primary-foreground" title="Prueba obligatoria de la ficha de ejecución">{prueba}</span>}
+                  {etiqueta && <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-bold">{etiqueta}</span>}
                   {r.servicio}
-                  {r.origen === 'mock' && <span className="ml-1.5 text-[11px] text-muted-foreground">(mock)</span>}
+                  {r.origen === 'mock' && <span className="ml-1.5 text-xs text-muted-foreground">(mock)</span>}
                 </TableCell>
                 <TableCell className="text-sm whitespace-normal min-w-[220px]">
                   {titulo}
-                  {esperado && <p className="text-[11px] text-muted-foreground">Esperado: {esperado}</p>}
+                  {esperado && <p className="text-xs text-muted-foreground">Esperado: {esperado}</p>}
                 </TableCell>
                 <TableCell><EstadoBadge r={r} /></TableCell>
                 <TableCell className="text-right tabular-nums whitespace-nowrap">
@@ -226,7 +226,7 @@ export function MotorZonasPanel({ servicios, devoluciones, aprobadas, onAprobada
       >
         <ChevronDown className={`h-4 w-4 transition-transform ${abierto ? '' : '-rotate-90'}`} />
         Motor de tarifas · casos de prueba
-        <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-warning-ink">Simulación</span>
+        <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-warning-ink">Simulación</span>
       </button>
       {abierto && (
         <div className="border-t border-primary/20 space-y-3 pb-3">

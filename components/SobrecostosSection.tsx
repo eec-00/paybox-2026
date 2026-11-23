@@ -166,15 +166,15 @@ export function SobrecostosSection() {
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-xl border bg-card/40 border-border/50 p-3">
           <p className="text-2xl font-extrabold tabular-nums">{filas.length}</p>
-          <p className="text-[11px] text-muted-foreground font-medium">Servicios QUIMTIA</p>
+          <p className="text-xs text-muted-foreground font-medium">Servicios QUIMTIA</p>
         </div>
         <div className={`rounded-xl border p-3 ${conAlerta > 0 ? 'border-destructive/30 bg-destructive-soft/60' : 'bg-card/40 border-border/50'}`}>
           <p className="text-2xl font-extrabold tabular-nums">{conAlerta}</p>
-          <p className="text-[11px] text-muted-foreground font-medium">Pasaron las {HORAS_LIBRES} h</p>
+          <p className="text-xs text-muted-foreground font-medium">Pasaron las {HORAS_LIBRES} h</p>
         </div>
         <div className="rounded-xl border bg-card/40 border-border/50 p-3">
           <p className="text-2xl font-extrabold tabular-nums">{excesoTotal > 0 ? formatDuracion(excesoTotal) : '—'}</p>
-          <p className="text-[11px] text-muted-foreground font-medium">Tiempo con sobrecosto</p>
+          <p className="text-xs text-muted-foreground font-medium">Tiempo con sobrecosto</p>
         </div>
       </div>
 
@@ -256,7 +256,7 @@ export function SobrecostosSection() {
         </Table>
       </div>
 
-      <p className="text-[11px] text-muted-foreground leading-relaxed">
+      <p className="text-xs text-muted-foreground leading-relaxed">
         Despacho / Recojo: llegada a salida del punto de carga + llegada a salida del destino. Importación: de llegada a salida del cliente.
         Exportación: llegada a salida del cliente + ingreso al almacén destino hasta la entrega del contenedor.
         Las primeras {HORAS_LIBRES} horas son libres. El monto en soles se completa en el Excel.

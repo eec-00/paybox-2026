@@ -152,7 +152,7 @@ function InfoField({ icon: Icon, label, value }: { icon: React.ElementType; labe
     <div className="flex items-start gap-2.5">
       <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
       <div className="min-w-0">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+        <p className="text-2xs text-muted-foreground uppercase tracking-wide">{label}</p>
         <p className="text-sm font-medium truncate">{value}</p>
       </div>
     </div>
@@ -520,7 +520,7 @@ export default function ServicioDetailPage() {
                       <span className="flex shrink-0 items-center gap-1.5">
                         {f && (
                           <span
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${f.real ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground italic'}`}
+                            className={`rounded px-1.5 py-0.5 text-2xs font-semibold tabular-nums ${f.real ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground italic'}`}
                             title={f.real
                               ? 'Fecha real en que el conductor marcó el hito'
                               : 'Fecha estimada: el hito no tiene ubicación registrada, se calcula desde la fecha de programación'}
@@ -574,7 +574,7 @@ export default function ServicioDetailPage() {
                     className="border rounded-lg overflow-hidden hover:opacity-90 transition-opacity"
                   >
                     <img src={urlArchivo(f.foto_url)} alt={f.hito_label} className="w-full h-64 object-contain bg-muted/30" />
-                    <p className="text-[11px] font-medium px-2 py-1.5 bg-muted/40 truncate" title={f.hito_label}>
+                    <p className="text-xs font-medium px-2 py-1.5 bg-muted/40 truncate" title={f.hito_label}>
                       {f.hito_label}
                     </p>
                   </a>

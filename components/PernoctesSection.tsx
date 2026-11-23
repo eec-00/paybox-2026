@@ -64,7 +64,7 @@ const ESTADO_CLASE: Record<EstadoPernocte, string> = {
 
 function EstadoBadge({ estado }: { estado: EstadoPernocte }) {
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ${ESTADO_CLASE[estado]}`}>
+    <span className={`rounded-full px-2 py-0.5 text-2xs font-bold uppercase tracking-wide whitespace-nowrap ${ESTADO_CLASE[estado]}`}>
       {ESTADO_PERNOCTE_LABEL[estado]}
     </span>
   )
@@ -186,7 +186,7 @@ export function PernoctesSection() {
               <TableRow key={p.id} className="cursor-pointer" onClick={() => setAbiertoId(p.id)}>
                 <TableCell className="whitespace-nowrap">
                   <p className="font-medium capitalize">{fechaNoche(p.noche)}</p>
-                  <p className="text-[11px] text-muted-foreground">Pedido {fechaHora(p.created_at)}</p>
+                  <p className="text-xs text-muted-foreground">Pedido {fechaHora(p.created_at)}</p>
                 </TableCell>
                 <TableCell className="font-medium">{p.conductor_nombre}</TableCell>
                 <TableCell className="font-mono text-xs">{servicioCodigo(p.servicio_nombre)}</TableCell>
@@ -290,13 +290,13 @@ function RevisionDialog({ pernocte: p, esAdmin, onClose, onHecho }: {
         <div className="space-y-4 text-sm">
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="rounded-lg border p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Motivo</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Motivo</p>
               <p className="font-medium">{MOTIVOS_PERNOCTE[p.motivo]}</p>
               {p.motivo_detalle && <p className="text-muted-foreground mt-1">{p.motivo_detalle}</p>}
               <p className="text-xs text-muted-foreground mt-2">Confirmó que duerme en la unidad.</p>
             </div>
             <div className="rounded-lg border p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Ubicación al pedir</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Ubicación al pedir</p>
               {p.lat !== null && p.lng !== null ? (
                 <a
                   href={`https://www.google.com/maps?q=${p.lat},${p.lng}`}
@@ -313,7 +313,7 @@ function RevisionDialog({ pernocte: p, esAdmin, onClose, onHecho }: {
           </div>
 
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Evidencia</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Evidencia</p>
             {p.evidencias.length ? (
               <div className="flex gap-2 flex-wrap">
                 {p.evidencias.map(url => (
@@ -329,7 +329,7 @@ function RevisionDialog({ pernocte: p, esAdmin, onClose, onHecho }: {
           </div>
 
           <div className="rounded-lg border p-3 space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Antes de aprobar</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Antes de aprobar</p>
             {CLAVES_EXCLUSION.map(k => (
               <div key={k} className="flex items-center justify-between gap-3">
                 <span>{EXCLUSIONES_PERNOCTE[k]}</span>
@@ -375,7 +375,7 @@ function RevisionDialog({ pernocte: p, esAdmin, onClose, onHecho }: {
           </div>
 
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Historial</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Historial</p>
             <ol className="space-y-1.5 border-l pl-3">
               {historial.map(h => (
                 <li key={h.id} className="text-xs">
