@@ -1,5 +1,7 @@
 'use client'
 
+import { useApp } from '@/lib/context/app-context'
+import { useConfirm } from '@/components/ui/confirm'
 import { formatMoney } from '@/lib/format'
 import { PageHeader } from '@/components/ui/page-header'
 import { useCallback, useMemo, useRef, useState } from 'react'
@@ -131,9 +133,10 @@ function Stat({ value, label, tone }: StatProps) {
       <CardContent className="px-4">
         <div
           className={cn(
-            'text-2xl font-bold leading-none',
-            tone === 'ok' && 'text-primary',
-            tone === 'bad' && 'text-destructive'
+            'text-2xl font-bold leading-none tabular-nums',
+            tone === 'ok' && 'text-success-ink',
+            tone === 'bad' && (value > 0 ? 'text-destructive-ink' : 'text-primary'),
+            tone === 'neutral' && 'text-primary'
           )}
         >
           {value}
@@ -156,6 +159,8 @@ export function DetraccionesSection() {
   const [unDet, setUnDet] = useState<DetraccionRecord[]>([])
   const [unBn, setUnBn] = useState<BnRecord[]>([])
   const [debug, setDebug] = useState('')
+  const confirmar = useConfirm()
+  const { isDeveloper } = useApp()
   const [hasResults, setHasResults] = useState(false)
 
   const [qMatched, setQMatched] = useState('')
@@ -372,7 +377,13 @@ export function DetraccionesSection() {
                 </>
               )}
             </Button>
-            <Button variant="outline" size="sm" onClick={reset}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (await confirmar({ title: '¿Quitar los archivos cargados?', description: 'Se borran los dos archivos y el resultado de la comparación. Tendrás que volver a cargarlos.', confirmText: 'Quitar archivos', destructive: true })) reset()
+              }}
+            >
               <Trash2 className="h-4 w-4 mr-2" />Limpiar
             </Button>
           </div>
@@ -423,7 +434,7 @@ export function DetraccionesSection() {
             rows={filteredUnBn.map((b) => [b.ruc, fmtMoney(b.monto), b.fecha, b.documento, b.trans])}
           />
 
-          {debug && <p className="text-xs text-muted-foreground font-mono">{debug}</p>}
+          {debug && isDeveloper && <p className="text-xs text-muted-foreground font-mono">{debug}</p>}
         </>
       )}
     </div>
