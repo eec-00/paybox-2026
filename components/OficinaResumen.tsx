@@ -130,9 +130,9 @@ export function OficinaResumen({ modo, config, trabajadores, onVerDia }: {
               </button>
             ))}
           </div>
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => mover(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button aria-label="Periodo anterior" variant="outline" size="icon" className="h-9 w-9" onClick={() => mover(-1)}><ChevronLeft className="h-4 w-4" /></Button>
           <span className="text-sm font-medium px-2 min-w-48 text-center">{etiquetaPeriodo(periodo, desde, hasta)}</span>
-          <Button variant="outline" size="icon" className="h-9 w-9" disabled={hasta >= hoy} onClick={() => mover(1)}><ChevronRight className="h-4 w-4" /></Button>
+          <Button aria-label="Periodo siguiente" variant="outline" size="icon" className="h-9 w-9" disabled={hasta >= hoy} onClick={() => mover(1)}><ChevronRight className="h-4 w-4" /></Button>
         </div>
         {modo === 'resumen' && (
           <Button variant="outline" size="sm" onClick={exportar} disabled={exportando || loading}>
@@ -177,7 +177,7 @@ export function OficinaResumen({ modo, config, trabajadores, onVerDia }: {
                             onClick={() => onVerDia(d.fecha)}
                             className={cn(
                               'rounded px-1.5 py-1 text-xs tabular-nums hover:bg-muted w-full',
-                              d.avisos.some((a) => a.grave) && 'text-red-700 font-semibold',
+                              d.avisos.some((a) => a.grave) && 'text-destructive-ink font-semibold',
                               !d.marcas.entrada && 'text-muted-foreground/50',
                             )}
                           >
@@ -188,14 +188,14 @@ export function OficinaResumen({ modo, config, trabajadores, onVerDia }: {
                       {periodo === 'mes' && <TableCell className="text-center tabular-nums">{r.diasTrabajados}</TableCell>}
                       <TableCell className="text-center tabular-nums font-semibold">{fmtDuracion(r.minutosTrabajados)}</TableCell>
                       <TableCell className="text-center tabular-nums text-muted-foreground">{fmtDuracion(r.metaMin)}</TableCell>
-                      <TableCell className={cn('text-center tabular-nums font-medium', dif >= 0 ? 'text-emerald-700' : 'text-red-700')}>
+                      <TableCell className={cn('text-center tabular-nums font-medium', dif >= 0 ? 'text-success-ink' : 'text-destructive-ink')}>
                         {dif >= 0 ? '+' : ''}{fmtDuracion(dif)}
                       </TableCell>
                       <TableCell className="text-center text-sm">
                         {r.tardanzas + r.tardanzasCompensadas === 0 ? '—' : (
                           <span title={`${r.minutosTarde} min tarde en total`}>
-                            <span className={cn(r.tardanzas > 0 && 'text-amber-700 font-semibold')}>{r.tardanzas}</span>
-                            {r.tardanzasCompensadas > 0 && <span className="text-sky-700"> +{r.tardanzasCompensadas} comp.</span>}
+                            <span className={cn(r.tardanzas > 0 && 'text-warning-ink font-semibold')}>{r.tardanzas}</span>
+                            {r.tardanzasCompensadas > 0 && <span className="text-info-ink"> +{r.tardanzasCompensadas} comp.</span>}
                           </span>
                         )}
                       </TableCell>
@@ -236,7 +236,7 @@ export function OficinaResumen({ modo, config, trabajadores, onVerDia }: {
 
           <div>
             <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-              <ShieldAlert className="h-4 w-4 text-red-600" /> Intentos rechazados
+              <ShieldAlert className="h-4 w-4 text-destructive-ink" /> Intentos rechazados
             </h3>
             <div className="rounded-lg border bg-white divide-y">
               {intentos.length === 0 && (
@@ -264,7 +264,7 @@ export function OficinaResumen({ modo, config, trabajadores, onVerDia }: {
 
 function Conteo({ n, grave = false }: { n: number; grave?: boolean }) {
   return (
-    <TableCell className={cn('text-center tabular-nums text-sm', n > 0 && (grave ? 'text-red-700 font-semibold' : 'text-orange-700 font-medium'))}>
+    <TableCell className={cn('text-center tabular-nums text-sm', n > 0 && (grave ? 'text-destructive-ink font-semibold' : 'text-warning-ink font-medium'))}>
       {n || '—'}
     </TableCell>
   )

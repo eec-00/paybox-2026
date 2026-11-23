@@ -1,22 +1,14 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
+import { useConfirm } from '@/components/ui/confirm'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import {
   AlertTriangle,
   Bell,
@@ -163,21 +155,26 @@ export function AutomatizacionSection({ tipo }: Props) {
   const saveConfig = async () => {
     setSavingConfig(true)
     try {
-      await fetch('/api/automatizacion/config', {
+      const res = await fetch('/api/automatizacion/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editConfig),
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `El servidor respondió ${res.status}`)
+      }
       setConfig(editConfig)
       setConfigSaved(true)
       setTimeout(() => setConfigSaved(false), 2500)
-    } catch {
-      /* noop */
+    } catch (e) {
+      toast.error('No se guardó la configuración', { description: e instanceof Error ? e.message : 'Revisa tu conexión e inténtalo de nuevo.' })
     } finally {
       setSavingConfig(false)
     }
   }
 
+  const confirmar = useConfirm()
   const handlePreview = async () => {
     setPreviewing(true)
     setPreview(null)
@@ -198,7 +195,34 @@ export function AutomatizacionSection({ tipo }: Props) {
     }
   }
 
+  // Un solo camino para enviar (botón del encabezado o vista previa): siempre
+  // confirma y dice cuántos correos van a salir.
   const handleSendAlerts = async () => {
+    let cantidad = preview?.length ?? null
+    if (cantidad === null) {
+      try {
+        const r = await fetch('/api/automatizacion/enviar-alertas', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tipo, soloPreview: true }),
+        })
+        const d = await r.json()
+        if (!r.ok || d.error) throw new Error(d.error || `El servidor respondió ${r.status}`)
+        cantidad = (d.detalle || []).length
+      } catch (err) {
+        toast.error('No se pudo calcular el envío', { description: err instanceof Error ? err.message : undefined })
+        return
+      }
+    }
+    if (cantidad === 0) {
+      toast.info('No hay correos pendientes de enviar', { description: 'Todo lo que vence ya fue notificado en su umbral.' })
+      return
+    }
+    const ok = await confirmar({
+      title: `¿Enviar ${cantidad} correo${cantidad !== 1 ? 's' : ''} ahora?`,
+      description: `Alertas de vencimiento de ${titulo}. Solo se envían los documentos que todavía no se notificaron en ese umbral.`,
+      confirmText: 'Sí, enviar ahora',
+    })
+    if (!ok) return
     setSending(true)
     setSendResult(null)
     try {
@@ -208,6 +232,7 @@ export function AutomatizacionSection({ tipo }: Props) {
         body: JSON.stringify({ tipo, soloPreview: false }),
       })
       const data = await res.json()
+      if (!res.ok && data.error) throw new Error(data.error)
       setSendResult(data)
       setShowPreview(false)
     } catch (err: any) {
@@ -380,97 +405,73 @@ export function AutomatizacionSection({ tipo }: Props) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Zap className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-primary">Automatización — {titulo}</h2>
-            <p className="text-xs text-muted-foreground">Vencimientos de documentos · Alertas automáticas por correo</p>
-          </div>
-        </div>
+      <PageHeader
+        icon={Zap}
+        title={<>Automatización — {titulo}</>}
+        description="Vencimientos de documentos · Alertas automáticas por correo"
+        actions={
+          <>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => { setShowConfig(!showConfig); setEditConfig(config) }}
-            className="gap-1.5"
-          >
-            <Settings className="h-4 w-4" />
-            Configurar
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadRegistros}
-            disabled={loading}
-            className="gap-1.5"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Actualizar
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePreview}
-            disabled={previewing || loading}
-            className="gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50"
-          >
-            {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
-            Vista previa
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDescargarFlyer}
-            disabled={downloading || loading}
-            className="gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50"
-          >
-            {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Descargar vencimientos
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
+                variant="outline"
                 size="sm"
-                disabled={sending || loading}
-                className="gap-1.5 bg-primary hover:bg-primary/90"
+                onClick={() => { setShowConfig(!showConfig); setEditConfig(config) }}
+                className="gap-1.5"
               >
+                <Settings className="h-4 w-4" />
+                Configurar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadRegistros}
+                disabled={loading}
+                className="gap-1.5"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Actualizar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreview}
+                disabled={previewing || loading}
+                className="gap-1.5 text-info-ink border-info/30 hover:bg-info-soft"
+              >
+                {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
+                Vista previa
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDescargarFlyer}
+                disabled={downloading || loading}
+                className="gap-1.5 text-warning-ink border-warning/40 hover:bg-warning-soft"
+              >
+                {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Descargar vencimientos
+              </Button>
+              <Button size="sm" onClick={handleSendAlerts} disabled={sending || loading} className="gap-1.5">
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
                 Enviar correos
               </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Confirmar envío de correos?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Se enviarán alertas de vencimientos a todos los destinatarios configurados para{' '}
-                  <strong>{titulo}</strong>. Solo se enviarán correos para documentos que aún no
-                  hayan sido notificados en este umbral.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleSendAlerts}>Sí, enviar ahora</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
+            </div>
+          </>
+        }
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: titulo, value: stats.total, color: 'bg-primary/10 text-primary' },
-          { label: 'Vencidos', value: stats.vencidos, color: 'bg-red-100 text-red-700' },
-          { label: 'Próx. 30 días', value: stats.proximos30, color: 'bg-orange-100 text-orange-700' },
-          { label: 'Próx. 90 días', value: stats.proximos90, color: 'bg-yellow-100 text-yellow-700' },
+          { label: titulo, value: stats.total, tono: 'text-primary' },
+          { label: 'Vencidos', value: stats.vencidos, tono: stats.vencidos ? 'text-destructive-ink' : 'text-primary' },
+          { label: 'Vencen en 30 días', value: stats.proximos30, tono: stats.proximos30 ? 'text-warning-ink' : 'text-primary' },
+          { label: 'Vencen en 90 días', value: stats.proximos90, tono: 'text-primary' },
         ].map((s) => (
-          <div key={s.label} className={`rounded-lg p-3 ${s.color}`}>
-            <p className="text-2xl font-bold">{s.value}</p>
-            <p className="text-xs font-medium opacity-80">{s.label}</p>
+          <div key={s.label} className={`rounded-lg border bg-card p-3 ${s.value && s.tono !== 'text-primary' ? (s.tono === 'text-destructive-ink' ? 'border-destructive/30 bg-destructive-soft/40' : 'border-warning/40 bg-warning-soft/40') : ''}`}>
+            <p className={`text-2xl font-bold tabular-nums ${s.tono}`}>{s.value}</p>
+            <p className="text-xs text-muted-foreground">{s.label}</p>
           </div>
         ))}
       </div>
@@ -482,7 +483,7 @@ export function AutomatizacionSection({ tipo }: Props) {
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <Settings className="h-4 w-4" /> Configuración de alertas
             </h3>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowConfig(false)}>
+            <Button aria-label="Cerrar configuración" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowConfig(false)}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -508,7 +509,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                 className="h-7 text-xs w-64"
               />
               {!esVehiculo && (
-                <span className="text-[10px] text-muted-foreground">Separa múltiples puestos con coma</span>
+                <span className="text-2xs text-muted-foreground">Separa múltiples puestos con coma</span>
               )}
             </div>
             <div className="flex flex-col gap-1">
@@ -522,7 +523,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                 type="text"
                 className="h-7 text-xs w-72"
               />
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-2xs text-muted-foreground">
                 {esVehiculo
                   ? 'Separa múltiples correos con coma'
                   : 'Recibirán un resumen consolidado de todos los conductores'}
@@ -545,7 +546,7 @@ export function AutomatizacionSection({ tipo }: Props) {
               <p className="text-xs text-muted-foreground italic py-1">Sin alertas globales</p>
             )}
             {(safeEditAlertas._global || []).map((alerta: any, i: number) => (
-              <div key={i} className="flex items-center gap-2 p-2 bg-blue-50/50 border border-blue-100 rounded-lg">
+              <div key={i} className="flex items-center gap-2 p-2 bg-info-soft/50 border border-info/30 rounded-lg">
                 <Checkbox
                   checked={alerta.activo}
                   onCheckedChange={(v: boolean) => updateGlobal(i, 'activo', v)}
@@ -559,8 +560,8 @@ export function AutomatizacionSection({ tipo }: Props) {
                   min={1}
                 />
                 <span className="text-xs text-muted-foreground shrink-0">días antes</span>
-                <span className="text-xs font-medium text-blue-700 flex-1">{diasANombre(alerta.dias)}</span>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeGlobal(i)}>
+                <span className="text-xs font-medium text-info-ink flex-1">{diasANombre(alerta.dias)}</span>
+                <Button aria-label="Quitar alerta" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeGlobal(i)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -597,17 +598,17 @@ export function AutomatizacionSection({ tipo }: Props) {
               const alertas = (safeEditAlertas[campoKey] as any[] | undefined) || []
               const expanded = expandedCampos.has(campoKey)
               return (
-                <div key={campoKey} className="border border-amber-200 bg-amber-50/40 rounded-lg overflow-hidden">
+                <div key={campoKey} className="border border-warning/40 bg-warning-soft/40 rounded-lg overflow-hidden">
                   <div
-                    className="flex items-center gap-2 p-2 cursor-pointer hover:bg-amber-50 transition-colors"
+                    className="flex items-center gap-2 p-2 cursor-pointer hover:bg-warning-soft transition-colors"
                     onClick={() => toggleExpanded(campoKey)}
                   >
                     {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                     <span className="text-xs font-medium flex-1">{campo?.label ?? campoKey}</span>
-                    <Badge variant="outline" className="text-[10px] h-4 border-amber-300 text-amber-700">
+                    <Badge variant="outline" className="text-2xs h-4 border-warning/40 text-warning-ink">
                       {alertas.length} alerta{alertas.length !== 1 ? 's' : ''}
                     </Badge>
-                    <Button
+                    <Button aria-label="Quitar alerta"
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 text-destructive"
@@ -617,7 +618,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                     </Button>
                   </div>
                   {expanded && (
-                    <div className="px-3 pb-3 space-y-2 border-t border-amber-100 pt-2">
+                    <div className="px-3 pb-3 space-y-2 border-t border-warning/40 pt-2">
                       {alertas.map((alerta, i) => (
                         <div key={i} className="flex items-center gap-2 p-2 bg-background rounded-md">
                           <Checkbox
@@ -633,8 +634,8 @@ export function AutomatizacionSection({ tipo }: Props) {
                             min={1}
                           />
                           <span className="text-xs text-muted-foreground shrink-0">días antes</span>
-                          <span className="text-xs font-medium text-amber-700 flex-1">{diasANombre(alerta.dias)}</span>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeCampoAlerta(campoKey, i)}>
+                          <span className="text-xs font-medium text-warning-ink flex-1">{diasANombre(alerta.dias)}</span>
+                          <Button aria-label="Quitar alerta" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeCampoAlerta(campoKey, i)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -654,7 +655,7 @@ export function AutomatizacionSection({ tipo }: Props) {
               {savingConfig ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               Guardar
             </Button>
-            {configSaved && <span className="text-xs text-green-600 font-medium">✓ Guardado</span>}
+            {configSaved && <span className="text-xs text-success-ink font-medium">✓ Guardado</span>}
             <p className="text-xs text-muted-foreground ml-auto">
               SMTP: configura SMTP_HOST, SMTP_USER, SMTP_PASS en .env.local
             </p>
@@ -664,16 +665,16 @@ export function AutomatizacionSection({ tipo }: Props) {
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+        <div className="flex items-center gap-2 p-3 bg-destructive-soft border border-destructive/30 rounded-lg text-sm text-destructive-ink">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {error}
-          <button className="ml-auto" onClick={() => setError(null)}><X className="h-4 w-4" /></button>
+          <button aria-label="Cerrar aviso" className="ml-auto" onClick={() => setError(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
       {/* Send result */}
       {sendResult && (
-        <div className={`p-3 rounded-lg border text-sm flex items-start gap-2 ${sendResult.error ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
+        <div className={`p-3 rounded-lg border text-sm flex items-start gap-2 ${sendResult.error ? 'bg-destructive-soft border-destructive/30 text-destructive-ink' : 'bg-success-soft border-success/30 text-success-ink'}`}>
           {sendResult.error ? (
             <><AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />{sendResult.error}</>
           ) : (
@@ -690,7 +691,7 @@ export function AutomatizacionSection({ tipo }: Props) {
               ))}
             </div>
           )}
-          <button onClick={() => setSendResult(null)}><X className="h-4 w-4" /></button>
+          <button aria-label="Cerrar aviso" onClick={() => setSendResult(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
@@ -699,10 +700,10 @@ export function AutomatizacionSection({ tipo }: Props) {
         <div className="border rounded-xl p-4 bg-card shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-sm flex items-center gap-2">
-              <Bell className="h-4 w-4 text-blue-600" />
+              <Bell className="h-4 w-4 text-info-ink" />
               Vista previa — {preview.length} {esVehiculo ? 'consolidado' : `${registroLabel} recibirán alertas`}
             </h3>
-            <button onClick={() => setShowPreview(false)}><X className="h-4 w-4" /></button>
+            <button aria-label="Cerrar vista previa" onClick={() => setShowPreview(false)}><X className="h-4 w-4" /></button>
           </div>
           {preview.length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">No hay alertas pendientes de envío.</p>
@@ -716,7 +717,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                       <Badge
                         key={j}
                         variant="outline"
-                        className={`text-[10px] ${c.dias < 0 ? 'border-red-400 text-red-700' : c.dias <= 30 ? 'border-orange-400 text-orange-700' : 'border-yellow-400 text-yellow-700'}`}
+                        className={`text-2xs ${c.dias < 0 ? 'border-red-400 text-destructive-ink' : c.dias <= 30 ? 'border-orange-400 text-warning-ink' : 'border-yellow-400 text-warning-ink'}`}
                       >
                         {c.label}: {c.dias < 0 ? 'vencido' : `${c.dias}d`}
                       </Badge>
@@ -746,7 +747,7 @@ export function AutomatizacionSection({ tipo }: Props) {
             className="pl-8 h-8 text-sm"
           />
           {busqueda && (
-            <button className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setBusqueda('')}>
+            <button aria-label="Limpiar búsqueda" className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => setBusqueda('')}>
               <X className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
           )}
@@ -813,7 +814,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                       <td className={`sticky left-40 z-20 px-3 py-2 border-r border-border/50 whitespace-nowrap max-w-[160px] ${stickyBg}`}>
                         <div className="flex items-center gap-1">
                           {!esVehiculo && reg.work_email && (
-                            <button
+                            <button aria-label="Copiar correo"
                               title="Copiar correo"
                               onClick={() => {
                                 navigator.clipboard.writeText(reg.work_email)
@@ -823,7 +824,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                               className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
                             >
                               {copiedId === reg.id
-                                ? <Check className="h-3 w-3 text-green-600" />
+                                ? <Check className="h-3 w-3 text-success-ink" />
                                 : <Copy className="h-3 w-3" />
                               }
                             </button>
@@ -846,7 +847,7 @@ export function AutomatizacionSection({ tipo }: Props) {
                             {fecha ? (
                               <div className="flex flex-col items-center">
                                 <span>{fecha as string}</span>
-                                <span className="text-[10px] opacity-75">{getStatusLabel(dias)}</span>
+                                <span className="text-2xs opacity-75">{getStatusLabel(dias)}</span>
                               </div>
                             ) : (
                               <span className="text-muted-foreground/40">—</span>
@@ -866,10 +867,10 @@ export function AutomatizacionSection({ tipo }: Props) {
       {/* Legend */}
       <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
         {[
-          { color: 'bg-red-100', label: 'Vencido' },
-          { color: 'bg-orange-100', label: '≤ 30 días' },
-          { color: 'bg-yellow-100', label: '≤ 90 días' },
-          { color: 'bg-green-100', label: '> 90 días' },
+          { color: 'bg-destructive-soft', label: 'Vencido' },
+          { color: 'bg-warning-soft', label: '≤ 30 días' },
+          { color: 'bg-warning-soft', label: '≤ 90 días' },
+          { color: 'bg-success-soft', label: '> 90 días' },
         ].map((l) => (
           <span key={l.label} className="flex items-center gap-1">
             <span className={`inline-block w-3 h-3 rounded-sm ${l.color}`} />

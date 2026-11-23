@@ -36,7 +36,7 @@ function Toggle({ checked, onChange, disabled, label }: { checked: boolean; onCh
       onClick={onChange}
       disabled={disabled}
       className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-40 disabled:cursor-not-allowed ${
-        checked ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
+        checked ? 'bg-info' : 'bg-gray-200 dark:bg-gray-700'
       }`}
     >
       <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
@@ -111,7 +111,7 @@ export function ModulePermissionsEditor({ value, onChange, disabled }: Props) {
                 className="flex items-center gap-1.5 text-xs font-medium select-none rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
               >
                 <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                  access[field] ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600'
+                  access[field] ? 'bg-info border-info' : 'border-gray-300 dark:border-gray-600'
                 }`}>
                   {access[field] && (
                     <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none">

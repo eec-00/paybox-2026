@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUserProfile } from '@/lib/utils/auth'
@@ -68,22 +69,19 @@ export function OficinaAsistenciaSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="p-2 bg-primary/10 rounded-lg">
-          <Building2 className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Asistencia oficina</h2>
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-            Marcas con sticker NFC y selfie
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={Building2}
+        title="Asistencia oficina"
+        description="Marcas con sticker NFC y selfie"
+      />
 
-      <div className="flex gap-1 border-b overflow-x-auto">
+      <div role="tablist" aria-label="Secciones de asistencia de oficina" className="flex gap-1 border-b overflow-x-auto">
         {TABS.map((t) => (
           <button
             key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
             className={cn(
               'flex items-center gap-1.5 px-3 sm:px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors',

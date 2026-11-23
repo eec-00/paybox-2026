@@ -16,13 +16,14 @@ export default function AutomatizacionLayout({ children }: { children: React.Rea
 
   return (
     <div>
-      <nav className="flex gap-1 overflow-x-auto border-b border-border px-4 pt-3 md:px-6">
+      <nav aria-label="Tipos de documento" className="mb-6 flex gap-1 overflow-x-auto border-b border-border">
         {TABS.map((tab) => {
           const active = pathname.startsWith(tab.href)
           return (
             <Link
               key={tab.href}
               href={tab.href}
+              aria-current={active ? 'page' : undefined}
               className={cn(
                 'whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors',
                 active

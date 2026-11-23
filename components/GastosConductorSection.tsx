@@ -1,5 +1,7 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
+import { toast } from 'sonner'
 import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -16,6 +18,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { GastoConductor } from '@/lib/types/database.types'
 import { GastosConductorExportModal, type DatosServicio } from '@/components/GastosConductorExportModal'
+import { formatMoney, totalPorMoneda } from '@/lib/format'
 
 export function GastosConductorSection() {
     const router = useRouter()
@@ -89,7 +92,7 @@ export function GastosConductorSection() {
             fetchGastos()
         } catch (err) {
             console.error('Error al eliminar:', err)
-            alert(`Error al eliminar el gasto: ${err instanceof Error ? err.message : err}`)
+            toast.error('No se pudo eliminar el gasto', { description: err instanceof Error ? err.message : String(err) })
         } finally {
             setDeleting(false)
         }
@@ -122,7 +125,7 @@ export function GastosConductorSection() {
             fetchGastos()
         } catch (err) {
             console.error('Error al editar:', err)
-            alert('Error al guardar cambios.')
+            toast.error('No se guardaron los cambios', { description: 'Inténtalo de nuevo.' })
         } finally {
             setEditSaving(false)
         }
@@ -152,39 +155,32 @@ export function GastosConductorSection() {
     }
 
     const pendientes = gastos.filter(g => g.estado === 'pendiente').length
-    const totalPendiente = gastos
-        .filter(g => g.estado === 'pendiente')
-        .reduce((sum, g) => sum + g.monto, 0)
+    // Soles y dólares por separado: sumarlos en un solo «S/» daba un monto falso
+    const totalPendiente = totalPorMoneda(gastos.filter(g => g.estado === 'pendiente'), g => g.monto, g => g.moneda)
 
     return (
         <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                        <Receipt className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Gastos de Conductores</h2>
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                            {pendientes} pendiente{pendientes !== 1 ? 's' : ''} · S/ {totalPendiente.toFixed(2)} por pagar
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <GastosConductorExportModal gastos={gastos} datosServicio={datosServicio} />
-                    <Button variant="outline" size="sm" onClick={fetchGastos} disabled={loading} className="h-8 gap-1.5">
-                        <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-                        Actualizar
-                    </Button>
-                </div>
-            </div>
+            <PageHeader
+              icon={Receipt}
+              title="Gastos de Conductores"
+              description={<>{pendientes} pendiente{pendientes !== 1 ? 's' : ''} · {totalPendiente} por pagar</>}
+              actions={
+                <>
+                  <GastosConductorExportModal gastos={gastos} datosServicio={datosServicio} />
+                  <Button variant="outline" size="sm" onClick={fetchGastos} disabled={loading} className="h-8 gap-1.5">
+                      <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                      Actualizar
+                  </Button>
+                </>
+              }
+            />
 
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-2 bg-card/40 p-3 rounded-xl border border-border/50 shadow-sm">
                 <div className="flex items-center gap-1.5 flex-1 min-w-[180px] bg-background border rounded-lg px-3 h-9">
                     <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <input
+                    <input aria-label="Buscar conductor, servicio, placa, contenedor, guía"
                         type="text"
                         placeholder="Buscar conductor, servicio, placa, contenedor, guía..."
                         value={search}
@@ -203,7 +199,7 @@ export function GastosConductorSection() {
                     </SelectContent>
                 </Select>
                 {(search || estadoFilter !== 'all') && (
-                    <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setEstadoFilter('all') }} className="h-9 px-2 text-muted-foreground hover:text-destructive">
+                    <Button aria-label="Limpiar búsqueda" variant="ghost" size="sm" onClick={() => { setSearch(''); setEstadoFilter('all') }} className="h-9 px-2 text-muted-foreground hover:text-destructive">
                         <XCircle className="h-4 w-4" />
                     </Button>
                 )}
@@ -241,42 +237,42 @@ export function GastosConductorSection() {
                                     </TableRow>
                                 ) : (
                                     filtered.map(gasto => (
-                                        <TableRow key={gasto.id} className={`text-xs hover:bg-muted/30 ${gasto.estado === 'pendiente' ? 'bg-primary/5/30' : ''}`}>
+                                        <TableRow key={gasto.id} className={`text-xs hover:bg-muted/30 ${gasto.estado === 'pendiente' ? 'bg-primary/5' : ''}`}>
                                             <TableCell className="whitespace-nowrap">{new Date(gasto.created_at).toLocaleDateString('es-PE')}</TableCell>
                                             <TableCell className="font-medium whitespace-nowrap">{gasto.conductor_nombre}</TableCell>
                                             <TableCell className="max-w-[160px]">
-                                                <span className="line-clamp-1 text-[11px]" title={gasto.servicio_nombre}>{gasto.servicio_nombre}</span>
+                                                <span className="line-clamp-1 text-xs" title={gasto.servicio_nombre}>{gasto.servicio_nombre}</span>
                                             </TableCell>
-                                            <TableCell className="whitespace-nowrap font-mono text-[11px]">{datoServicio(gasto, 'placa')}</TableCell>
-                                            <TableCell className="whitespace-nowrap font-mono text-[11px]">{datoServicio(gasto, 'contenedor')}</TableCell>
-                                            <TableCell className="whitespace-nowrap font-mono text-[11px]">{datoServicio(gasto, 'guia')}</TableCell>
+                                            <TableCell className="whitespace-nowrap font-mono text-xs">{datoServicio(gasto, 'placa')}</TableCell>
+                                            <TableCell className="whitespace-nowrap font-mono text-xs">{datoServicio(gasto, 'contenedor')}</TableCell>
+                                            <TableCell className="whitespace-nowrap font-mono text-xs">{datoServicio(gasto, 'guia')}</TableCell>
                                             <TableCell className="max-w-[200px]">
                                                 <span className="line-clamp-2" title={gasto.descripcion}>{gasto.descripcion}</span>
                                             </TableCell>
                                             <TableCell className="text-right font-semibold whitespace-nowrap">
-                                                {gasto.moneda === 'soles' ? 'S/' : '$'} {gasto.monto.toFixed(2)}
+                                                {formatMoney(gasto.monto, gasto.moneda)}
                                             </TableCell>
                                             <TableCell className="text-center">
                                                 {gasto.estado === 'pagado' ? (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">
+                                                    <span className="inline-flex items-center gap-1 text-2xs bg-success-soft text-success-ink px-2 py-0.5 rounded-full font-semibold">
                                                         <CheckCircle2 className="w-3 h-3" /> Pagado
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">
+                                                    <span className="inline-flex items-center gap-1 text-2xs bg-warning-soft text-warning-ink px-2 py-0.5 rounded-full font-semibold">
                                                         <AlertCircle className="w-3 h-3" /> Pendiente
                                                     </span>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-center">
                                                 {gasto.fotos?.length > 0 ? (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] text-primary font-semibold">
+                                                    <span className="inline-flex items-center gap-1 text-2xs text-primary font-semibold">
                                                         <Camera className="w-3 h-3" /> {gasto.fotos.length}
                                                     </span>
                                                 ) : '—'}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => setDetailGasto(gasto)} title="Ver detalle">
+                                                    <Button aria-label="Ver detalle" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => setDetailGasto(gasto)} title="Ver detalle">
                                                         <Eye className="h-3.5 w-3.5" />
                                                     </Button>
                                                     {gasto.estado === 'pendiente' && (
@@ -287,10 +283,10 @@ export function GastosConductorSection() {
                                                                     Pagar
                                                                 </Button>
                                                             )}
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openEdit(gasto)} title="Editar">
+                                                            <Button aria-label="Editar" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => openEdit(gasto)} title="Editar">
                                                                 <Pencil className="h-3.5 w-3.5" />
                                                             </Button>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteGasto(gasto)} title="Eliminar">
+                                                            <Button aria-label="Eliminar" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteGasto(gasto)} title="Eliminar">
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </>
@@ -315,7 +311,7 @@ export function GastosConductorSection() {
                             {deleteGasto && (
                                 <>
                                     <strong>{deleteGasto.conductor_nombre}</strong> · {deleteGasto.descripcion} ·{' '}
-                                    {deleteGasto.moneda === 'soles' ? 'S/' : '$'} {deleteGasto.monto}
+                                    {formatMoney(deleteGasto.monto, deleteGasto.moneda)}
                                     <br />Esta acción no se puede deshacer. También eliminará la entrada del calendario de pagos.
                                 </>
                             )}
@@ -358,7 +354,7 @@ export function GastosConductorSection() {
                         <div>
                             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Monto</Label>
                             <div className="flex items-center gap-2 mt-1.5">
-                                <span className="text-sm text-muted-foreground shrink-0">{editGasto?.moneda === 'soles' ? 'S/' : '$'}</span>
+                                <span className="text-sm text-muted-foreground shrink-0">{editGasto?.moneda === 'soles' ? 'S/' : 'US$'}</span>
                                 <Input
                                     type="number"
                                     step="0.01"
@@ -397,7 +393,7 @@ export function GastosConductorSection() {
                             <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Conductor</p><p className="font-semibold">{detailGasto.conductor_nombre}</p></div>
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Estado</p>
-                                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${detailGasto.estado === 'pagado' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${detailGasto.estado === 'pagado' ? 'bg-success-soft text-success-ink' : 'bg-warning-soft text-warning-ink'}`}>
                                         {detailGasto.estado === 'pagado' ? <><CheckCircle2 className="w-3 h-3" />Pagado</> : <><AlertCircle className="w-3 h-3" />Pendiente</>}
                                     </span>
                                 </div>
@@ -406,7 +402,7 @@ export function GastosConductorSection() {
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Contenedor</p><p className="font-semibold font-mono">{datoServicio(detailGasto, 'contenedor')}</p></div>
                                 <div className="col-span-2"><p className="text-xs text-muted-foreground uppercase tracking-wide">N° Guía</p><p className="font-semibold font-mono">{datoServicio(detailGasto, 'guia')}</p></div>
                                 <div className="col-span-2"><p className="text-xs text-muted-foreground uppercase tracking-wide">Descripción</p><p className="font-medium">{detailGasto.descripcion}</p></div>
-                                <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Monto</p><p className="font-bold text-xl text-primary">{detailGasto.moneda === 'soles' ? 'S/' : '$'} {detailGasto.monto}</p></div>
+                                <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Monto</p><p className="font-bold text-xl text-primary">{formatMoney(detailGasto.monto, detailGasto.moneda)}</p></div>
                                 <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Registrado</p><p className="font-semibold">{new Date(detailGasto.created_at).toLocaleDateString('es-PE')}</p></div>
                                 {detailGasto.pagado_at && (
                                     <div><p className="text-xs text-muted-foreground uppercase tracking-wide">Pagado el</p><p className="font-semibold">{new Date(detailGasto.pagado_at).toLocaleDateString('es-PE')}</p></div>
@@ -428,7 +424,7 @@ export function GastosConductorSection() {
                                 <div>
                                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Voucher de pago</p>
                                     <a href={urlArchivo(detailGasto.foto_pago)} target="_blank" rel="noopener noreferrer">
-                                        <img src={urlArchivo(detailGasto.foto_pago)} alt="voucher pago" className="w-24 h-24 object-cover rounded-lg border border-green-200 hover:opacity-80 transition-opacity" />
+                                        <img src={urlArchivo(detailGasto.foto_pago)} alt="voucher pago" className="w-24 h-24 object-cover rounded-lg border border-success/30 hover:opacity-80 transition-opacity" />
                                     </a>
                                 </div>
                             )}

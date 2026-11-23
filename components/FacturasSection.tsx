@@ -1,22 +1,16 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
+import { useConfirm } from '@/components/ui/confirm'
 import { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
+import { diasHastaLima, tonoVencimiento } from '@/lib/automatizacion/campos'
+import { formatMoney } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import {
   AlertTriangle,
   Bell,
@@ -80,12 +74,7 @@ const DEFAULT_CONFIG: FacturasConfig = {
 }
 
 function daysUntil(dateStr: string | false): number | null {
-  if (!dateStr) return null
-  const target = new Date(dateStr)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  target.setHours(0, 0, 0, 0)
-  return Math.round((target.getTime() - today.getTime()) / 86400000)
+  return diasHastaLima(dateStr)
 }
 
 function formatDue(dateStr: string | false): string {
@@ -97,9 +86,6 @@ function formatDue(dateStr: string | false): string {
   return `En ${days} días`
 }
 
-function formatMoney(amount: number): string {
-  return `S/ ${amount.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
 
 const CLOSED_PAYMENT_STATES = new Set(['paid', 'reversed', 'in_payment'])
 
@@ -109,30 +95,25 @@ function isDueClosed(state: string, paymentState: string): boolean {
 
 function dueCellClass(state: string, paymentState: string, dias: number | null): string {
   if (isDueClosed(state, paymentState) || dias === null) return 'text-muted-foreground'
-  if (dias < 0) return 'bg-red-100 text-red-700 font-semibold'
-  if (dias <= 7) return 'bg-orange-100 text-orange-700 font-semibold'
-  if (dias <= 14) return 'bg-yellow-100 text-yellow-700 font-medium'
-  if (dias <= 30) return 'bg-green-100 text-green-700'
-  return 'text-muted-foreground'
+  return tonoVencimiento(dias, { critico: 7, alerta: 30, okVerde: false })
 }
 
-function EstadoBadge({ state, paymentState, isSent }: { state: string; paymentState: string; isSent: boolean | false }) {
-  if (state === 'cancel') return <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100">Cancelado</Badge>
+function EstadoBadge({ state, paymentState }: { state: string; paymentState: string }) {
+  if (state === 'cancel') return <Badge variant="danger">Cancelado</Badge>
   if (state === 'posted') {
-    if (paymentState === 'paid') return <Badge className="bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-100">Pagado</Badge>
-    if (paymentState === 'reversed') return <Badge className="bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100">Revertido</Badge>
-    if (paymentState === 'in_payment') return <Badge className="bg-cyan-100 text-cyan-700 border-cyan-200 hover:bg-cyan-100">En proceso de pago</Badge>
-    if (paymentState === 'partial') return <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 hover:bg-indigo-100">Pago parcial</Badge>
-    if (isSent) return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Enviado</Badge>
-    return <Badge className="bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-100">Registrado</Badge>
+    if (paymentState === 'paid') return <Badge variant="success">Pagado</Badge>
+    if (paymentState === 'reversed') return <Badge variant="neutral">Revertido</Badge>
+    if (paymentState === 'in_payment') return <Badge variant="info">En proceso de pago</Badge>
+    if (paymentState === 'partial') return <Badge variant="warning">Pago parcial</Badge>
+    return <Badge variant="info">Registrado</Badge>
   }
   return <Badge variant="outline">Borrador</Badge>
 }
 
 function EnviadoBadge({ isSent }: { isSent: boolean | false }) {
   return isSent
-    ? <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Enviado</Badge>
-    : <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100">Sin enviar</Badge>
+    ? <Badge variant="success">Enviado</Badge>
+    : <Badge variant="neutral">Sin enviar</Badge>
 }
 
 export function FacturasSection() {
@@ -198,17 +179,24 @@ export function FacturasSection() {
   const saveConfig = async () => {
     setSavingConfig(true)
     try {
-      await fetch('/api/automatizacion/config', {
+      const res = await fetch('/api/automatizacion/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editConfig),
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `El servidor respondió ${res.status}`)
+      }
       setConfig(editConfig)
       setConfigSaved(true)
       setTimeout(() => setConfigSaved(false), 2500)
-    } catch { /* noop */ } finally { setSavingConfig(false) }
+    } catch (e) {
+      toast.error('No se guardó la configuración', { description: e instanceof Error ? e.message : 'Revisa tu conexión e inténtalo de nuevo.' })
+    } finally { setSavingConfig(false) }
   }
 
+  const confirmar = useConfirm()
   const handlePreview = async () => {
     setPreviewing(true)
     setPreview(null)
@@ -226,7 +214,34 @@ export function FacturasSection() {
     finally { setPreviewing(false) }
   }
 
+  // Un solo camino para enviar (botón del encabezado o vista previa): siempre
+  // confirma y dice cuántos correos van a salir.
   const handleSendAlerts = async () => {
+    let cantidad = preview?.length ?? null
+    if (cantidad === null) {
+      try {
+        const r = await fetch('/api/automatizacion/facturas-alertas', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ soloPreview: true }),
+        })
+        const d = await r.json()
+        if (!r.ok || d.error) throw new Error(d.error || `El servidor respondió ${r.status}`)
+        cantidad = (d.detalle || []).length
+      } catch (err) {
+        toast.error('No se pudo calcular el envío', { description: err instanceof Error ? err.message : undefined })
+        return
+      }
+    }
+    if (cantidad === 0) {
+      toast.info('No hay correos pendientes de enviar', { description: 'Todo lo que vence ya fue notificado en su umbral.' })
+      return
+    }
+    const ok = await confirmar({
+      title: `¿Enviar ${cantidad} correo${cantidad !== 1 ? 's' : ''} ahora?`,
+      description: 'Correo consolidado con las facturas próximas a vencer. Solo se incluyen las que todavía no se notificaron en ese umbral.',
+      confirmText: 'Sí, enviar ahora',
+    })
+    if (!ok) return
     setSending(true)
     setSendResult(null)
     try {
@@ -236,6 +251,7 @@ export function FacturasSection() {
         body: JSON.stringify({ soloPreview: false }),
       })
       const data = await res.json()
+      if (!res.ok && data.error) throw new Error(data.error)
       setSendResult(data)
       setShowPreview(false)
     } catch (err: any) { setError(err.message) }
@@ -270,70 +286,48 @@ export function FacturasSection() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <FileText className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-primary">Facturas</h2>
-            <p className="text-xs text-muted-foreground">Facturas de clientes · Alertas de vencimiento por correo</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => { setShowConfig(!showConfig); setEditConfig(config) }} className="gap-1.5">
-            <Settings className="h-4 w-4" /> Configurar
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => loadFacturas(busqueda, estadoFiltro, page)} disabled={loading} className="gap-1.5">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Actualizar
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePreview}
-            disabled={previewing || loading}
-            className="gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50"
-          >
-            {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
-            Vista previa
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button size="sm" disabled={sending || loading} className="gap-1.5 bg-primary hover:bg-primary/90">
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                Enviar correos
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Confirmar envío de correos?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Se enviará un correo consolidado a los destinatarios configurados con todas las facturas
-                  próximas a vencer según los umbrales configurados. Solo se enviarán facturas que aún no
-                  hayan sido notificadas en ese umbral.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleSendAlerts}>Sí, enviar ahora</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
+      <PageHeader
+        icon={FileText}
+        title="Facturas"
+        description="Facturas de clientes · Alertas de vencimiento por correo"
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => { setShowConfig(!showConfig); setEditConfig(config) }} className="gap-1.5">
+              <Settings className="h-4 w-4" /> Configurar
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => loadFacturas(busqueda, estadoFiltro, page)} disabled={loading} className="gap-1.5">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Actualizar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePreview}
+              disabled={previewing || loading}
+              className="gap-1.5 text-info-ink border-info/30 hover:bg-info-soft"
+            >
+              {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
+              Vista previa
+            </Button>
+            <Button size="sm" onClick={handleSendAlerts} disabled={sending || loading} className="gap-1.5">
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Enviar correos
+            </Button>
+          </>
+        }
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total facturas', value: total, color: 'bg-primary/10 text-primary' },
-          { label: 'Enviadas (pág.)', value: stats.enviadas, color: 'bg-green-100 text-green-700' },
-          { label: 'Canceladas (pág.)', value: stats.canceladas, color: 'bg-red-100 text-red-700' },
-          { label: 'Monto (pág.)', value: formatMoney(stats.montoTotal), color: 'bg-blue-100 text-blue-700' },
+          { label: 'Facturas en total', value: total },
+          { label: 'Enviadas, en esta página', value: stats.enviadas },
+          { label: 'Canceladas, en esta página', value: stats.canceladas },
+          { label: 'Monto total, en esta página', value: formatMoney(stats.montoTotal) },
         ].map((s) => (
-          <div key={s.label} className={`rounded-lg p-3 ${s.color}`}>
-            <p className="text-lg font-bold leading-tight">{s.value}</p>
-            <p className="text-xs font-medium opacity-80">{s.label}</p>
+          <div key={s.label} className="rounded-lg border bg-card p-3">
+            <p className="text-lg font-bold leading-tight tabular-nums text-primary">{s.value}</p>
+            <p className="text-xs text-muted-foreground">{s.label}</p>
           </div>
         ))}
       </div>
@@ -345,7 +339,7 @@ export function FacturasSection() {
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <Settings className="h-4 w-4" /> Configuración de alertas — Facturas
             </h3>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowConfig(false)}>
+            <Button aria-label="Cerrar configuración" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowConfig(false)}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -359,7 +353,7 @@ export function FacturasSection() {
               placeholder="admin@empresa.com, gerente@empresa.com"
               className="h-7 text-xs"
             />
-            <span className="text-[10px] text-muted-foreground">Separa múltiples correos con coma. Recibirán un resumen consolidado.</span>
+            <span className="text-2xs text-muted-foreground">Separa múltiples correos con coma. Recibirán un resumen consolidado.</span>
           </div>
 
           {/* Global alertas */}
@@ -377,7 +371,7 @@ export function FacturasSection() {
               <p className="text-xs text-muted-foreground italic py-1">Sin umbrales. Agrega al menos uno.</p>
             )}
             {globalAlertas.map((alerta, i) => (
-              <div key={i} className="flex items-center gap-2 p-2 bg-blue-50/50 border border-blue-100 rounded-lg">
+              <div key={i} className="flex items-center gap-2 p-2 bg-info-soft/50 border border-info/30 rounded-lg">
                 <Checkbox
                   checked={alerta.activo}
                   onCheckedChange={(v: boolean) => updateGlobal(i, 'activo', v)}
@@ -391,8 +385,8 @@ export function FacturasSection() {
                   min={1}
                 />
                 <span className="text-xs text-muted-foreground shrink-0">días antes</span>
-                <span className="text-xs font-medium text-blue-700 flex-1">{diasANombre(alerta.dias)}</span>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeGlobal(i)}>
+                <span className="text-xs font-medium text-info-ink flex-1">{diasANombre(alerta.dias)}</span>
+                <Button aria-label="Quitar alerta" variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeGlobal(i)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -404,7 +398,7 @@ export function FacturasSection() {
               {savingConfig ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               Guardar
             </Button>
-            {configSaved && <span className="text-xs text-green-600 font-medium">✓ Guardado</span>}
+            {configSaved && <span className="text-xs text-success-ink font-medium">✓ Guardado</span>}
             <p className="text-xs text-muted-foreground ml-auto">
               SMTP: configura SMTP_HOST, SMTP_USER, SMTP_PASS en .env.local
             </p>
@@ -414,16 +408,16 @@ export function FacturasSection() {
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+        <div className="flex items-center gap-2 p-3 bg-destructive-soft border border-destructive/30 rounded-lg text-sm text-destructive-ink">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {error}
-          <button className="ml-auto" onClick={() => setError(null)}><X className="h-4 w-4" /></button>
+          <button aria-label="Cerrar aviso" className="ml-auto" onClick={() => setError(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
       {/* Send result */}
       {sendResult && (
-        <div className={`p-3 rounded-lg border text-sm flex items-start gap-2 ${sendResult.error ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
+        <div className={`p-3 rounded-lg border text-sm flex items-start gap-2 ${sendResult.error ? 'bg-destructive-soft border-destructive/30 text-destructive-ink' : 'bg-success-soft border-success/30 text-success-ink'}`}>
           {sendResult.error ? (
             <><AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />{sendResult.error}</>
           ) : (
@@ -438,7 +432,7 @@ export function FacturasSection() {
               ))}
             </div>
           )}
-          <button onClick={() => setSendResult(null)}><X className="h-4 w-4" /></button>
+          <button aria-label="Cerrar aviso" onClick={() => setSendResult(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
@@ -447,10 +441,10 @@ export function FacturasSection() {
         <div className="border rounded-xl p-4 bg-card shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-sm flex items-center gap-2">
-              <Bell className="h-4 w-4 text-blue-600" />
+              <Bell className="h-4 w-4 text-info-ink" />
               Vista previa — {preview.length} factura(s) pendientes de notificar
             </h3>
-            <button onClick={() => setShowPreview(false)}><X className="h-4 w-4" /></button>
+            <button aria-label="Cerrar vista previa" onClick={() => setShowPreview(false)}><X className="h-4 w-4" /></button>
           </div>
           {preview.length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">No hay facturas pendientes de notificar con los umbrales configurados.</p>
@@ -468,11 +462,7 @@ export function FacturasSection() {
                 </thead>
                 <tbody>
                   {preview.map((p, i) => {
-                    const colorClass = p.dias < 0
-                      ? 'text-red-600 font-semibold'
-                      : p.dias <= 7 ? 'text-orange-600 font-semibold'
-                      : p.dias <= 14 ? 'text-yellow-700 font-medium'
-                      : 'text-green-700'
+                    const colorClass = tonoVencimiento(p.dias, { critico: 7, alerta: 30, okVerde: false })
                     return (
                       <tr key={i} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
                         <td className="px-2 py-1.5 font-medium whitespace-nowrap">{p.nombre}</td>
@@ -502,7 +492,7 @@ export function FacturasSection() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
+          <Input aria-label="Buscar número o cliente"
             placeholder="Buscar número o cliente…"
             value={busquedaInput}
             onChange={(e) => setBusquedaInput(e.target.value)}
@@ -510,7 +500,7 @@ export function FacturasSection() {
             className="pl-8 h-8 text-sm"
           />
           {busquedaInput && (
-            <button className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => { setBusquedaInput(''); setBusqueda(''); setPage(0) }}>
+            <button aria-label="Limpiar búsqueda" className="absolute right-2 top-1/2 -translate-y-1/2" onClick={() => { setBusquedaInput(''); setBusqueda(''); setPage(0) }}>
               <X className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
           )}
@@ -578,7 +568,7 @@ export function FacturasSection() {
                       <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{formatMoney(f.amount_untaxed)}</td>
                       <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-muted-foreground">{formatMoney(f.amount_tax)}</td>
                       <td className="px-3 py-2 text-right font-mono font-semibold whitespace-nowrap">{formatMoney(f.amount_total)}</td>
-                      <td className="px-3 py-2 text-center"><EstadoBadge state={f.state} paymentState={f.payment_state} isSent={f.is_move_sent} /></td>
+                      <td className="px-3 py-2 text-center"><EstadoBadge state={f.state} paymentState={f.payment_state} /></td>
                       <td className="px-3 py-2 text-center"><EnviadoBadge isSent={f.is_move_sent} /></td>
                     </tr>
                   )
@@ -592,10 +582,10 @@ export function FacturasSection() {
       {/* Legend */}
       <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
         {[
-          { color: 'bg-red-100', label: 'Vencido' },
-          { color: 'bg-orange-100', label: '≤ 7 días' },
-          { color: 'bg-yellow-100', label: '≤ 14 días' },
-          { color: 'bg-green-100', label: '≤ 30 días' },
+          { color: 'bg-destructive-soft', label: 'Vencido' },
+          { color: 'bg-warning-soft', label: '≤ 7 días' },
+          { color: 'bg-warning-soft', label: '≤ 14 días' },
+          { color: 'bg-success-soft', label: '≤ 30 días' },
         ].map((l) => (
           <span key={l.label} className="flex items-center gap-1">
             <span className={`inline-block w-3 h-3 rounded-sm ${l.color}`} />

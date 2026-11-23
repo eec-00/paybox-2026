@@ -14,15 +14,24 @@
 // Horarios en minutos desde la medianoche del día de programación (> 1440 =
 // días después), ver lib/servicios/fechasHitos.ts.
 //
-// Fuera de cálculo automático: 08 · Pernocte (S/40) — no tiene hito disparador;
-// lo confirma Operaciones. 05 · Devolución posterior Crosland ya no se paga
+// Desde VIGENCIA_REGLAS_NOV (pagosConductores.ts) rigen las respuestas de
+// Margiory al correo de Mirella (nov. 2026): cena por hora efectiva de
+// devolución (I12 desde las 19:00) y ADHT por retiro antes de las 06:00 (I04)
+// con devolución tardía; el ADHT reemplaza a la cena en todos los clientes.
+// Los servicios anteriores conservan las reglas de la guía v1.0.
+//
+// 08 · Pernocte (S/40): no tiene hito disparador. Sale de la solicitud «Voy a
+// pernoctar» de la app, aprobada por Operaciones en Pruebas > Pernoctes
+// (lib/pernoctes/reglas.ts). 05 · Devolución posterior Crosland ya no se paga
 // aparte: va en la tarifa (Rosario, 12/11/2026). El tramo base y el reparto Crosland A/B (06 · TDC
 // de Crosland) los calcula motorZonas.ts.
 // ============================================================================
 
 import {
-  servicioCodigo, type AsistenciaPago, type DevolucionPago, type GastoPago, type ServicioPago,
+  reglasNuevas, servicioCodigo, VIGENCIA_REGLAS_NOV, type AsistenciaPago, type DevolucionPago, type GastoPago, type ServicioPago,
 } from './pagosConductores'
+import type { PernoctePago } from './pagosConductores'
+import { EXCLUSION_CORTA, MONTO_PERNOCTE, MOTIVOS_PERNOCTE, type ExclusionPernocte, type MotivoPernocte } from '@/lib/pernoctes/reglas'
 
 export type ConceptoAdicional =
   | 'cena'
@@ -31,6 +40,7 @@ export type ConceptoAdicional =
   | 'crosland_medianoche'
   | 'tdc'
   | 'retiro_0300'
+  | 'pernocte'
   | 'maquina'
   | 'bono'
   | 'viatico'
@@ -42,11 +52,12 @@ export type EstadoAdicional = 'simulado' | 'requiere_revision' | 'pagado'
 /** Número y nombre del concepto en la tabla-resumen de la guía (§1) */
 export const CONCEPTO_LABEL: Record<ConceptoAdicional, string> = {
   cena: '01 · Cena ordinaria',
-  adht: '02 · ADHT devolución tardía',
+  adht: '02 · Cena extraordinaria (ADHT)',
   crosland_nocturno: '03 · Crosland nocturno',
   crosland_medianoche: '04 · Crosland medianoche',
   tdc: '06 · TDC por otro conductor',
   retiro_0300: '07 · Retiro 03:00',
+  pernocte: '08 · Pernocte',
   maquina: '09 · Máquina',
   bono: '10 · Bono ocho integrales',
   viatico: '11 · Viático provincia',
@@ -77,12 +88,21 @@ export interface Adicional {
   umbral?: { min: number; label: string }
 }
 
+const FECHA_NUEVAS = VIGENCIA_REGLAS_NOV.split('-').reverse().join('/')
+
+/** Reglas que rigen desde VIGENCIA_REGLAS_NOV (respuesta de Margiory, nov. 2026) */
+export const REGLAS_NUEVAS: Partial<Record<ConceptoAdicional, string>> = {
+  cena: `Desde el ${FECHA_NUEVAS} · S/20. Importación: devolución efectiva del contenedor (I12, hora real marcada en la app, no la cita) a partir de las 19:00 (Margiory, nov. 2026). Despacho: D10 a partir de las 19:00. Si la devolución la hace otro conductor (B), la cena es para B cuando además trabajó ese día en otro servicio; el conductor A no cobra nada (Margiory, 18/11/2026). Una sola cena por día. Nunca I13/D12 ni hora de regreso a cochera.`,
+  adht: `Desde el ${FECHA_NUEVAS} · S/30. Cena extraordinaria: retiro efectivo del contenedor (I04 Salida almacén de retiro) antes de las 06:00 y devolución efectiva (I12) tarde, con horas reales, no las de la cita. Devolución desde las 17:00 (opción A, elegida por Margiory). Reemplaza a la cena de S/20, no se acumulan (Margiory, nov. 2026).`,
+}
+
 export const REGLAS: Record<ConceptoAdicional, string> = {
   cena: 'Guía §3.01 · S/20. Importación: I08 (Fin descarga) después de las 19:00; despacho: D10. Crosland: también si el mismo conductor devuelve (I12) después de las 19:00, porque la devolución va en su tarifa (Rosario, 12/11/2026). En otros clientes, si I08/D10 fue antes de las 19:00 pero el conductor siguió trabajando después (I09/D11, I10–I12), requiere revisión. Nunca I13/D12 ni hora de regreso a cochera.',
   adht: 'S/30. Regla de Margiory (10/11/2026), confirmada el 12/11/2026 en lugar de la guía §3.02: I10 (Llegada a depósito) a las 17:00 o después, con cita de devolución a las 17:00 o después (Servicio Extraordinario, SSEE: el mismo conductor hace retiro, traslado y devolución de vacío). Si el conductor ingresa (I11) antes de la cita, no corresponde: ya lo cubre la máquina. Crosland: el ADHT reemplaza a la cena (Rosario, 12/11/2026).',
   crosland_nocturno: 'Guía §3.03 · S/30 ref. Crosland, atención desde I06 (Ingreso cliente). Hito decisivo: I09 (Salida cliente) después de las 22:00, definido por Margiory el 10/11/2026. No usar I12 ni I13; no duplicar con ADHT.',
   crosland_medianoche: 'Guía §3.04 · S/50 ref. Crosland, atención desde I06. Hito decisivo: I09 (Salida cliente) después de las 00:00, igual que el nocturno (Margiory, 12/11/2026). Sustituye los S/30 nocturnos; no se suman (Rosario, 12/11/2026).',
   tdc: 'Guía §3.06 · Otros clientes: el conductor B que devuelve el contenedor de otro cobra S/30 si lo devuelve en APM o DPW y S/20 en cualquier otro almacén (Rosario, 12/11/2026). Basta I12 en la subtarea asignada. Crosland va en la tarifa base (CR-03/CR-04).',
+  pernocte: 'S/40 por cada noche efectiva en que el conductor duerme en su camión por la operación (Margiory, nov. 2026). Fuente: solicitud «Voy a pernoctar» de la app (motivo, hora, ubicación y evidencia) aprobada en Pruebas > Pernoctes; autoriza Charito si la evidencia es clara, si no Emerson. No corresponde si la unidad se quedó en el cliente y el conductor volvió a su casa, si se depositó hotel o movilidad de retorno, ni en viajes a provincia (ahí se paga hospedaje y, si la unidad no queda en el almacén del cliente, cochera — Rosario). No se activa por cruzar la medianoche. Pendiente: compatibilidad con cena y con retiro 03:00.',
   retiro_0300: 'Guía §3.07 · S/20. Cita original Odoo de RETIRO exactamente a las 03:00; contrastar I01 (Inicio ruta), I02/I03 y foto de salida de cochera. No aplica a cita 03:30 ni a I01 aislado. Revisar incompatibilidad con pernocte.',
   maquina: 'Guía §3.09 · S/5 por día válido, máximo S/30 por semana (seis días). Fuente: módulo Asistencia de la app (entrada/salida) con servicio asignado ese día. No aplica a días sin servicio.',
   bono: 'Guía §3.10 · S/100 semanal. Ocho Sxxxxx únicos y completos (sábado–viernes). Importación: I08/I09 + devolución propia I12. Despacho/exportación: flujo propio completo. Las entregas de isotanque lleno o vacío sí cuentan. NO son acumulables: traslados internos de isotanque (ITK), viajes a provincia (fuera de Lima) y devoluciones por terceros (Rosario, 11 y 12/11/2026).',
@@ -94,6 +114,7 @@ export const REGLAS: Record<ConceptoAdicional, string> = {
 const ETAPA_FINALIZADA = 'Servicio Finalizado'
 const MIN_19 = 19 * 60
 const MIN_17 = 17 * 60
+const MIN_06 = 6 * 60
 const MIN_22 = 22 * 60
 const MIN_24 = 24 * 60
 const CITA_0300 = 3 * 60
@@ -113,7 +134,7 @@ export function esFinalizado(etapa: string | null): boolean {
 
 export function esPuerto(almacen: string | null): boolean {
   const a = (almacen ?? '').toUpperCase()
-  return a.includes('DPW') || a.includes('APMT') || a.includes('DP WORLD')
+  return a.includes('DPW') || a.includes('DP WORLD') || /\bAPM/.test(a)
 }
 
 /**
@@ -181,7 +202,61 @@ const CENA: Record<string, { fin: [string, string]; despues: [string, string][] 
   despacho: { fin: ['fin_descarga', 'D10'], despues: [['salida_destino', 'D11']] },
 }
 
+/** Desde VIGENCIA_REGLAS_NOV: la cena la define la hora efectiva de devolución (I12) */
+function cenaNuevaDe(s: ServicioPago): Adicional | null {
+  const def = CENA[s.flujo]
+  if (!def || !s.fecha) return null
+  const base = {
+    concepto: 'cena' as const, fecha: s.fecha, servicio: servicioCodigo(s.name), regla: REGLAS_NUEVAS.cena!,
+    servicioIds: [s.id], umbral: { min: MIN_19, label: 'Desde 19:00' },
+  }
+  if (s.flujo === 'despacho') {
+    const d10 = hora(s, 'fin_descarga')
+    if (d10 !== null && d10 >= MIN_19) {
+      return sim({ ...base, monto: 20, detalle: `${marca(s, 'fin_descarga', 'D10')} (Fin descarga)`, hitos: ['D10'], claves: ['fin_descarga'] })
+    }
+    const d11 = hora(s, 'salida_destino')
+    if (d11 === null || d11 < MIN_19) return null
+    return rev(
+      { ...base, detalle: `${d10 === null ? 'D10 sin marcar' : marca(s, 'fin_descarga', 'D10')}; ${marca(s, 'salida_destino', 'D11')}`, hitos: ['D10', 'D11'], claves: ['fin_descarga', 'salida_destino'] },
+      d10 === null ? 'D10 sin marcar y salió del destino después de las 19:00' : 'D10 antes de las 19:00 pero salió del destino después',
+    )
+  }
+  // Importación: si la devolución la hace otro conductor, su cena se ve en la subtarea
+  if (s.devolucionOtroConductor) return null
+  const i12 = hora(s, 'contenedor_devuelto')
+  if (i12 !== null) {
+    if (i12 < MIN_19) return null
+    return sim({ ...base, monto: 20, detalle: `${marca(s, 'contenedor_devuelto', 'I12')} (devolución efectiva)`, hitos: ['I12'], claves: ['contenedor_devuelto'] })
+  }
+  const previo = (['ingreso_devolucion', 'llegada_devolucion'] as const).map(k => [k, hora(s, k)] as const).find(([, m]) => m !== null && m >= MIN_19)
+  if (!previo) return null
+  const [k] = previo
+  const c = k === 'ingreso_devolucion' ? 'I11' : 'I10'
+  return rev(
+    { ...base, detalle: `${marca(s, k, c)}; I12 sin marcar`, hitos: [c, 'I12'], claves: [k, 'contenedor_devuelto'] },
+    `Sin I12 (devolución efectiva), pero ${c} ya fue después de las 19:00`,
+  )
+}
+
+/** Desde VIGENCIA_REGLAS_NOV: el conductor B devolvió el vacío de otro después de las 19:00 */
+function cenaDevolucionTerceroDe(d: DevolucionPago, todos: ServicioPago[]): Adicional | null {
+  if (!reglasNuevas(d.fecha) || d.devueltoMin === null || d.devueltoMin < MIN_19) return null
+  if (d.conductorId === null || d.conductorId === d.padreConductorId) return null
+  // «Si viene todo el día trabajando y además devuelve un vacío, el pago va para él» (Margiory, 18/11/2026)
+  const otros = todos.filter(s => s.conductorId === d.conductorId && s.fecha === d.fecha && s.id !== d.padreId)
+  const linea = {
+    concepto: 'cena' as const, fecha: d.fecha || null, servicio: servicioCodigo(d.padreName), regla: REGLAS_NUEVAS.cena!,
+    detalle: `Devolvió el vacío de ${d.padreConductor ?? 'otro conductor'}${d.almacen ? ` en ${d.almacen}` : ''} · I12 ${horaLabel(d.devueltoMin)}`
+      + (otros.length ? ` · ese día también hizo ${otros.map(s => servicioCodigo(s.name)).join(', ')}` : ''),
+    hitos: ['I12'], servicioIds: [d.padreId, ...otros.map(s => s.id)], claves: [], umbral: { min: MIN_19, label: 'Desde 19:00' },
+  }
+  if (otros.length === 0) return rev(linea, 'Solo hizo esta devolución ese día: la cena va para quien viene trabajando todo el día')
+  return sim({ ...linea, monto: 20 })
+}
+
 function cenaDe(s: ServicioPago): Adicional | null {
+  if (reglasNuevas(s.fecha)) return cenaNuevaDe(s)
   const def = CENA[s.flujo]
   if (!def || !s.fecha) return null
   const [keyFin, codFin] = def.fin
@@ -212,7 +287,25 @@ function cenaDe(s: ServicioPago): Adicional | null {
 
 // ── 02 · ADHT ───────────────────────────────────────────────────────────
 
+/** Desde VIGENCIA_REGLAS_NOV: retiro efectivo (I04) antes de las 06:00 y devolución efectiva (I12) tarde */
+function adhtNuevoDe(s: ServicioPago): Adicional | null {
+  if (s.flujo !== 'importacion' || s.devolucionOtroConductor) return null
+  const i12 = hora(s, 'contenedor_devuelto')
+  if (i12 === null || i12 < MIN_17) return null
+  const i04 = hora(s, 'salida_almacen_retiro')
+  if (i04 !== null && i04 >= MIN_06) return null
+  const linea = {
+    concepto: 'adht' as const, fecha: s.fecha || null, servicio: servicioCodigo(s.name), regla: REGLAS_NUEVAS.adht!,
+    detalle: `${marca(s, 'salida_almacen_retiro', 'I04')} (retiro) → ${marca(s, 'contenedor_devuelto', 'I12')} (devolución)`,
+    hitos: ['I04', 'I12'], servicioIds: [s.id], claves: ['salida_almacen_retiro', 'contenedor_devuelto'],
+    umbral: { min: MIN_17, label: 'Devolución desde 17:00' },
+  }
+  if (i04 === null) return rev(linea, 'Devolución tardía pero sin I04 (salida del almacén de retiro) para comprobar el retiro antes de las 06:00')
+  return sim({ ...linea, monto: 30 })
+}
+
 function adhtDe(s: ServicioPago): Adicional | null {
+  if (reglasNuevas(s.fecha)) return adhtNuevoDe(s)
   if (s.flujo !== 'importacion' || s.devolucionOtroConductor) return null
   const i10 = hora(s, 'llegada_devolucion')
   if (i10 === null || i10 < MIN_17) return null
@@ -289,6 +382,37 @@ function retiroDe(s: ServicioPago): Adicional | null {
   // La app no pide foto en I01: la hora de salida se acepta solo si quedó registrada con ubicación
   if (!conUbicacion(s, 'inicio_ruta')) return rev(linea, 'Salida de cochera sin ubicación registrada ni foto: hay que comprobarla, no asumirla')
   return sim({ ...linea, monto: 20 })
+}
+
+// ── 08 · Pernocte ───────────────────────────────────────────────────────
+
+const PENDIENTE_PERNOCTE: Record<string, string> = {
+  pendiente: 'Pendiente de aprobación en Pruebas > Pernoctes',
+  escalado: 'Escalado a Emerson: falta su decisión',
+}
+
+function pernocteDe(p: PernoctePago, todos: ServicioPago[]): Adicional | null {
+  if (p.estado === 'rechazado' || p.estado === 'anulado') return null
+  const s = todos.find(x => x.id === p.servicioId)
+  const [y, m, d] = p.noche.split('-')
+  const linea = {
+    concepto: 'pernocte' as const, fecha: p.noche, servicio: servicioCodigo(p.servicio), regla: REGLAS.pernocte,
+    detalle: `Noche del ${d}/${m}/${y} · ${MOTIVOS_PERNOCTE[p.motivo as MotivoPernocte] ?? p.motivo} · ${p.evidencias} foto(s)${p.revisadoPor ? ` · revisó ${p.revisadoPor}` : ''}`,
+    hitos: ['App Pernocte'], servicioIds: s ? [s.id] : [], claves: [],
+  }
+  if (p.estado !== 'aprobado') return rev(linea, PENDIENTE_PERNOCTE[p.estado] ?? `Estado ${p.estado}`)
+  if (p.exclusiones.length) {
+    return rev(linea, `Aprobado, pero marcado: ${p.exclusiones.map(k => EXCLUSION_CORTA[k as ExclusionPernocte] ?? k).join(', ')}`)
+  }
+  if (s?.atributos.zona === 'Provincia') {
+    return rev(linea, 'El servicio es a provincia en Odoo: ahí se paga hospedaje, no pernocte')
+  }
+  return sim({ ...linea, monto: MONTO_PERNOCTE })
+}
+
+function diaAnterior(fecha: string): string {
+  const [y, m, d] = fecha.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d - 1, 12)).toISOString().slice(0, 10)
 }
 
 // ── 09 · Máquina ────────────────────────────────────────────────────────
@@ -431,10 +555,12 @@ export interface EntradaAdicionales {
   conductorId: number
   asistencias: AsistenciaPago[]
   gastos: GastoPago[]
+  /** Solicitudes de pernocte de la semana (por noche), de todos los conductores */
+  pernoctes?: PernoctePago[]
 }
 
 const ORDEN: ConceptoAdicional[] = [
-  'cena', 'adht', 'crosland_nocturno', 'crosland_medianoche', 'tdc', 'retiro_0300',
+  'cena', 'adht', 'crosland_nocturno', 'crosland_medianoche', 'tdc', 'retiro_0300', 'pernocte',
   'maquina', 'bono', 'viatico', 'gasto', 'no_devolucion',
 ]
 
@@ -462,8 +588,9 @@ export function calcularAdicionales(e: EntradaAdicionales): Adicional[] {
     if (!crosland) {
       const a = adhtDe(s)
       if (a) out.push(a)
-      // Crosland: el ADHT (S/30) reemplaza a la cena (Rosario, 12/11/2026)
-      if (a?.estado === 'simulado' && esCrosland(s.clienteId)) {
+      // El ADHT (S/30) reemplaza a la cena: en Crosland (Rosario, 12/11/2026) y,
+      // desde VIGENCIA_REGLAS_NOV, en todos los clientes (Margiory, nov. 2026)
+      if (a?.estado === 'simulado' && (esCrosland(s.clienteId) || reglasNuevas(s.fecha))) {
         const i = out.findIndex(x => x.concepto === 'cena' && x.servicioIds.includes(s.id) && x.estado === 'simulado')
         if (i >= 0) out.splice(i, 1)
       }
@@ -476,6 +603,12 @@ export function calcularAdicionales(e: EntradaAdicionales): Adicional[] {
   for (const d of e.devoluciones) {
     if (d.conductorId !== e.conductorId) continue
     const t = tdcDe(d, e.todos.find(s => s.id === d.padreId)); if (t) out.push(t)
+    const c = cenaDevolucionTerceroDe(d, e.todos)
+    if (c) {
+      // Una sola cena por día: si ya tiene cena o cena extraordinaria simulada ese día, esta queda en revisión
+      const yaCena = out.some(x => (x.concepto === 'cena' || x.concepto === 'adht') && x.estado === 'simulado' && x.fecha === c.fecha)
+      out.push(yaCena && c.estado === 'simulado' ? { ...c, monto: null, estado: 'requiere_revision', motivo: 'Ya tiene cena ese día' } : c)
+    }
   }
 
   // Máquina: día con servicio realmente asignado, finalizado o no (guía §3.09)
@@ -483,6 +616,19 @@ export function calcularAdicionales(e: EntradaAdicionales): Adicional[] {
   const m = maquinaDe(asignados, e.asistencias.filter(a => a.conductorId === e.conductorId)); if (m) out.push(m)
   const b = bonoDe(e.servicios); if (b) out.push(b)
   for (const g of e.gastos) if (g.conductorId === e.conductorId) out.push(gastoDe(g, e.todos))
+
+  // 08 · Pernocte: una línea por noche
+  for (const p of e.pernoctes ?? []) {
+    if (p.conductorId !== e.conductorId) continue
+    const x = pernocteDe(p, e.todos); if (x) out.push(x)
+  }
+  // Retiro 03:00 la mañana siguiente a un pernocte aprobado: la compatibilidad
+  // está sin definir, así que no se suman los dos sin que alguien lo mire
+  const noches = new Set(out.filter(a => a.concepto === 'pernocte' && a.estado === 'simulado').map(a => a.fecha))
+  out.forEach((a, i) => {
+    if (a.concepto !== 'retiro_0300' || a.estado !== 'simulado' || !a.fecha || !noches.has(diaAnterior(a.fecha))) return
+    out[i] = { ...a, monto: null, estado: 'requiere_revision', motivo: 'Pernocte aprobado la noche anterior: falta definir si se pagan los dos' }
+  })
 
   return out.sort((a, b) => ORDEN.indexOf(a.concepto) - ORDEN.indexOf(b.concepto) || String(a.fecha).localeCompare(String(b.fecha)))
 }

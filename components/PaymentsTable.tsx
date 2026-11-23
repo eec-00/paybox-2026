@@ -13,6 +13,9 @@ import { getUserPermissions, isAdmin } from '@/lib/utils/auth'
 import type { Registro } from '@/lib/types/database.types'
 import { format } from 'date-fns'
 import EditPaymentForm from './EditPaymentForm'
+import { toast } from 'sonner'
+import { ErrorCarga } from '@/components/ui/alert'
+import { formatMoney } from '@/lib/format'
 
 interface PaymentsTableProps {
   refresh?: number
@@ -47,6 +50,7 @@ export function PaymentsTable({
   const [isAdminUser, setIsAdminUser] = useState(false)
   const [permissions, setPermissions] = useState({ can_create: false, can_edit: false, can_delete: false })
   const [deleting, setDeleting] = useState<number | null>(null)
+  const [errorCarga, setErrorCarga] = useState<string | null>(null)
 
   const [currentPage, setCurrentPage] = useState(1)
   const [totalRecords, setTotalRecords] = useState(0)
@@ -88,6 +92,7 @@ export function PaymentsTable({
 
   const loadRegistros = async () => {
     setLoading(true)
+    setErrorCarga(null)
     try {
       const from = (currentPage - 1) * PAGE_SIZE
       const to = from + PAGE_SIZE - 1
@@ -166,14 +171,14 @@ export function PaymentsTable({
       }
     } catch (error: any) {
       console.error('❌ Error al cargar registros:', error)
+      setErrorCarga(error?.message || 'Revisa tu conexión e inténtalo de nuevo.')
     } finally {
       setLoading(false)
     }
   }
 
   const formatCurrency = (amount: number, currency: 'soles' | 'dolares') => {
-    const symbol = currency === 'soles' ? 'S/' : '$'
-    return `${symbol} ${amount.toFixed(2)}`
+    return formatMoney(amount, currency)
   }
 
   const formatDateTime = (dateString: string) => {
@@ -206,7 +211,7 @@ export function PaymentsTable({
       await loadRegistros()
     } catch (error: any) {
       console.error('Error al eliminar registro:', error)
-      alert('Error al eliminar el registro: ' + error.message)
+      toast.error('No se pudo eliminar el registro', { description: error.message })
     } finally {
       setDeleting(null)
     }
@@ -223,6 +228,10 @@ export function PaymentsTable({
     if (isAdminUser) return true
     return permissions.can_delete && registro.creado_por === currentUser.id
   }
+
+  const hayFiltros = !!(externalCatSearch || externalDocSearch || externalStartDate || externalEndDate
+    || externalMinAmount || externalMaxAmount || (externalCategories && externalCategories.length > 0)
+    || (externalCurrency && externalCurrency !== 'all') || (externalPaymentType && externalPaymentType !== 'all'))
 
   if (loading) {
     return (
@@ -248,6 +257,7 @@ export function PaymentsTable({
         </div>
       </CardHeader>
       <CardContent>
+        {errorCarga && <ErrorCarga className="mb-4" titulo="No se pudieron cargar los registros" mensaje={errorCarga} onRetry={loadRegistros} />}
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -257,7 +267,7 @@ export function PaymentsTable({
                 <TableHead className="whitespace-nowrap">Fecha de Pago</TableHead>
                 <TableHead>Beneficiario</TableHead>
                 <TableHead className="hidden md:table-cell">Tipo Doc.</TableHead>
-                <TableHead className="whitespace-nowrap">Monto</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Monto</TableHead>
                 <TableHead className="hidden lg:table-cell">Categoría</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -266,7 +276,11 @@ export function PaymentsTable({
               {registros.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                    No hay registros aún. Crea tu primer registro arriba.
+                    {errorCarga
+                      ? 'Sin datos: no se pudieron cargar los registros.'
+                      : hayFiltros
+                        ? 'Ningún registro coincide con los filtros. Prueba ampliando las fechas o quitando filtros.'
+                        : 'Todavía no hay registros. Usa «Nuevo pago» para crear el primero.'}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -285,19 +299,19 @@ export function PaymentsTable({
                     <TableCell className="text-sm max-w-[120px] sm:max-w-none truncate">{registro.beneficiario}</TableCell>
                     <TableCell className="hidden md:table-cell">
                       {registro.tipo_documento ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary/10 text-secondary">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary/15 text-warning-ink">
                           {registro.tipo_documento === 'factura' ? 'Factura' : 'Comprobante'}
                         </span>
                       ) : (
                         <span className="text-muted-foreground text-xs">-</span>
                       )}
                     </TableCell>
-                    <TableCell className="font-semibold text-sm whitespace-nowrap">
+                    <TableCell className="font-semibold text-sm whitespace-nowrap text-right">
                       {formatCurrency(registro.monto, registro.moneda)}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
                       <div className="flex flex-col">
-                        <span className="font-medium text-secondary text-sm">
+                        <span className="font-medium text-primary text-sm">
                           {registro.categoria?.categoria_id_texto}
                         </span>
                         <span className="text-xs text-muted-foreground">
@@ -332,7 +346,7 @@ export function PaymentsTable({
                                 <div className="lg:col-span-2 space-y-6">
                                   {/* Datos Generales */}
                                   <div className="bg-secondary/5 rounded-lg p-6">
-                                    <h3 className="font-semibold text-lg text-secondary mb-4 flex items-center gap-2">
+                                    <h3 className="font-semibold text-lg text-primary mb-4 flex items-center gap-2">
                                       <span className="w-1 h-6 bg-secondary rounded"></span>
                                       Datos Generales
                                     </h3>
@@ -391,7 +405,7 @@ export function PaymentsTable({
                                       )}
                                       <div className="space-y-1">
                                         <span className="text-xs text-muted-foreground uppercase tracking-wide">Categoría</span>
-                                        <p className="font-semibold text-base text-secondary">
+                                        <p className="font-semibold text-base text-primary">
                                           {selectedRegistro.categoria?.categoria_id_texto}
                                         </p>
                                         <p className="text-sm text-muted-foreground">{selectedRegistro.categoria?.categoria_nombre}</p>
@@ -455,7 +469,7 @@ export function PaymentsTable({
                                 <div className="lg:col-span-1">
                                   {selectedRegistro.comprobantes && selectedRegistro.comprobantes.length > 0 && (
                                     <div className="bg-white rounded-lg border shadow-sm p-6 sticky top-4">
-                                      <h3 className="font-semibold text-lg text-secondary mb-4 flex items-center gap-2">
+                                      <h3 className="font-semibold text-lg text-primary mb-4 flex items-center gap-2">
                                         <span className="w-1 h-6 bg-secondary rounded"></span>
                                         Comprobantes
                                       </h3>
@@ -484,7 +498,7 @@ export function PaymentsTable({
                                               href={urlArchivo(url)}
                                               target="_blank"
                                               rel="noopener noreferrer"
-                                              className="mt-3 flex items-center justify-center gap-2 text-sm text-secondary hover:text-secondary/80 font-semibold hover:underline transition-colors"
+                                              className="mt-3 flex items-center justify-center gap-2 text-sm text-primary hover:text-primary/80 font-semibold hover:underline transition-colors"
                                             >
                                               <Eye className="h-4 w-4" />
                                               Ver en tamaño completo
@@ -505,7 +519,7 @@ export function PaymentsTable({
                             if (!open) setEditingRegistro(null)
                           }}>
                             <DialogTrigger asChild>
-                              <Button
+                              <Button aria-label="Editar registro"
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setEditingRegistro(registro)}
@@ -531,7 +545,7 @@ export function PaymentsTable({
                         {canDeleteRegistro(registro) && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button
+                              <Button aria-label="Eliminar registro"
                                 variant="outline"
                                 size="sm"
                                 disabled={deleting === registro.id}

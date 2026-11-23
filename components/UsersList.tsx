@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -64,9 +65,9 @@ function ModulePermsBadges({ user }: { user: UserProfile }) {
                 {CRUD_LABELS.map(({ key: ck, label }) => (
                   <span
                     key={ck}
-                    className={`w-4 h-4 text-[10px] font-bold flex items-center justify-center rounded ${
+                    className={`w-4 h-4 text-2xs font-bold flex items-center justify-center rounded ${
                       access[ck]
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                        ? 'bg-success-soft text-success-ink dark:bg-green-900 dark:text-green-300'
                         : 'bg-gray-100 text-gray-400 dark:bg-gray-800 line-through'
                     }`}
                   >
@@ -221,7 +222,7 @@ export function UsersList() {
 
     } catch (err: any) {
       console.error('Error deleting user:', err)
-      alert(`Error al eliminar usuario: ${err.message}`)
+      toast.error('No se pudo eliminar el usuario', { description: err.message })
     } finally {
       setDeleting(false)
     }
@@ -230,13 +231,13 @@ export function UsersList() {
   const getRoleBadgeColor = (role: UserRole) => {
     switch (role) {
       case 'admin':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+        return 'bg-primary text-primary-foreground'
       case 'developer':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+        return 'bg-purple-100 text-purple-800'
       case 'user':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+        return 'bg-info-soft text-info-ink'
       case 'viewer':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+        return 'bg-muted text-muted-foreground'
     }
   }
 
@@ -290,9 +291,9 @@ export function UsersList() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
-            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-            <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+          <div className="flex items-center gap-2 p-4 bg-destructive-soft dark:bg-red-950 border border-destructive/30 dark:border-red-800 rounded-lg">
+            <AlertCircle className="h-5 w-5 text-destructive-ink dark:text-red-400" />
+            <p className="text-sm text-destructive-ink dark:text-red-200">{error}</p>
           </div>
           <Button onClick={loadUsers} className="mt-4">
             Reintentar
@@ -366,7 +367,7 @@ export function UsersList() {
                           Editar
                         </Button>
                         {(user.role !== 'admin' && user.role !== 'developer') && (
-                          <Button
+                          <Button aria-label="Eliminar usuario"
                             variant="destructive"
                             size="sm"
                             onClick={() => handleDeleteClick(user)}
@@ -461,7 +462,7 @@ export function UsersList() {
             )}
 
             {editRole === 'admin' && (
-              <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg text-sm">
+              <div className="p-3 bg-info-soft dark:bg-blue-950 border border-info/30 dark:border-blue-800 rounded-lg text-sm">
                 Los administradores tienen acceso completo a todas las funciones del sistema.
               </div>
             )}
@@ -473,16 +474,16 @@ export function UsersList() {
             )}
 
             {saveError && (
-              <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
-                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <p className="text-sm text-red-800 dark:text-red-200">{saveError}</p>
+              <div className="flex items-center gap-2 p-3 bg-destructive-soft dark:bg-red-950 border border-destructive/30 dark:border-red-800 rounded-lg">
+                <AlertCircle className="h-4 w-4 text-destructive-ink dark:text-red-400" />
+                <p className="text-sm text-destructive-ink dark:text-red-200">{saveError}</p>
               </div>
             )}
 
             {saveSuccess && (
-              <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
-                <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <p className="text-sm text-green-800 dark:text-green-200">
+              <div className="flex items-center gap-2 p-3 bg-success-soft dark:bg-green-950 border border-success/30 dark:border-green-800 rounded-lg">
+                <Check className="h-4 w-4 text-success-ink dark:text-green-400" />
+                <p className="text-sm text-success-ink dark:text-green-200">
                   Permisos actualizados correctamente
                 </p>
               </div>
@@ -522,7 +523,7 @@ export function UsersList() {
             <AlertDialogAction
               onClick={handleConfirmDelete}
               disabled={deleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-red-700"
             >
               {deleting ? 'Eliminando...' : 'Eliminar usuario'}
             </AlertDialogAction>

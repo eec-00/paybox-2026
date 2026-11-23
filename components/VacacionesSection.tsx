@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUserProfile } from '@/lib/utils/auth'
@@ -330,36 +331,34 @@ export function VacacionesSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <CalendarClock className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Vacaciones</h2>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              Control de vacaciones del personal
-            </p>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={fetchEmpleados} disabled={loading} className="h-8 gap-1.5">
-          <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
-          Actualizar
-        </Button>
-      </div>
+      <PageHeader
+        icon={CalendarClock}
+        title="Vacaciones"
+        description="Control de vacaciones del personal"
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={fetchEmpleados} disabled={loading} className="h-8 gap-1.5">
+              <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
+              Actualizar
+            </Button>
+          </>
+        }
+      />
 
       {alertas > 0 && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+        <div className="flex items-center gap-2 p-3 bg-destructive-soft border border-destructive/30 rounded-lg text-sm text-destructive-ink">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {alertas} trabajador{alertas !== 1 ? 'es' : ''} con vacaciones pendientes o con aviso vencido.
         </div>
       )}
 
       {/* Tabs por empresa (los 2 "libros" del Excel) */}
-      <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg w-fit">
+      <div role="group" aria-label="Empresa" className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg w-fit">
         {(['EESAC', 'EGARCIA'] as VacacionEmpresa[]).map((emp) => (
           <button
             key={emp}
+            type="button"
+            aria-pressed={empresaTab === emp}
             onClick={() => setEmpresaTab(emp)}
             className={cn(
               'px-4 py-1.5 rounded-md text-sm font-medium transition-colors',
@@ -375,7 +374,7 @@ export function VacacionesSection() {
       <div className="flex flex-wrap items-center gap-2 bg-card/40 p-3 rounded-xl border border-border/50 shadow-sm">
         <div className="flex items-center gap-1.5 flex-1 min-w-[180px] bg-background border rounded-lg px-3 h-9">
           <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <input
+          <input aria-label="Buscar por nombre o DNI"
             type="text"
             placeholder="Buscar por nombre o DNI..."
             value={search}
@@ -392,7 +391,7 @@ export function VacacionesSection() {
           {mostrarInactivos ? 'Ocultar inactivos' : 'Mostrar inactivos'}
         </Button>
         {search && (
-          <Button variant="ghost" size="sm" onClick={() => setSearch('')} className="h-9 px-2 text-muted-foreground hover:text-destructive">
+          <Button aria-label="Limpiar búsqueda" variant="ghost" size="sm" onClick={() => setSearch('')} className="h-9 px-2 text-muted-foreground hover:text-destructive">
             <XCircle className="h-4 w-4" />
           </Button>
         )}
@@ -470,13 +469,13 @@ export function VacacionesSection() {
                         <div className="flex items-center justify-end gap-1">
                           <Button size="sm" variant="outline" onClick={() => setDetalleEmpleado(e)}>Gestionar</Button>
                           {canEdit && (
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditar(e)}>
+                            <Button aria-label="Editar trabajador" size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditar(e)}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           )}
                           {canEdit && (
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setBajaEmpleado(e)}>
-                              {e.activo ? <UserX className="h-3.5 w-3.5 text-red-600" /> : <UserCheck className="h-3.5 w-3.5 text-green-600" />}
+                            <Button aria-label={e.activo ? 'Dar de baja' : 'Reactivar'} size="icon" variant="ghost" className="h-8 w-8" onClick={() => setBajaEmpleado(e)}>
+                              {e.activo ? <UserX className="h-3.5 w-3.5 text-destructive-ink" /> : <UserCheck className="h-3.5 w-3.5 text-success-ink" />}
                             </Button>
                           )}
                         </div>
@@ -601,7 +600,7 @@ export function VacacionesSection() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={bajaSaving}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBaja} disabled={bajaSaving} className={bajaEmpleado?.activo ? 'bg-red-600 hover:bg-red-700' : ''}>
+            <AlertDialogAction onClick={handleBaja} disabled={bajaSaving} className={bajaEmpleado?.activo ? 'bg-destructive text-white hover:bg-destructive/90' : ''}>
               {bajaSaving ? 'Guardando...' : (bajaEmpleado?.activo ? 'Dar de baja' : 'Reactivar')}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -645,7 +644,7 @@ export function VacacionesSection() {
                         value={importFechaIngreso[u.id] || ''}
                         onChange={(e) => setImportFechaIngreso((s) => ({ ...s, [u.id]: e.target.value }))}
                       />
-                      {faltaFecha && <p className="text-[10px] text-red-500 mt-0.5">Falta fecha</p>}
+                      {faltaFecha && <p className="text-2xs text-destructive-ink mt-0.5">Falta fecha</p>}
                     </div>
                   </div>
                 )

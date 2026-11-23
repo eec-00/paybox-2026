@@ -1,5 +1,8 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
+import { useConfirm } from '@/components/ui/confirm'
+import { toast } from 'sonner'
 import { urlArchivo } from '@/lib/archivos'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
@@ -120,10 +123,10 @@ function m2oName(value: [number, string] | false | undefined): string {
 }
 
 const STAGE_DOT_COLORS: Record<string, string> = {
-  'nueva solicitud': 'bg-blue-500',
-  'pre-operativo': 'bg-amber-500',
-  'en ruta': 'bg-orange-500',
-  'en cliente': 'bg-green-500',
+  'nueva solicitud': 'bg-info',
+  'pre-operativo': 'bg-warning',
+  'en ruta': 'bg-warning',
+  'en cliente': 'bg-success',
   'cargando': 'bg-yellow-400',
   'finalizó carga': 'bg-cyan-500',
   'finalizo carga': 'bg-cyan-500',
@@ -149,7 +152,7 @@ function InfoField({ icon: Icon, label, value }: { icon: React.ElementType; labe
     <div className="flex items-start gap-2.5">
       <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
       <div className="min-w-0">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+        <p className="text-2xs text-muted-foreground uppercase tracking-wide">{label}</p>
         <p className="text-sm font-medium truncate">{value}</p>
       </div>
     </div>
@@ -218,10 +221,11 @@ export default function ServicioDetailPage() {
   // se lee después de montar para no desalinear el render del servidor)
   const [volverHref, setVolverHref] = useState('/servicios/trailers')
   useEffect(() => { setVolverHref(urlListaTrailers()) }, [])
+  const confirmar = useConfirm()
   const cambiarEtapa = async (stage: { id: number; name: string }) => {
     if (!task) return
     const codigo = task.name.includes(' - ') ? task.name.split(' - ')[0] : task.name
-    if (!window.confirm(`¿Pasar ${codigo} a la etapa "${stage.name}"?`)) return
+    if (!(await confirmar({ title: `¿Pasar ${codigo} a «${stage.name}»?`, description: 'El cambio se guarda en Odoo y lo verán todos los que siguen este servicio.', confirmText: 'Cambiar etapa' }))) return
     setCambiandoEtapa(true)
     try {
       const res = await fetch('/api/servicios', {
@@ -233,7 +237,7 @@ export default function ServicioDetailPage() {
       if (!res.ok) throw new Error(data.error || 'No se pudo cambiar la etapa')
       setTask((prev) => prev ? { ...prev, stage_id: [stage.id, stage.name] } : prev)
     } catch (e: unknown) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      toast.error('No se pudo cambiar la etapa', { description: e instanceof Error ? e.message : String(e) })
     } finally {
       setCambiandoEtapa(false)
     }
@@ -297,22 +301,16 @@ export default function ServicioDetailPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Truck className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
-              {loading ? 'Cargando...' : `Servicio ${code}`}
-            </h2>
-            {stageName && (
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${stageDotColor(stageName)}`} />
-                {stageName}
-              </p>
-            )}
-          </div>
-        </div>
+        <PageHeader
+          icon={Truck}
+          title={loading ? 'Cargando…' : `Servicio ${code}`}
+          description={stageName && (
+            <span className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${stageDotColor(stageName)}`} aria-hidden />
+              Etapa: {stageName}
+            </span>
+          )}
+        />
         <div className="flex items-center gap-1.5">
         {vecinos && (
           <>
@@ -414,19 +412,19 @@ export default function ServicioDetailPage() {
                         </span>
                       ))}
                       {g.expiraAt && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded text-xs">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-success-soft dark:bg-emerald-950/30 text-success-ink dark:text-emerald-400 border border-success/30 dark:border-emerald-800 rounded text-xs">
+                          <span className="h-1.5 w-1.5 rounded-full bg-success inline-block" />
                           Activo hasta {formatOdooDateTime(g.expiraAt)}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <button
+                      <button aria-label="Copiar enlace"
                         onClick={() => copyLink(g.url)}
                         title="Copiar enlace"
                         className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md border hover:bg-muted/50 transition-colors"
                       >
-                        {copied ? <CheckCircle className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                        {copied ? <CheckCircle className="h-3.5 w-3.5 text-success-ink" /> : <Copy className="h-3.5 w-3.5" />}
                       </button>
                       <a
                         href={g.url}
@@ -437,7 +435,7 @@ export default function ServicioDetailPage() {
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
-                      <button
+                      <button aria-label="Compartir"
                         onClick={() => shareLink(g.url, g.placas.join(', '))}
                         title="Compartir"
                         className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded-md border hover:bg-muted/50 transition-colors"
@@ -522,7 +520,7 @@ export default function ServicioDetailPage() {
                       <span className="flex shrink-0 items-center gap-1.5">
                         {f && (
                           <span
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${f.real ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground italic'}`}
+                            className={`rounded px-1.5 py-0.5 text-2xs font-semibold tabular-nums ${f.real ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground italic'}`}
                             title={f.real
                               ? 'Fecha real en que el conductor marcó el hito'
                               : 'Fecha estimada: el hito no tiene ubicación registrada, se calcula desde la fecha de programación'}
@@ -576,7 +574,7 @@ export default function ServicioDetailPage() {
                     className="border rounded-lg overflow-hidden hover:opacity-90 transition-opacity"
                   >
                     <img src={urlArchivo(f.foto_url)} alt={f.hito_label} className="w-full h-64 object-contain bg-muted/30" />
-                    <p className="text-[11px] font-medium px-2 py-1.5 bg-muted/40 truncate" title={f.hito_label}>
+                    <p className="text-xs font-medium px-2 py-1.5 bg-muted/40 truncate" title={f.hito_label}>
                       {f.hito_label}
                     </p>
                   </a>

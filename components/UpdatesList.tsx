@@ -24,14 +24,14 @@ const CATEGORY_STYLE: Record<UpdateCategory, {
 }> = {
   feature: {
     label: 'Nueva funcionalidad', icon: Rocket,
-    dot: 'bg-emerald-500 text-white',
-    soft: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900',
+    dot: 'bg-success text-white',
+    soft: 'bg-success-soft text-success-ink border-success/30 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900',
     band: 'from-emerald-500 to-green-600',
   },
   improvement: {
     label: 'Mejora', icon: TrendingUp,
-    dot: 'bg-sky-500 text-white',
-    soft: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900',
+    dot: 'bg-info text-white',
+    soft: 'bg-info-soft text-info-ink border-info/30 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-900',
     band: 'from-sky-500 to-blue-600',
   },
   bugfix: {
@@ -229,9 +229,9 @@ export function UpdatesList({ headerAction }: UpdatesListProps) {
     return (
       <div className="space-y-6">
         {hero}
-        <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
-          <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-          <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+        <div className="flex items-center gap-2 p-4 bg-destructive-soft dark:bg-red-950 border border-destructive/30 dark:border-red-800 rounded-lg">
+          <AlertCircle className="h-5 w-5 text-destructive-ink dark:text-red-400" />
+          <p className="text-sm text-destructive-ink dark:text-red-200">{error}</p>
         </div>
       </div>
     )
@@ -396,10 +396,10 @@ export function UpdatesList({ headerAction }: UpdatesListProps) {
                         }`}
                       >
                         <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${st.soft}`}>{st.label}</span>
-                          {modulo && <span className="text-[11px] font-medium text-muted-foreground truncate max-w-[60%]">{modulo}</span>}
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${st.soft}`}>{st.label}</span>
+                          {modulo && <span className="text-xs font-medium text-muted-foreground truncate max-w-[60%]">{modulo}</span>}
                           {nueva && (
-                            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-warning px-2 py-0.5 text-2xs font-bold uppercase tracking-wide text-white">
                               Nuevo
                             </span>
                           )}

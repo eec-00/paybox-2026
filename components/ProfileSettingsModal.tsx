@@ -104,7 +104,7 @@ export function ProfileSettingsModal({
             onClick={() => setActiveTab('perfil')}
             className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'perfil'
-                ? 'border-secondary text-secondary'
+                ? 'border-secondary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -115,7 +115,7 @@ export function ProfileSettingsModal({
             onClick={() => setActiveTab('seguridad')}
             className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'seguridad'
-                ? 'border-secondary text-secondary'
+                ? 'border-secondary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -140,7 +140,7 @@ export function ProfileSettingsModal({
               />
             </div>
             {nameMsg && (
-              <div className={`flex items-center gap-2 text-sm ${nameMsg.type === 'success' ? 'text-green-600' : 'text-destructive'}`}>
+              <div className={`flex items-center gap-2 text-sm ${nameMsg.type === 'success' ? 'text-success-ink' : 'text-destructive'}`}>
                 {nameMsg.type === 'success' ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                 {nameMsg.text}
               </div>
@@ -174,7 +174,7 @@ export function ProfileSettingsModal({
               />
             </div>
             {passMsg && (
-              <div className={`flex items-center gap-2 text-sm ${passMsg.type === 'success' ? 'text-green-600' : 'text-destructive'}`}>
+              <div className={`flex items-center gap-2 text-sm ${passMsg.type === 'success' ? 'text-success-ink' : 'text-destructive'}`}>
                 {passMsg.type === 'success' ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                 {passMsg.text}
               </div>

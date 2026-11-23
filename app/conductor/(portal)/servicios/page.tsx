@@ -15,6 +15,7 @@ import {
   MODALIDAD_DEVOLUCION_FIELD, MODALIDAD_MISMO_CONDUCTOR, MODALIDAD_OTRO_CONDUCTOR,
 } from '@/lib/servicios/hitos'
 import { compressImage } from '@/lib/image/compress'
+import { PernocteCard } from '@/components/conductor/PernocteCard'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -1318,6 +1319,9 @@ export default function ConductorServiciosPage() {
               ))}
             </div>
           </div>
+
+          {/* Pernocte */}
+          <PernocteCard servicioId={task.id} conductorId={conductorUserId} enCurso={currentStep < steps.length} />
 
           {/* Documentos adjuntos */}
           <GuiasSection taskId={task.id} />

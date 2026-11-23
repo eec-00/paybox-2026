@@ -20,20 +20,20 @@ import {
 import { cargarMarcas, type PermisosOficina } from '@/components/OficinaAsistenciaSection'
 
 const ESTILO_AVISO: Record<Aviso['tipo'], string> = {
-  ausente: 'bg-red-100 text-red-800 border-red-200',
-  falta_marca: 'bg-red-100 text-red-800 border-red-200',
-  sospechosa: 'bg-red-600 text-white border-red-600',
+  ausente: 'bg-destructive-soft text-destructive-ink border-destructive/30',
+  falta_marca: 'bg-destructive-soft text-destructive-ink border-destructive/30',
+  sospechosa: 'bg-destructive text-white border-destructive',
   nocturno: 'bg-purple-100 text-purple-800 border-purple-200',
-  tardanza: 'bg-amber-100 text-amber-800 border-amber-200',
-  tarde_compenso: 'bg-sky-50 text-sky-700 border-sky-200',
+  tardanza: 'bg-warning-soft text-warning-ink border-warning/40',
+  tarde_compenso: 'bg-info-soft text-info-ink border-info/30',
   sin_almuerzo: 'bg-gray-100 text-gray-700 border-gray-200',
-  almuerzo_corto: 'bg-orange-100 text-orange-800 border-orange-200',
-  almuerzo_largo: 'bg-orange-100 text-orange-800 border-orange-200',
+  almuerzo_corto: 'bg-warning-soft text-warning-ink border-warning/40',
+  almuerzo_largo: 'bg-warning-soft text-warning-ink border-warning/40',
 }
 
 export function AvisoBadge({ aviso }: { aviso: Aviso }) {
   return (
-    <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap', ESTILO_AVISO[aviso.tipo])}>
+    <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap', ESTILO_AVISO[aviso.tipo])}>
       {aviso.texto}
     </span>
   )
@@ -85,7 +85,7 @@ export function OficinaDiario({ config, trabajadores, permisos, fechaInicial }: 
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setFecha(sumarDias(fecha, -1))}>
+          <Button aria-label="Día anterior" variant="outline" size="icon" className="h-9 w-9" onClick={() => setFecha(sumarDias(fecha, -1))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Input
@@ -95,7 +95,7 @@ export function OficinaDiario({ config, trabajadores, permisos, fechaInicial }: 
             onChange={(e) => e.target.value && setFecha(e.target.value)}
             className="h-9 w-40"
           />
-          <Button variant="outline" size="icon" className="h-9 w-9" disabled={fecha >= hoy} onClick={() => setFecha(sumarDias(fecha, 1))}>
+          <Button aria-label="Día siguiente" variant="outline" size="icon" className="h-9 w-9" disabled={fecha >= hoy} onClick={() => setFecha(sumarDias(fecha, 1))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
           {fecha !== hoy && (
@@ -106,7 +106,7 @@ export function OficinaDiario({ config, trabajadores, permisos, fechaInicial }: 
           <p className="text-sm text-muted-foreground">
             {fmtDiaLargo(fecha)} · <span className="font-medium text-foreground">{marcaron} de {filas.length}</span> marcaron entrada
           </p>
-          <Button variant="outline" size="sm" onClick={cargar} disabled={loading}>
+          <Button aria-label="Actualizar" variant="outline" size="sm" onClick={cargar} disabled={loading}>
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
           </Button>
         </div>
@@ -150,8 +150,8 @@ export function OficinaDiario({ config, trabajadores, permisos, fechaInicial }: 
                           'w-full rounded-md px-2 py-1.5 text-sm tabular-nums transition-colors inline-flex items-center justify-center gap-1',
                           m ? 'hover:bg-muted font-medium' : 'text-muted-foreground/50',
                           !m && permisos.canEdit && 'hover:bg-muted hover:text-muted-foreground',
-                          m?.sospechosa && 'bg-red-50 text-red-700 ring-1 ring-red-300',
-                          tarde && !m?.sospechosa && 'text-amber-700',
+                          m?.sospechosa && 'bg-destructive-soft text-destructive-ink ring-1 ring-red-300',
+                          tarde && !m?.sospechosa && 'text-warning-ink',
                         )}
                         title={m?.sospechosa ? m.motivo_sospecha ?? 'Sospechosa' : m?.manual ? 'Corregida a mano por RRHH' : undefined}
                       >
@@ -185,7 +185,7 @@ export function OficinaDiario({ config, trabajadores, permisos, fechaInicial }: 
       <p className="text-xs text-muted-foreground">
         Toca una hora para ver la selfie{permisos.canEdit ? ', corregirla o agregar una marca que faltó' : ''}.
         <Camera className="inline h-3 w-3 mx-1" /> con selfie · <PenLine className="inline h-3 w-3 mx-1" /> corregida por RRHH ·
-        <ShieldAlert className="inline h-3 w-3 mx-1 text-red-600" /> sospechosa
+        <ShieldAlert className="inline h-3 w-3 mx-1 text-destructive-ink" /> sospechosa
       </p>
 
       {celda && (
@@ -273,7 +273,7 @@ function MarcaDialog({ celda, fecha, permisos, onClose, onGuardado }: {
         {marca && (
           <div className="space-y-3">
             {marca.sospechosa && (
-              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-800 flex gap-2">
+              <div className="rounded-lg bg-destructive-soft border border-destructive/30 p-3 text-sm text-destructive-ink flex gap-2">
                 <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold">Marca sospechosa</p>

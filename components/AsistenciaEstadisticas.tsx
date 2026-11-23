@@ -291,7 +291,7 @@ export function AsistenciaEstadisticas({ conductores }: { conductores: Conductor
       {/* Filtros */}
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground">Periodo</Label>
+          <Label className="text-xs text-muted-foreground">Periodo</Label>
           <Select value={rango} onValueChange={(v) => setRango(v as RangoStats)}>
             <SelectTrigger className="h-9 text-xs w-[160px]">
               <SelectValue />
@@ -306,17 +306,17 @@ export function AsistenciaEstadisticas({ conductores }: { conductores: Conductor
         {rango === 'custom' && (
           <>
             <div className="space-y-1">
-              <Label className="text-[11px] text-muted-foreground">Desde</Label>
+              <Label className="text-xs text-muted-foreground">Desde</Label>
               <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 text-xs w-[150px]" />
             </div>
             <div className="space-y-1">
-              <Label className="text-[11px] text-muted-foreground">Hasta</Label>
+              <Label className="text-xs text-muted-foreground">Hasta</Label>
               <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 text-xs w-[150px]" />
             </div>
           </>
         )}
         <div className="space-y-1">
-          <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
+          <Label className="text-xs text-muted-foreground flex items-center gap-1">
             <Utensils className="h-3 w-3" /> Almuerzo a descontar (h/día)
           </Label>
           <Input
@@ -325,7 +325,7 @@ export function AsistenciaEstadisticas({ conductores }: { conductores: Conductor
             className="h-9 text-xs w-[110px]"
           />
         </div>
-        <p className="text-[11px] text-muted-foreground pb-2">
+        <p className="text-xs text-muted-foreground pb-2">
           {diasEnRango} días · {semanasEnRango.toFixed(1)} semanas en el periodo
         </p>
       </div>

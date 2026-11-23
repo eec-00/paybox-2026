@@ -78,7 +78,7 @@ function NormalUserForm() {
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña *</Label>
               <Input id="password" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} disabled={loading} />
-              <p className="text-xs text-green-600">✓ El usuario podrá acceder inmediatamente sin verificar email</p>
+              <p className="text-xs text-success-ink">✓ El usuario podrá acceder inmediatamente sin verificar email</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="role">Rol del usuario *</Label>
@@ -109,7 +109,7 @@ function NormalUserForm() {
             </div>
           )}
           {role === 'admin' && (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+            <div className="p-3 bg-info-soft border border-info/30 rounded-lg text-sm">
               <strong>Administrador:</strong> Tiene acceso completo a todas las funciones del sistema.
             </div>
           )}
@@ -119,7 +119,7 @@ function NormalUserForm() {
             </div>
           )}
           {error && <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">{error}</div>}
-          {success && <div className="text-sm text-green-700 bg-green-50 p-3 rounded-md border border-green-200">{success}</div>}
+          {success && <div className="text-sm text-success-ink bg-success-soft p-3 rounded-md border border-success/30">{success}</div>}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Creando usuario...' : 'Crear Usuario'}
           </Button>
@@ -247,12 +247,12 @@ function ConductorForm() {
             <p className="text-xs text-muted-foreground">Vincula con el empleado de Odoo para mostrar servicios y documentos.</p>
           </div>
 
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
-            <strong>Portal del Conductor:</strong> El conductor accede en <code className="text-xs bg-amber-100 px-1 rounded">/conductor/login</code> con su DNI y contraseña.
+          <div className="p-3 bg-warning-soft border border-warning/40 rounded-lg text-sm">
+            <strong>Portal del Conductor:</strong> El conductor accede en <code className="text-xs bg-warning-soft px-1 rounded">/conductor/login</code> con su DNI y contraseña.
           </div>
 
           {error && <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">{error}</div>}
-          {success && <div className="text-sm text-green-700 bg-green-50 p-3 rounded-md border border-green-200">{success}</div>}
+          {success && <div className="text-sm text-success-ink bg-success-soft p-3 rounded-md border border-success/30">{success}</div>}
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Creando conductor...' : 'Crear Conductor'}

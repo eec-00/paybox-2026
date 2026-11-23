@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -209,8 +210,6 @@ export function SunatGREBFSection() {
     vehiculo: string
     carreta: string
     conductor: string
-    _debug?: string
-    _debugRow?: string
   }
 
   const BF_EXCEL_COLS: [keyof BFExcelRow, string][] = [
@@ -225,8 +224,6 @@ export function SunatGREBFSection() {
     ['conductor', 'CONDUCTOR'],
     ['puntoPartida', 'PUNTO DE PARTIDA'],
     ['puntoLlegada', 'PUNTO DE LLEGADA'],
-    ['_debug', '_DEBUG (temporal)'],
-    ['_debugRow', '_DEBUG_ROW (temporal)'],
   ]
 
   async function exportarExcel() {
@@ -256,8 +253,6 @@ export function SunatGREBFSection() {
             vehiculo: detalle.placas[0] ?? '',
             carreta: detalle.placas[1] ?? '',
             conductor: detalle.conductor,
-            _debug: detalle.debug,
-            _debugRow: JSON.stringify(r),
           }
           done++
           setExportProgress(`Extrayendo datos operativos ${done}/${rows.length}...`)
@@ -284,7 +279,7 @@ export function SunatGREBFSection() {
 
       const headerRow = worksheet.getRow(1)
       headerRow.eachCell((cell) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2332' } }
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 }
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: false }
         cell.border = { ...blackBorder, bottom: { style: 'medium', color: { argb: 'FF000000' } } }
@@ -305,6 +300,8 @@ export function SunatGREBFSection() {
 
       const buffer = await workbook.xlsx.writeBuffer()
       saveAs(new Blob([buffer]), `GRE-BF-${tipConsulta}-${periodoDesde}-${periodoHasta}.xlsx`)
+    } catch (e) {
+      toast.error('No se pudo generar el Excel', { description: e instanceof Error ? e.message : 'Inténtalo de nuevo en unos minutos.' })
     } finally {
       setExportingExcel(false)
       setExportProgress('')
@@ -313,12 +310,7 @@ export function SunatGREBFSection() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">SUNAT — GRE Bienes Fiscalizables</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Guía de Remisión Electrónica BF · ww1.sunat.gob.pe · SEE-SOL
-        </p>
-      </div>
+      <PageHeader icon={FileText} title="SUNAT · GRE Bienes Fiscalizables" description="Consulta de Guías de Remisión de bienes fiscalizados (BF)" />
 
       {/* Session cookie */}
       <Card className={sessionStatus?.active === false ? 'border-destructive' : ''}>
@@ -437,7 +429,7 @@ export function SunatGREBFSection() {
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Badge
-                  className={items !== null && items.length >= 0 ? 'bg-green-100 text-green-800 border-green-200' : ''}
+                  className={items !== null && items.length >= 0 ? 'bg-success-soft text-success-ink border-success/30' : ''}
                   variant={items !== null ? 'outline' : 'destructive'}
                 >
                   HTTP {httpStatus}
@@ -485,19 +477,19 @@ export function SunatGREBFSection() {
                           <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
                             <td className="px-2 py-2">
                               <div className="flex items-center gap-1.5">
-                                <button
+                                <button aria-label="Ver PDF"
                                   onClick={() => verPDF(r)}
                                   disabled={!!loadingPdf}
                                   title="Ver PDF"
-                                  className="text-muted-foreground hover:text-blue-600 transition-colors disabled:opacity-40"
+                                  className="text-muted-foreground hover:text-info-ink transition-colors disabled:opacity-40"
                                 >
                                   {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
                                 </button>
-                                <button
+                                <button aria-label="Descargar PDF"
                                   onClick={() => descargarPDF(r)}
                                   disabled={!!loadingPdf}
                                   title="Descargar PDF"
-                                  className="text-muted-foreground hover:text-green-600 transition-colors disabled:opacity-40"
+                                  className="text-muted-foreground hover:text-success-ink transition-colors disabled:opacity-40"
                                 >
                                   {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                                 </button>
@@ -530,6 +522,6 @@ export function SunatGREBFSection() {
 function SessionBadge({ status }: { status: SessionStatus | null }) {
   if (!status) return <Badge variant="outline">Cargando...</Badge>
   if (status.active)
-    return <Badge className="bg-green-100 text-green-800 border-green-200"><CheckCircle2 className="h-3 w-3 mr-1" />{status.minutes_left} min restantes</Badge>
+    return <Badge className="bg-success-soft text-success-ink border-success/30"><CheckCircle2 className="h-3 w-3 mr-1" />{status.minutes_left} min restantes</Badge>
   return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Expirada</Badge>
 }

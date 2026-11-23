@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -449,7 +450,7 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
         if (!res?.ok) {
           const data = await res?.json().catch(() => null)
           console.error('No se pudo marcar gasto como pagado:', data?.error)
-          alert(`El pago se guardó, pero el gasto del conductor no se marcó como pagado: ${data?.error || 'error de conexión'}. Avisa a Sistemas antes de volver a pagarlo.`)
+          toast.warning('El pago se guardó, pero el gasto del conductor no se marcó como pagado', { description: `${data?.error || 'Error de conexión'}. Avisa a Sistemas antes de volver a pagarlo.`, duration: 15000 })
         }
       }
 
@@ -511,7 +512,7 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
   return (
     <>
       {ocrToast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-9999 bg-green-500 text-white px-5 py-2.5 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 animate-fade-in pointer-events-none">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-9999 bg-success text-white px-5 py-2.5 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 animate-fade-in pointer-events-none">
           <CheckCircle2 className="w-4 h-4" />
           Datos obtenidos
         </div>
@@ -533,12 +534,12 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
               maxImages={4}
             />
             {faltaFotoPago && (
-              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-md">
+              <p className="text-sm text-warning-ink bg-warning-soft border border-warning/40 p-3 rounded-md">
                 Sube primero la foto del pago para continuar con los demás datos.
               </p>
             )}
             {avisoVoucher && (
-              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-md">
+              <p className="text-sm text-warning-ink bg-warning-soft border border-warning/40 p-3 rounded-md">
                 {avisoVoucher}
               </p>
             )}
@@ -746,7 +747,7 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
           </div>
           {/* Selector de Categoría con filtros en cascada */}
           <div className="space-y-4 border-t pt-4">
-            <p className="text-sm font-semibold text-secondary">Categoría *</p>
+            <p className="text-sm font-semibold text-primary">Categoría *</p>
 
             {/* Paso 1 y 2: Filtros opcionales */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -797,7 +798,7 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
                 )}
               </Label>
               <div className="relative">
-                <Input
+                <Input aria-label="Escribe para buscar"
                   placeholder="Escribe para buscar..."
                   value={categoriaSearch}
                   onChange={(e) => {
@@ -830,7 +831,7 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
               </div>
               {selectedCategoria && (
                 <p className="text-xs text-muted-foreground pt-1">
-                  <span className="font-medium text-secondary">{selectedCategoria.naturaleza}</span>
+                  <span className="font-medium text-primary">{selectedCategoria.naturaleza}</span>
                   {' · '}
                   {selectedCategoria.subgrupo}
                 </p>
@@ -841,7 +842,7 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
           {/* Campos Dinámicos según Categoría */}
           {selectedCategoria && selectedCategoria.ejes_obligatorios.filter((eje) => !isHiddenAxis(eje)).length > 0 && (
             <div className="space-y-4 border-t pt-4">
-              <h3 className="font-semibold text-secondary">Datos Específicos de la Categoría</h3>
+              <h3 className="font-semibold text-primary">Datos Específicos de la Categoría</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {selectedCategoria.ejes_obligatorios
                   .filter((eje) => !isHiddenAxis(eje))

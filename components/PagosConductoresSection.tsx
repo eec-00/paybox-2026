@@ -1,5 +1,7 @@
 'use client'
 
+import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/ui/page-header'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -9,14 +11,17 @@ import {
   Trophy, UtensilsCrossed, Moon, Undo2, MapPin, Truck, Gauge, Receipt, PackageX,
 } from 'lucide-react'
 import {
-  rangoSemanaPago, sabadoDe, servicioCodigo,
-  type AsistenciaPago, type DevolucionPago, type GastoPago, type ServicioPago,
+  VIGENCIA_REGLAS_NOV, rangoSemanaPago, sabadoDe, servicioCodigo,
+  type AsistenciaPago, type DevolucionPago, type GastoPago, type PernoctePago, type ServicioPago, type TarifaAprobada,
 } from '@/lib/pruebas/pagosConductores'
 import {
   CONCEPTO_LABEL, calcularAdicionales, esFinalizado, horaLabel, totalAdicionales, type Adicional, type EstadoAdicional,
 } from '@/lib/pruebas/adicionalesConductores'
 import { VERSION_TARIFARIO, entradaDesdeOdoo, simularTarifa, type LineaMotor } from '@/lib/pruebas/motorZonas'
+import { ErrorCarga } from '@/components/ui/alert'
 import { MotorZonasPanel } from '@/components/MotorZonasPanel'
+
+const VERSION_NUEVAS = VIGENCIA_REGLAS_NOV.split('-').reverse().join('/')
 
 function formatFecha(value: string | false | null): string {
   if (!value) return '—'
@@ -36,7 +41,7 @@ const ESTADO_BADGE: Record<EstadoAdicional, { label: string; clase: string }> = 
 
 function Estado({ estado }: { estado: EstadoAdicional }) {
   const b = ESTADO_BADGE[estado]
-  return <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap ${b.clase}`}>{b.label}</span>
+  return <span className={`rounded-full px-1.5 py-0.5 text-2xs font-bold uppercase tracking-wide whitespace-nowrap ${b.clase}`}>{b.label}</span>
 }
 
 /** Una línea de tarifa base del motor para un conductor (principal o retorno) */
@@ -58,6 +63,8 @@ export function PagosConductoresSection() {
   const [devoluciones, setDevoluciones] = useState<DevolucionPago[]>([])
   const [asistencias, setAsistencias] = useState<AsistenciaPago[]>([])
   const [gastos, setGastos] = useState<GastoPago[]>([])
+  const [pernoctes, setPernoctes] = useState<PernoctePago[]>([])
+  const [tarifasAprobadas, setTarifasAprobadas] = useState<TarifaAprobada[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sabado, setSabado] = useState(() => sabadoDe(new Date()))
@@ -78,12 +85,15 @@ export function PagosConductoresSection() {
       setDevoluciones(data.devoluciones ?? [])
       setAsistencias(data.asistencias ?? [])
       setGastos(data.gastos ?? [])
+      setPernoctes(data.pernoctes ?? [])
+      setTarifasAprobadas(data.tarifasAprobadas ?? [])
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
       setServicios([])
       setDevoluciones([])
       setAsistencias([])
       setGastos([])
+      setPernoctes([])
     } finally {
       setLoading(false)
     }
@@ -110,7 +120,7 @@ export function PagosConductoresSection() {
 
     // Tarifa base: una línea por tramo y conductor (A principal, B retorno Crosland)
     for (const s of visibles) {
-      const res = simularTarifa(entradaDesdeOdoo(s, devoluciones))
+      const res = simularTarifa(entradaDesdeOdoo(s, devoluciones), tarifasAprobadas)
       for (const linea of res.lineas) {
         const r = obtener(linea.conductorId, linea.conductor)
         const simulada = linea.estado === 'simulado' && res.estado === 'simulado'
@@ -123,18 +133,19 @@ export function PagosConductoresSection() {
 
     // Adicionales (guía v1.0): también para quien solo hizo devoluciones de otros
     for (const d of devoluciones) if (d.conductorId && d.conductorId !== d.padreConductorId) obtener(d.conductorId, d.conductor)
+    for (const p of pernoctes) if (p.conductorId) obtener(p.conductorId, p.conductor)
     for (const r of Array.from(porConductor.values())) {
       if (r.key === 'sin') continue
       const conductorId = Number(r.key)
       r.adicionales = calcularAdicionales({
         servicios: visibles.filter(s => s.conductorId === conductorId), devoluciones, todos: servicios,
-        conductorId, asistencias, gastos,
+        conductorId, asistencias, gastos, pernoctes,
       })
       r.totalAdicionales = totalAdicionales(r.adicionales)
       r.enRevision += r.adicionales.filter(a => a.estado === 'requiere_revision').length
     }
     return Array.from(porConductor.values()).sort((a, b) => a.conductor.localeCompare(b.conductor))
-  }, [visibles, servicios, devoluciones, asistencias, gastos])
+  }, [visibles, servicios, devoluciones, asistencias, gastos, pernoctes, tarifasAprobadas])
 
   const totalServicios = resumen.reduce((s, r) => s + r.servicios, 0)
   const totalRevision = resumen.reduce((s, r) => s + r.enRevision, 0)
@@ -151,33 +162,27 @@ export function PagosConductoresSection() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Wallet className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight flex items-center gap-2">
-              Pagos a conductores
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Prueba</span>
-            </h2>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              Liquidación simulada · tarifa base y adicionales
-            </p>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => fetchData(semana)} disabled={loading} className="h-8 gap-1.5">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </Button>
-      </div>
+      <PageHeader
+        icon={Wallet}
+        title="Pagos a conductores"
+        badge={<Badge variant="warning">Prueba</Badge>}
+        description="Liquidación simulada · tarifa base y adicionales"
+        actions={
+          <Button variant="outline" size="sm" onClick={() => fetchData(semana)} disabled={loading} className="h-8 gap-1.5">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
+          </Button>
+        }
+      />
 
       <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-xl text-sm">
         <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
         <p>
           <strong>Simulación, no pago.</strong> Tarifa base según la ficha de ejecución y el {VERSION_TARIFARIO};
           adicionales según las Reglas de liquidación de conductores (guía piloto v1.0), con las definiciones de Margiory
-          del 10/11/2026 (vigencia desde enero 2026, I09 en Crosland nocturno). «Requiere revisión» no suma al total: falta un dato o una decisión. Los tramos y
+          del 10/11/2026 (vigencia desde enero 2026, I09 en Crosland nocturno). Desde el {VERSION_NUEVAS} rigen
+          sus respuestas de noviembre: cena por hora real de devolución, cena extraordinaria por retiro antes de las 06:00, Zona 4
+          unificada en S/ 90 y tarifa de zona para distritos nuevos; lo anterior conserva las reglas previas. «Requiere revisión» no suma al total: falta un dato o una decisión. Los tramos y
           adicionales se acreditan con los hitos que marca el conductor en la app, nunca con «Servicio finalizado».
           No se pagan, descuentan ni sincronizan con Odoo.
         </p>
@@ -205,31 +210,34 @@ export function PagosConductoresSection() {
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="rounded-xl border bg-card/40 border-border/50 p-3">
           <p className="text-2xl font-extrabold tabular-nums">{resumen.length}</p>
-          <p className="text-[11px] text-muted-foreground font-medium">Conductores</p>
+          <p className="text-xs text-muted-foreground font-medium">Conductores</p>
         </div>
         <div className="rounded-xl border bg-card/40 border-border/50 p-3">
           <p className="text-2xl font-extrabold tabular-nums">{totalServicios}</p>
-          <p className="text-[11px] text-muted-foreground font-medium">Servicios</p>
+          <p className="text-xs text-muted-foreground font-medium">Servicios</p>
         </div>
         <div className={`rounded-xl border p-3 ${totalRevision > 0 ? 'border-red-200 bg-red-50/60' : 'bg-card/40 border-border/50'}`}>
           <p className="text-2xl font-extrabold tabular-nums">{totalRevision}</p>
-          <p className="text-[11px] text-muted-foreground font-medium">Líneas en revisión</p>
+          <p className="text-xs text-muted-foreground font-medium">Líneas en revisión</p>
         </div>
         <div className="rounded-xl border bg-card/40 border-border/50 p-3">
           <p className="text-2xl font-extrabold tabular-nums">{soles(totalAdic)}</p>
-          <p className="text-[11px] text-muted-foreground font-medium">Adicionales simulados</p>
+          <p className="text-xs text-muted-foreground font-medium">Adicionales simulados</p>
         </div>
         <div className="rounded-xl border bg-card/40 border-border/50 p-3">
           <p className="text-2xl font-extrabold tabular-nums">{soles(totalSubtotal + totalAdic)}</p>
-          <p className="text-[11px] text-muted-foreground font-medium">Total simulado de la semana</p>
+          <p className="text-xs text-muted-foreground font-medium">Total simulado de la semana</p>
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
-      )}
+      {error && <ErrorCarga titulo="No se pudo cargar la semana" mensaje={error} onRetry={() => fetchData(semana)} />}
 
-      <MotorZonasPanel servicios={visibles} devoluciones={devoluciones} />
+      <MotorZonasPanel
+        servicios={visibles}
+        devoluciones={devoluciones}
+        aprobadas={tarifasAprobadas}
+        onAprobadas={setTarifasAprobadas}
+      />
 
       <div className="rounded-xl border overflow-x-auto">
         <Table>
@@ -253,7 +261,7 @@ export function PagosConductoresSection() {
             ) : resumen.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                  No hay servicios en esta semana.
+                  {error ? 'Sin datos: la semana no se pudo cargar.' : 'No hay servicios en esta semana.'}
                 </TableCell>
               </TableRow>
             ) : (
@@ -261,7 +269,7 @@ export function PagosConductoresSection() {
                 const abierto = abiertos.includes(r.key)
                 return (
                   <Fragment key={r.key}>
-                    <TableRow className="cursor-pointer hover:bg-muted/40" onClick={() => toggle(r.key)}>
+                    <TableRow className="cursor-pointer hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" tabIndex={0} aria-expanded={abierto} onClick={() => toggle(r.key)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(r.key) } }}>
                       <TableCell className="text-sm font-semibold">
                         <span className="inline-flex items-center gap-1.5">
                           {abierto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -296,7 +304,7 @@ export function PagosConductoresSection() {
                                   <TableRow key={`${s.id}-${linea.tramo}`} className={motivo ? 'bg-red-50/40' : undefined}>
                                     <TableCell className="pl-10 font-mono text-xs font-semibold whitespace-nowrap">
                                       {servicioCodigo(s.name)}
-                                      {linea.tramo === 'retorno' && <span className="ml-1 font-sans text-[10px] font-normal text-muted-foreground">(retorno)</span>}
+                                      {linea.tramo === 'retorno' && <span className="ml-1 font-sans text-2xs font-normal text-muted-foreground">(retorno)</span>}
                                     </TableCell>
                                     <TableCell className="text-xs whitespace-nowrap">{formatFecha(s.fecha)}</TableCell>
                                     <TableCell className="text-xs max-w-[200px] truncate" title={s.cliente ?? ''}>{s.cliente ?? '—'}</TableCell>
@@ -381,14 +389,16 @@ export function PagosConductoresSection() {
         onClose={() => setDetalle(null)}
       />
 
-      <p className="text-[11px] text-muted-foreground leading-relaxed">
+      <p className="text-xs text-muted-foreground leading-relaxed">
         Tarifa base: distrito físico acreditado, ruta especial exacta o contrato Crosland (A integral S/ 90; A S/ 70 + B S/ 20,
         o S/ 30 en DPW/APMT), según el {VERSION_TARIFARIO}. Adicionales (guía v1.0): 01 Cena S/ 20 (I08/D10 después de las 19:00;
-        en Crosland también por devolución propia después de las 19:00) · 02 ADHT S/ 30 (I10 desde las 17:00, cita SSEE desde las 17:00) · 03/04 Crosland
+        en Crosland también por devolución propia después de las 19:00) · 02 ADHT S/ 30 (I10 desde las 17:00, cita SSEE desde las 17:00).
+        Desde el {VERSION_NUEVAS}: 01 Cena S/ 20 con devolución real (I12) desde las 19:00 · 02 Cena extraordinaria S/ 30 con retiro
+        real (I04) antes de las 06:00 y devolución real desde las 17:00, reemplaza a la cena · 03/04 Crosland
         nocturno S/ 30 / medianoche S/ 50 (I09 después de las 22:00 / 00:00) · 05 Crosland devolución posterior: va en la tarifa, no se paga aparte · 06 TDC fuera de
         Crosland S/ 20 (S/ 30 en APM/DPW) · 07 Retiro 03:00 S/ 20 · 09 Máquina S/ 5 por día (máx. S/ 30) · 10 Bono S/ 100 con
         8 integrales (sin ITK ni provincia) · 11 Viático (en revisión) · 12 Gastos con comprobante (dólares al TC venta SBS del día) ·
-        13 No devolución (incidencia, nunca descuento). 08 Pernocte no se calcula: lo confirma Operaciones. La semana va de
+        13 No devolución (incidencia, nunca descuento). 08 Pernocte S/ 40 por noche aprobada en Pruebas {">"} Pernoctes (sin provincia, hotel ni movilidad depositada). La semana va de
         sábado a viernes; el básico mensual no se incluye.
       </p>
     </div>
@@ -416,6 +426,7 @@ const CONCEPTO_ESTILO: Record<Adicional['concepto'], EstiloConcepto> = {
   cena: { icon: UtensilsCrossed, soft: 'bg-orange-100 text-orange-700', text: 'text-orange-700', highlight: 'border-orange-400 bg-orange-50', solid: 'bg-orange-500', solidSoft: 'bg-orange-200' },
   adht: { icon: Undo2, soft: 'bg-teal-100 text-teal-700', text: 'text-teal-700', highlight: 'border-teal-400 bg-teal-50', solid: 'bg-teal-500', solidSoft: 'bg-teal-200' },
   crosland_nocturno: { icon: Moon, soft: 'bg-indigo-100 text-indigo-700', text: 'text-indigo-700', highlight: 'border-indigo-400 bg-indigo-50', solid: 'bg-indigo-500', solidSoft: 'bg-indigo-200' },
+  pernocte: { icon: Moon, soft: 'bg-indigo-100 text-indigo-700', text: 'text-indigo-700', highlight: 'border-indigo-400 bg-indigo-50', solid: 'bg-indigo-500', solidSoft: 'bg-indigo-200' },
   crosland_medianoche: { icon: Moon, soft: 'bg-violet-100 text-violet-700', text: 'text-violet-700', highlight: 'border-violet-400 bg-violet-50', solid: 'bg-violet-500', solidSoft: 'bg-violet-200' },
   tdc: { icon: Truck, soft: 'bg-teal-100 text-teal-700', text: 'text-teal-700', highlight: 'border-teal-400 bg-teal-50', solid: 'bg-teal-500', solidSoft: 'bg-teal-200' },
   retiro_0300: { icon: AlarmClock, soft: 'bg-sky-100 text-sky-700', text: 'text-sky-700', highlight: 'border-sky-400 bg-sky-50', solid: 'bg-sky-500', solidSoft: 'bg-sky-200' },
@@ -446,7 +457,7 @@ function Hora({ min, className = '', estimada = false }: { min: number | null; c
       {hora}
       {dias !== 0 && (
         <span
-          className={`rounded px-1 py-px text-[10px] font-bold leading-none ${estimada ? 'border border-dashed border-foreground/30 text-foreground/50' : 'bg-foreground/10 text-foreground/70'}`}
+          className={`rounded px-1 py-px text-2xs font-bold leading-none ${estimada ? 'border border-dashed border-foreground/30 text-foreground/50' : 'bg-foreground/10 text-foreground/70'}`}
           title={`${Math.abs(dias)} día(s) ${dias > 0 ? 'después' : 'antes'} de la programación${estimada ? ' (estimado: el hito no tiene ubicación registrada)' : ''}`}
         >
           {dias > 0 ? '+' : ''}{dias}d
@@ -477,9 +488,9 @@ function HoraTile({ label, value, destacado, estilo, nota }: {
 }) {
   return (
     <div className={`rounded-lg border p-2.5 ${destacado ? `border-2 ${estilo.highlight}` : 'bg-card/40'}`}>
-      <p className={`text-[11px] font-medium ${destacado ? `${estilo.text} font-semibold` : 'text-muted-foreground'}`}>{label}</p>
+      <p className={`text-xs font-medium ${destacado ? `${estilo.text} font-semibold` : 'text-muted-foreground'}`}>{label}</p>
       <Hora min={value} className="text-base font-extrabold" />
-      {nota && <span className="ml-1.5 text-[10px] text-muted-foreground">{nota}</span>}
+      {nota && <span className="ml-1.5 text-2xs text-muted-foreground">{nota}</span>}
     </div>
   )
 }
@@ -506,7 +517,7 @@ function BarraJornada({ servicio: s, umbral, estilo, cita }: {
 
   return (
     <div className="rounded-xl border p-3.5">
-      <div className="mb-3 flex items-center justify-between text-[11px]">
+      <div className="mb-3 flex items-center justify-between text-xs">
         <p className="font-bold uppercase tracking-wider text-muted-foreground">Jornada</p>
         <p className="text-muted-foreground">Duración: <span className="font-semibold text-foreground">{duracion(fin - inicio)}</span></p>
       </div>
@@ -527,14 +538,14 @@ function BarraJornada({ servicio: s, umbral, estilo, cita }: {
           <div key={m} className="absolute top-3 h-7 border-l border-foreground/20" style={{ left: `${pct(m)}%` }}>
             {/* Sin texto si queda pegada a la etiqueta del límite */}
             {!(umbral && Math.abs(pct(m) - pct(umbral.min)) < 15) && (
-              <span className="absolute -top-3.5 -translate-x-1/2 whitespace-nowrap text-[9px] text-muted-foreground">00:00</span>
+              <span className="absolute -top-3.5 -translate-x-1/2 whitespace-nowrap text-2xs text-muted-foreground">00:00</span>
             )}
           </div>
         ))}
         {/* límite de la regla */}
         {umbral && (
           <div className="absolute top-1 h-11 border-l-2 border-dashed border-foreground/60" style={{ left: `${pct(umbral.min)}%` }}>
-            <span className="absolute -top-1 left-1 whitespace-nowrap rounded bg-foreground px-1 text-[9px] font-bold text-background">{umbral.label}</span>
+            <span className="absolute -top-1 left-1 whitespace-nowrap rounded bg-foreground px-1 text-2xs font-bold text-background">{umbral.label}</span>
           </div>
         )}
         {/* cita */}
@@ -544,10 +555,10 @@ function BarraJornada({ servicio: s, umbral, estilo, cita }: {
           </div>
         )}
         {/* etiquetas inicio / fin */}
-        <div className="absolute top-9 -translate-x-1/2 text-[10px] font-semibold" style={{ left: `${Math.min(Math.max(pct(inicio), 6), 94)}%` }}>
+        <div className="absolute top-9 -translate-x-1/2 text-2xs font-semibold" style={{ left: `${Math.min(Math.max(pct(inicio), 6), 94)}%` }}>
           <Hora min={inicio} />
         </div>
-        <div className={`absolute top-9 -translate-x-1/2 text-[10px] font-extrabold ${estilo.text}`} style={{ left: `${Math.min(Math.max(pct(fin), 6), 94)}%` }}>
+        <div className={`absolute top-9 -translate-x-1/2 text-2xs font-extrabold ${estilo.text}`} style={{ left: `${Math.min(Math.max(pct(fin), 6), 94)}%` }}>
           <Hora min={fin} />
         </div>
       </div>
@@ -595,11 +606,11 @@ function LineaTiempo({ servicio, claves, umbral, estilo }: {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Horarios marcados</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Horarios marcados</p>
         {sinMarcar > 0 && (
           <button
             type="button" onClick={() => setVerSinMarcar(v => !v)}
-            className="text-[11px] font-semibold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            className="text-xs font-semibold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
             {verSinMarcar ? 'Ocultar' : 'Mostrar'} {sinMarcar} sin marcar
           </button>
@@ -611,7 +622,7 @@ function LineaTiempo({ servicio, claves, umbral, estilo }: {
             {mostrarUmbral && umbral && (
               <li className="flex items-center gap-2 py-1.5 pl-6">
                 <span className="flex-1 border-t-2 border-dashed border-foreground/30" />
-                <span className="rounded bg-foreground px-1.5 py-0.5 text-[10px] font-bold text-background">{umbral.label}</span>
+                <span className="rounded bg-foreground px-1.5 py-0.5 text-2xs font-bold text-background">{umbral.label}</span>
                 <span className="flex-1 border-t-2 border-dashed border-foreground/30" />
               </li>
             )}
@@ -631,15 +642,15 @@ function LineaTiempo({ servicio, claves, umbral, estilo }: {
                     {h.label}
                   </p>
                   {finalizadoAparte && marcado && (
-                    <p className="text-[10px] text-muted-foreground">Se marca aparte, no cuenta para el cálculo</p>
+                    <p className="text-2xs text-muted-foreground">Se marca aparte, no cuenta para el cálculo</p>
                   )}
                   {delta !== null && delta > 0 && (
-                    <p className="text-[10px] text-muted-foreground">+{duracion(delta)}</p>
+                    <p className="text-2xs text-muted-foreground">+{duracion(delta)}</p>
                   )}
                 </div>
                 {marcado
                   ? <Hora min={h.min} estimada={!h.real} className={`text-xs ${clave ? `font-extrabold ${estilo.text}` : finalizadoAparte ? 'text-muted-foreground' : 'font-semibold'}`} />
-                  : <span className="text-[11px] italic text-muted-foreground/60">sin marcar</span>}
+                  : <span className="text-xs italic text-muted-foreground/60">sin marcar</span>}
               </div>
             </li>
           </Fragment>
@@ -714,14 +725,14 @@ function DetalleAdicionalDialog({ detalle, servicios, onClose }: {
               {/* Resumen */}
               <div className="space-y-4 p-6 md:overflow-y-auto">
                 <div className={`rounded-xl border-2 p-4 ${estilo.highlight}`}>
-                  <p className={`mb-1 text-[11px] font-bold uppercase tracking-wider ${estilo.text}`}>
+                  <p className={`mb-1 text-xs font-bold uppercase tracking-wider ${estilo.text}`}>
                     {a.estado === 'requiere_revision' ? 'Por qué requiere revisión' : 'Por qué aplica'}
                   </p>
                   <p className="text-base font-bold leading-snug">{a.detalle}</p>
                   {a.motivo && <p className="mt-1 text-sm font-semibold text-red-800">{a.motivo}</p>}
-                  {a.hitos.length > 0 && <p className="mt-1 text-[11px] text-muted-foreground">Hitos: {a.hitos.join(', ')}</p>}
+                  {a.hitos.length > 0 && <p className="mt-1 text-xs text-muted-foreground">Hitos: {a.hitos.join(', ')}</p>}
                   <details className="group mt-2">
-                    <summary className="cursor-pointer list-none text-[11px] font-semibold text-muted-foreground hover:text-foreground">
+                    <summary className="cursor-pointer list-none text-xs font-semibold text-muted-foreground hover:text-foreground">
                       <span className="group-open:hidden">Ver regla de la guía v1.0 ▸</span>
                       <span className="hidden group-open:inline">Ocultar regla ▾</span>
                     </summary>
@@ -761,7 +772,7 @@ function DetalleAdicionalDialog({ detalle, servicios, onClose }: {
                         <div className="flex items-center gap-2 min-w-0">
                           <p className="font-mono text-sm font-bold">{servicioCodigo(unico.name)}</p>
                           {unico.etapa && (
-                            <span className={`truncate rounded-full px-2 py-0.5 text-[10px] font-semibold ${esFinalizado(unico.etapa) ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`truncate rounded-full px-2 py-0.5 text-2xs font-semibold ${esFinalizado(unico.etapa) ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
                               {unico.etapa}
                             </span>
                           )}
@@ -774,7 +785,7 @@ function DetalleAdicionalDialog({ detalle, servicios, onClose }: {
                         </a>
                       </div>
                       {a.concepto === 'tdc' && (
-                        <p className="mb-2 text-[11px] text-muted-foreground">Servicio original del compañero, del que se hizo la devolución.</p>
+                        <p className="mb-2 text-xs text-muted-foreground">Servicio original del compañero, del que se hizo la devolución.</p>
                       )}
                       <DatosServicio servicio={unico} />
                     </div>
@@ -794,7 +805,7 @@ function DetalleAdicionalDialog({ detalle, servicios, onClose }: {
                   <LineaTiempo servicio={unico} claves={claves} umbral={a.umbral} estilo={estilo} />
                 ) : relacionados.length > 0 ? (
                   <div className="space-y-2">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                       Servicios que cuentan ({relacionados.length})
                     </p>
                     {relacionados.map(s => (
@@ -804,8 +815,8 @@ function DetalleAdicionalDialog({ detalle, servicios, onClose }: {
                       >
                         <div className="min-w-0">
                           <p className="font-mono text-xs font-bold">{servicioCodigo(s.name)}</p>
-                          <p className="truncate text-[11px] text-muted-foreground">{s.cliente ?? '—'}</p>
-                          <p className="mt-0.5 flex items-center gap-1 text-[11px]">
+                          <p className="truncate text-xs text-muted-foreground">{s.cliente ?? '—'}</p>
+                          <p className="mt-0.5 flex items-center gap-1 text-xs">
                             {formatFecha(s.fecha)} · {s.atributos.zona ?? '—'}
                             {s.horarios.inicio !== null && s.horarios.fin !== null && (
                               <> · <Hora min={s.horarios.inicio} /> → <Hora min={s.horarios.fin} /></>

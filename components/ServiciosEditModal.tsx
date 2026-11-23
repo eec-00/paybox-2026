@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useConfirm } from '@/components/ui/confirm'
+import { useState, useEffect, useRef, useId } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -121,14 +122,14 @@ function getPlacaDisplay(val: unknown): string {
 }
 
 const STAGE_COLORS: Record<string, string> = {
-  'nueva solicitud': 'bg-blue-100 text-blue-800 border-blue-200',
-  'pre-operativo': 'bg-amber-100 text-amber-800 border-amber-200',
-  'en ruta': 'bg-orange-100 text-orange-800 border-orange-200',
-  'en cliente': 'bg-green-100 text-green-800 border-green-200',
-  'cargando': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  'nueva solicitud': 'bg-info-soft text-info-ink border-info/30',
+  'pre-operativo': 'bg-warning-soft text-warning-ink border-warning/40',
+  'en ruta': 'bg-warning-soft text-warning-ink border-warning/40',
+  'en cliente': 'bg-success-soft text-success-ink border-success/30',
+  'cargando': 'bg-warning-soft text-warning-ink border-warning/40',
   'finalizó carga': 'bg-cyan-100 text-cyan-800 border-cyan-200',
   'finalizo carga': 'bg-cyan-100 text-cyan-800 border-cyan-200',
-  'servicio finalizado': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  'servicio finalizado': 'bg-success-soft text-success-ink border-success/30',
   'facturac': 'bg-indigo-100 text-indigo-800 border-indigo-200',
   'cerrado': 'bg-gray-200 text-gray-700 border-gray-300',
 }
@@ -156,8 +157,18 @@ function SectionHeader({ icon: Icon, title }: { icon: React.FC<{ className?: str
   )
 }
 
+// La etiqueta se asocia sola al primer control de su grupo (input, select,
+// botón del selector), para que el lector de pantalla diga qué campo es.
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{children}</Label>
+  const id = useId()
+  const ref = useRef<HTMLLabelElement>(null)
+  useEffect(() => {
+    const ctrl = ref.current?.parentElement?.querySelector<HTMLElement>('input:not([type="hidden"]), select, textarea, button, [role="combobox"]')
+    if (ctrl && !ctrl.hasAttribute('aria-label') && !ctrl.hasAttribute('aria-labelledby')) {
+      ctrl.setAttribute('aria-labelledby', id)
+    }
+  })
+  return <Label ref={ref} id={id} className="text-2xs font-semibold text-muted-foreground uppercase tracking-wide">{children}</Label>
 }
 
 function ReadonlyField({ value }: { value: string }) {
@@ -295,10 +306,10 @@ function PartnerSelect({
         )}
       </div>
       {sinElegir && !open && (
-        <p className="text-[10px] text-amber-600">Elige un almacén de la lista para que se guarde.</p>
+        <p className="text-2xs text-warning-ink">Elige un almacén de la lista para que se guarde.</p>
       )}
       {puedeAtajo && shortcut && (
-        <button type="button" onClick={() => elegir(shortcut.value)} className="text-[10px] text-primary hover:underline">
+        <button type="button" onClick={() => elegir(shortcut.value)} className="text-2xs text-primary hover:underline">
           {shortcut.label}
         </button>
       )}
@@ -417,50 +428,55 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
     return displayVal // keep typed value if no match
   }
 
+  // Campos que cambiaron respecto de Odoo (lo único que se guarda)
+  const calcularCambios = (): Record<string, unknown> => {
+    const orig = {
+      stageId:      String(m2oId(task.stage_id) || ''),
+      programacion: (task[F.programacion] as string) || '',
+      horaCita:     floatToTime(task[F.horaCita]),
+      placaCamion:  getPlacaDisplay(task[F.placaCamion]),
+      placaCarreta: getPlacaDisplay(task[F.placaCarreta]),
+      conductorId:  String(m2oId(task[F.conductor]) || ''),
+      refBooking:   (task[F.refBooking] as string) || '',
+      agencia:      (task[F.agencia] as string) || '',
+      nContenedor:  (task[F.nContenedor] as string) || '',
+      esImport:     Boolean(task[F.esImport]),
+      tiempos: Object.fromEntries(hitos.map(h => [h.field, floatToTime(task[h.field])])) as Record<string, string>,
+    }
+
+    const fields: Record<string, unknown> = {}
+    if (stageId !== orig.stageId && stageId) fields.stage_id = parseInt(stageId)
+    if (programacion !== orig.programacion) fields[F.programacion] = programacion || false
+    if (horaCita !== orig.horaCita) fields[F.horaCita] = timeToFloat(horaCita)
+    if (placaCamion !== orig.placaCamion) fields[F.placaCamion] = resolveVehicleWrite(placaCamion, placaCamionIsM2o)
+    if (placaCarreta !== orig.placaCarreta) fields[F.placaCarreta] = resolveVehicleWrite(placaCarreta, placaCarretaIsM2o)
+    if (conductorId !== orig.conductorId && conductorId) fields[F.conductor] = parseInt(conductorId)
+    if (refBooking !== orig.refBooking) fields[F.refBooking] = refBooking || false
+    if (agencia !== orig.agencia) fields[F.agencia] = agencia || false
+    if (nContenedor !== orig.nContenedor) fields[F.nContenedor] = nContenedor || false
+    if (esImport !== orig.esImport) fields[F.esImport] = esImport
+    const partnerId = (p: Partner | false) => (p ? p.id : false)
+    if (partnerId(almRetiro) !== partnerId(m2oPartner(task[F.almRetiro]))) fields[F.almRetiro] = partnerId(almRetiro)
+    if (partnerId(almDestino) !== partnerId(m2oPartner(task[F.almDestino]))) fields[F.almDestino] = partnerId(almDestino)
+    if (devolucionEditable && partnerId(almDevolucion) !== partnerId(m2oPartner(task[F.almDevolucion]))) {
+      fields[F.almDevolucion] = partnerId(almDevolucion)
+    }
+    if (devolucionEditable && muestraFechaMaxDev && fechaMaxDev !== odooDatetimeToInput(task[F.fechaMaxDevolucion])) {
+      fields[F.fechaMaxDevolucion] = inputToOdooDatetime(fechaMaxDev)
+    }
+    if (muestraModalidad && modalidad && modalidad !== origModalidad) fields[MODALIDAD_DEVOLUCION_FIELD] = modalidad
+    for (const h of hitos) {
+      const val = tiempos[h.field] ?? ''
+      if (val !== (orig.tiempos[h.field] ?? '')) fields[h.field] = timeToFloat(val)
+    }
+    return fields
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setError(null)
     try {
-      const orig = {
-        stageId:      String(m2oId(task.stage_id) || ''),
-        programacion: (task[F.programacion] as string) || '',
-        horaCita:     floatToTime(task[F.horaCita]),
-        placaCamion:  getPlacaDisplay(task[F.placaCamion]),
-        placaCarreta: getPlacaDisplay(task[F.placaCarreta]),
-        conductorId:  String(m2oId(task[F.conductor]) || ''),
-        refBooking:   (task[F.refBooking] as string) || '',
-        agencia:      (task[F.agencia] as string) || '',
-        nContenedor:  (task[F.nContenedor] as string) || '',
-        esImport:     Boolean(task[F.esImport]),
-        tiempos: Object.fromEntries(hitos.map(h => [h.field, floatToTime(task[h.field])])) as Record<string, string>,
-      }
-
-      const fields: Record<string, unknown> = {}
-      if (stageId !== orig.stageId && stageId) fields.stage_id = parseInt(stageId)
-      if (programacion !== orig.programacion) fields[F.programacion] = programacion || false
-      if (horaCita !== orig.horaCita) fields[F.horaCita] = timeToFloat(horaCita)
-      if (placaCamion !== orig.placaCamion) fields[F.placaCamion] = resolveVehicleWrite(placaCamion, placaCamionIsM2o)
-      if (placaCarreta !== orig.placaCarreta) fields[F.placaCarreta] = resolveVehicleWrite(placaCarreta, placaCarretaIsM2o)
-      if (conductorId !== orig.conductorId && conductorId) fields[F.conductor] = parseInt(conductorId)
-      if (refBooking !== orig.refBooking) fields[F.refBooking] = refBooking || false
-      if (agencia !== orig.agencia) fields[F.agencia] = agencia || false
-      if (nContenedor !== orig.nContenedor) fields[F.nContenedor] = nContenedor || false
-      if (esImport !== orig.esImport) fields[F.esImport] = esImport
-      const partnerId = (p: Partner | false) => (p ? p.id : false)
-      if (partnerId(almRetiro) !== partnerId(m2oPartner(task[F.almRetiro]))) fields[F.almRetiro] = partnerId(almRetiro)
-      if (partnerId(almDestino) !== partnerId(m2oPartner(task[F.almDestino]))) fields[F.almDestino] = partnerId(almDestino)
-      if (devolucionEditable && partnerId(almDevolucion) !== partnerId(m2oPartner(task[F.almDevolucion]))) {
-        fields[F.almDevolucion] = partnerId(almDevolucion)
-      }
-      if (devolucionEditable && muestraFechaMaxDev && fechaMaxDev !== odooDatetimeToInput(task[F.fechaMaxDevolucion])) {
-        fields[F.fechaMaxDevolucion] = inputToOdooDatetime(fechaMaxDev)
-      }
-      if (muestraModalidad && modalidad && modalidad !== origModalidad) fields[MODALIDAD_DEVOLUCION_FIELD] = modalidad
-      for (const h of hitos) {
-        const val = tiempos[h.field] ?? ''
-        if (val !== (orig.tiempos[h.field] ?? '')) fields[h.field] = timeToFloat(val)
-      }
-
+      const fields = calcularCambios()
       if (Object.keys(fields).length === 0) { onClose(); return }
 
       const res = await fetch('/api/servicios', {
@@ -478,10 +494,27 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
     }
   }
 
+  const confirmar = useConfirm()
+  // Cerrar con Esc, clic afuera o «Cancelar» no tira los cambios sin avisar
+  const cerrar = async () => {
+    if (saving) return
+    if (Object.keys(calcularCambios()).length > 0) {
+      const ok = await confirmar({
+        title: '¿Salir sin guardar?',
+        description: 'Hay cambios en este servicio que todavía no se guardaron en Odoo.',
+        confirmText: 'Salir sin guardar',
+        cancelText: 'Seguir editando',
+        destructive: true,
+      })
+      if (!ok) return
+    }
+    onClose()
+  }
+
   const currentStage = stages.find(s => String(s.id) === stageId)
 
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open onOpenChange={abierto => { if (!abierto) cerrar() }}>
       <DialogContent className="w-[72vw]! max-w-[72vw]! max-h-[92vh] overflow-hidden flex flex-col p-0 gap-0">
         <DialogTitle className="sr-only">{task.name as string}</DialogTitle>
 
@@ -491,11 +524,11 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
             <Truck className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] text-white/50 uppercase tracking-widest">Editar Servicio</p>
+            <p className="text-2xs text-white/50 uppercase tracking-widest">Editar Servicio</p>
             <h2 className="text-sm font-semibold leading-tight truncate">{task.name as string}</h2>
           </div>
           {currentStage && (
-            <span className={`text-[11px] font-semibold px-3 py-1 rounded-full border shrink-0 ${stageColor(currentStage.name)}`}>
+            <span className={`text-xs font-semibold px-3 py-1 rounded-full border shrink-0 ${stageColor(currentStage.name)}`}>
               {currentStage.name}
             </span>
           )}
@@ -506,7 +539,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
 
           {/* ① PROGRAMACIÓN — banda prominente */}
           <div className="bg-background rounded-xl border p-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">① Programación</p>
+            <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground mb-3">① Programación</p>
             <div className="grid grid-cols-5 gap-3 items-end">
               <div className="space-y-1">
                 <FieldLabel>Etapa</FieldLabel>
@@ -551,7 +584,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
 
             {/* Vehículos */}
             <div className="bg-background rounded-xl border p-4 space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">② Vehículos y Conductor</p>
+              <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground">② Vehículos y Conductor</p>
               <div className="space-y-1">
                 <FieldLabel>Camión / Tracto</FieldLabel>
                 {loadingLookups
@@ -592,12 +625,12 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                     </SelectContent>
                   </Select>
                   {modalidad === MODALIDAD_OTRO_CONDUCTOR && !subtareaCreada && (
-                    <p className="text-[11px] text-muted-foreground leading-snug">
+                    <p className="text-xs text-muted-foreground leading-snug">
                       Al guardar se crea la subtarea &quot;Devolución de vacío&quot; con la misma fecha de este servicio, su almacén de devolución y su fecha máxima de devolución. Luego asígnale el conductor desde la tabla.
                     </p>
                   )}
                   {modalidad === MODALIDAD_MISMO_CONDUCTOR && origModalidad === MODALIDAD_OTRO_CONDUCTOR && subtareaCreada && (
-                    <p className="text-[11px] text-amber-600 leading-snug">
+                    <p className="text-xs text-warning-ink leading-snug">
                       La subtarea de devolución que ya se creó no se borra sola — elimínala en Odoo si ya no corresponde.
                     </p>
                   )}
@@ -607,7 +640,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
 
             {/* Detalles logísticos */}
             <div className="bg-background rounded-xl border p-4 space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">③ Detalles Logísticos</p>
+              <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground">③ Detalles Logísticos</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <FieldLabel>Referencia / Booking</FieldLabel>
@@ -647,7 +680,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                   ) : (
                     <>
                       <ReadonlyField value={m2oName(task[F.almDevolucion])} />
-                      <p className="text-[10px] text-muted-foreground">Se toma del servicio original — para cambiarlo, edita ese servicio.</p>
+                      <p className="text-2xs text-muted-foreground">Se toma del servicio original — para cambiarlo, edita ese servicio.</p>
                     </>
                   )}
                 </div>
@@ -663,7 +696,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                         onChange={e => setFechaMaxDev(e.target.value)}
                         className="h-9 text-sm"
                       />
-                      <p className="text-[10px] text-muted-foreground">Si la devuelve otro conductor, la subtarea toma esta fecha automáticamente.</p>
+                      <p className="text-2xs text-muted-foreground">Si la devuelve otro conductor, la subtarea toma esta fecha automáticamente.</p>
                     </>
                   ) : (
                     <ReadonlyField value={formatOdooDatetime(task[F.fechaMaxDevolucionPadre] || task[F.fechaMaxDevolucion])} />
@@ -674,8 +707,8 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
           </div>
 
           {/* ④ TIEMPOS OPERATIVOS — fondo diferenciado */}
-          <div className="bg-background rounded-xl border border-blue-100 dark:border-blue-900/40 p-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          <div className="bg-background rounded-xl border border-info/30 dark:border-blue-900/40 p-4">
+            <p className="text-2xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
               ④ Tiempos Operativos · {tipoServicioLabelFor(task as TaskTypeFlags)}
             </p>
             <div className="grid grid-cols-6 gap-3">
@@ -689,7 +722,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
                     className="h-9 text-sm font-mono text-center"
                   />
                   {h.foto !== 'no' && (
-                    <p className="text-[9px] text-amber-600 font-medium uppercase tracking-wide">Foto: {h.foto}</p>
+                    <p className="text-2xs text-warning-ink font-medium uppercase tracking-wide">Foto: {h.foto}</p>
                   )}
                 </div>
               ))}
@@ -707,7 +740,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
         <div className="border-t px-5 py-3 flex items-center justify-between shrink-0 bg-background">
           <p className="text-xs text-muted-foreground">Solo campos modificados → Odoo</p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancelar</Button>
+            <Button variant="outline" size="sm" onClick={cerrar} disabled={saving}>Cancelar</Button>
             <Button size="sm" onClick={handleSave} disabled={saving || loadingLookups} className="gap-2 min-w-[130px]">
               {saving
                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Guardando...</>

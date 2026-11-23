@@ -1,5 +1,7 @@
 'use client'
 
+import { formatMoney } from '@/lib/format'
+import { toast } from 'sonner'
 import { useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -220,7 +222,7 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
             setOpen(false)
         } catch (err) {
             console.error('Error exportando gastos:', err)
-            alert('Hubo un error al exportar: ' + (err instanceof Error ? err.message : String(err)))
+            toast.error('No se pudo exportar', { description: err instanceof Error ? err.message : String(err) })
         } finally {
             setExporting(false)
         }
@@ -276,8 +278,8 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
                         )}
                         {periodo === 'rango' && (
                             <div className="grid grid-cols-2 gap-2">
-                                <div><Label className="text-[10px] uppercase text-muted-foreground">Desde</Label><Input type="date" className="h-9 text-xs" value={desde} onChange={e => setDesde(e.target.value)} /></div>
-                                <div><Label className="text-[10px] uppercase text-muted-foreground">Hasta</Label><Input type="date" className="h-9 text-xs" value={hasta} onChange={e => setHasta(e.target.value)} /></div>
+                                <div><Label className="text-2xs uppercase text-muted-foreground">Desde</Label><Input type="date" className="h-9 text-xs" value={desde} onChange={e => setDesde(e.target.value)} /></div>
+                                <div><Label className="text-2xs uppercase text-muted-foreground">Hasta</Label><Input type="date" className="h-9 text-xs" value={hasta} onChange={e => setHasta(e.target.value)} /></div>
                             </div>
                         )}
                         <p className="text-xs text-muted-foreground first-letter:uppercase">{rango.etiqueta}</p>
@@ -285,7 +287,7 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
                         <h3 className="text-sm font-semibold flex items-center gap-2 pt-2"><Filter className="w-4 h-4 text-primary" /> Otros filtros</h3>
                         <div className="grid grid-cols-2 gap-2">
                             <div>
-                                <Label className="text-[10px] uppercase text-muted-foreground">Estado</Label>
+                                <Label className="text-2xs uppercase text-muted-foreground">Estado</Label>
                                 <Select value={estado} onValueChange={v => setEstado(v as typeof estado)}>
                                     <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
                                     <SelectContent>
@@ -296,7 +298,7 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
                                 </Select>
                             </div>
                             <div>
-                                <Label className="text-[10px] uppercase text-muted-foreground">Moneda</Label>
+                                <Label className="text-2xs uppercase text-muted-foreground">Moneda</Label>
                                 <Select value={moneda} onValueChange={v => setMoneda(v as typeof moneda)}>
                                     <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
                                     <SelectContent>
@@ -311,8 +313,8 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
                         {placas.length > 0 && (
                             <div className="space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                    <Label className="text-[10px] uppercase text-muted-foreground flex items-center gap-1"><Truck className="w-3 h-3" /> Placas</Label>
-                                    <span className="text-[10px] text-muted-foreground">{placasSel.length === 0 ? 'Todas' : `${placasSel.length} elegida(s)`}</span>
+                                    <Label className="text-2xs uppercase text-muted-foreground flex items-center gap-1"><Truck className="w-3 h-3" /> Placas</Label>
+                                    <span className="text-2xs text-muted-foreground">{placasSel.length === 0 ? 'Todas' : `${placasSel.length} elegida(s)`}</span>
                                 </div>
                                 <div className="flex flex-wrap gap-1.5">
                                     {placas.map(p => (
@@ -320,7 +322,7 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
                                             key={p}
                                             type="button"
                                             onClick={() => toggle(placasSel, setPlacasSel, p)}
-                                            className={`text-[11px] font-mono px-2 py-0.5 rounded border transition-colors ${placasSel.includes(p) ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}`}
+                                            className={`text-xs font-mono px-2 py-0.5 rounded border transition-colors ${placasSel.includes(p) ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'}`}
                                         >
                                             {p}
                                         </button>
@@ -335,10 +337,10 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold flex items-center gap-2"><Users className="w-4 h-4 text-primary" /> Conductores</h3>
                             <div className="flex gap-1">
-                                <button type="button" onClick={() => setConductoresSel([])} className={`text-[10px] px-2 py-1 rounded ${conductoresSel.length === 0 ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted text-muted-foreground'}`}>Todos</button>
+                                <button type="button" onClick={() => setConductoresSel([])} className={`text-2xs px-2 py-1 rounded ${conductoresSel.length === 0 ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted text-muted-foreground'}`}>Todos</button>
                             </div>
                         </div>
-                        <Input placeholder="Buscar conductor..." className="h-8 text-xs" value={buscarConductor} onChange={e => setBuscarConductor(e.target.value)} />
+                        <Input aria-label="Buscar conductor" placeholder="Buscar conductor..." className="h-8 text-xs" value={buscarConductor} onChange={e => setBuscarConductor(e.target.value)} />
                         <div className="border rounded-lg max-h-[300px] overflow-y-auto divide-y">
                             {conductoresVisibles.length === 0 ? (
                                 <p className="text-xs text-muted-foreground p-3 text-center">Sin conductores</p>
@@ -349,7 +351,7 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
                                 </label>
                             ))}
                         </div>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                             {conductoresSel.length === 0 ? 'Sin selección = todos los conductores' : `${conductoresSel.length} conductor(es) elegido(s)`}
                         </p>
                     </div>
@@ -358,8 +360,8 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
                 <div className="flex items-center justify-between gap-3 border-t pt-4 mt-2 flex-wrap">
                     <div className="text-xs">
                         <span className="font-semibold">{seleccion.length}</span> gasto(s)
-                        {totalSoles > 0 && <> · <span className="font-semibold">S/ {totalSoles.toFixed(2)}</span></>}
-                        {totalDolares > 0 && <> · <span className="font-semibold">US$ {totalDolares.toFixed(2)}</span></>}
+                        {totalSoles > 0 && <> · <span className="font-semibold">{formatMoney(totalSoles, 'soles')}</span></>}
+                        {totalDolares > 0 && <> · <span className="font-semibold">{formatMoney(totalDolares, 'dolares')}</span></>}
                     </div>
                     <Button onClick={handleExport} disabled={exporting || seleccion.length === 0} className="gap-2">
                         {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}

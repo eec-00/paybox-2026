@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -181,7 +182,7 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
     e.preventDefault()
 
     if (!selectedCategoria) {
-      alert('Por favor selecciona una categoría')
+      toast.warning('Selecciona una categoría para continuar')
       return
     }
 
@@ -215,7 +216,7 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
       onSuccess()
     } catch (error) {
       console.error('Error al actualizar registro:', error)
-      alert('Error al actualizar el registro')
+      toast.error('No se pudo actualizar el registro', { description: 'Revisa los datos e inténtalo de nuevo.' })
     } finally {
       setLoading(false)
     }
@@ -224,7 +225,7 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
   return (
     <>
       {ocrToast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-9999 bg-green-500 text-white px-5 py-2.5 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 animate-fade-in pointer-events-none">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-9999 bg-success text-white px-5 py-2.5 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 animate-fade-in pointer-events-none">
           <CheckCircle2 className="w-4 h-4" />
           Datos obtenidos
         </div>
@@ -410,7 +411,7 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
         {/* Campos Dinámicos */}
         {selectedCategoria && selectedCategoria.ejes_obligatorios && selectedCategoria.ejes_obligatorios.filter((eje) => !isHiddenAxis(eje)).length > 0 && (
           <div className="space-y-4 border-t pt-4">
-            <h3 className="font-semibold text-base text-secondary">Datos Específicos de la Categoría</h3>
+            <h3 className="font-semibold text-base text-primary">Datos Específicos de la Categoría</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {selectedCategoria.ejes_obligatorios
                 .filter((eje) => !isHiddenAxis(eje))

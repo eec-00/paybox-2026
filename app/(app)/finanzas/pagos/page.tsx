@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useApp } from '@/lib/context/app-context'
@@ -88,19 +89,11 @@ export default function PagosPage() {
       <div className="flex flex-col gap-3 bg-card/40 p-3 sm:p-4 rounded-xl border border-border/50 shadow-sm">
         {/* Título + Acciones */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg">
-              <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Pagos</h2>
-              <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wider">Historial y gestión de registros</p>
-            </div>
-          </div>
+          <PageHeader icon={FileText} title="Pagos" description="Historial y gestión de registros" />
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <ExportExcelModal buttonVariant="outline" buttonSize="sm" buttonClass="h-8 sm:h-9 px-2 sm:px-4 bg-emerald-50 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 border-emerald-200 shadow-sm font-semibold text-xs rounded-lg" />
+            <ExportExcelModal buttonVariant="outline" buttonSize="sm" buttonClass="h-8 sm:h-9 px-2 sm:px-4 text-xs" />
             {canCreate && !showNewPaymentForm && (
-              <Button onClick={() => setShowNewPaymentForm(true)} size="sm" className="h-8 sm:h-9 px-3 sm:px-5 shadow-md hover:shadow-lg transition-all font-bold text-xs rounded-lg bg-[#1a2332] hover:bg-[#2c3a4f]">
+              <Button onClick={() => setShowNewPaymentForm(true)} size="sm" className="h-8 sm:h-9 px-3 sm:px-5 text-xs font-semibold">
                 <PlusCircle className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Nuevo pago</span>
               </Button>
@@ -113,12 +106,12 @@ export default function PagosPage() {
           <div className="flex flex-1 min-w-0 flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-0 bg-background rounded-lg border border-border shadow-sm">
             <div className="flex items-center gap-1 px-2 py-1 flex-1 min-w-0">
               <CalendarIcon className="h-3 w-3 text-primary/70 shrink-0" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">Desde</span>
+              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground shrink-0">Desde</span>
               <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-7 flex-1 min-w-0 text-xs bg-transparent border-none shadow-none focus-visible:ring-0 p-0" />
             </div>
             <div className="hidden sm:block h-4 w-[1px] bg-border/60 shrink-0" />
             <div className="flex items-center gap-1 px-2 py-1 flex-1 min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">Hasta</span>
+              <span className="text-2xs font-bold uppercase tracking-wider text-muted-foreground shrink-0">Hasta</span>
               <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-7 flex-1 min-w-0 text-xs bg-transparent border-none shadow-none focus-visible:ring-0 p-0" />
             </div>
           </div>
@@ -134,7 +127,7 @@ export default function PagosPage() {
               {showAdvancedFilters ? <ChevronUp className="h-4 w-4 ml-0 sm:ml-1" /> : <ChevronDown className="h-4 w-4 ml-0 sm:ml-1" />}
             </Button>
             {hasActiveFilters && (
-              <Button onClick={handleClearFilters} variant="ghost" size="sm" className="h-8 sm:h-9 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5" title="Limpiar filtros">
+              <Button aria-label="Limpiar filtros" onClick={handleClearFilters} variant="ghost" size="sm" className="h-8 sm:h-9 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/5" title="Limpiar filtros">
                 <XCircle className="h-4 w-4" />
               </Button>
             )}
@@ -148,9 +141,9 @@ export default function PagosPage() {
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Rango de Monto</label>
                 <div className="flex items-center gap-2">
-                  <Input placeholder="Mínimo" type="number" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} className="h-9 text-xs focus-visible:ring-1" />
+                  <Input aria-label="Monto mínimo" placeholder="Mínimo" type="number" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} className="h-9 text-xs focus-visible:ring-1" />
                   <span className="text-muted-foreground">-</span>
-                  <Input placeholder="Máximo" type="number" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} className="h-9 text-xs focus-visible:ring-1" />
+                  <Input aria-label="Monto máximo" placeholder="Máximo" type="number" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} className="h-9 text-xs focus-visible:ring-1" />
                 </div>
               </div>
 
@@ -211,9 +204,9 @@ export default function PagosPage() {
                         if (e.target.checked) setSelectedCategories([...selectedCategories, cat.id.toString()])
                         else setSelectedCategories(selectedCategories.filter(id => id !== cat.id.toString()))
                       }}
-                      className="hidden"
+                      className="peer sr-only"
                     />
-                    <div className={`w-4 h-4 rounded-sm border flex items-center justify-center ${selectedCategories.includes(cat.id.toString()) ? 'bg-primary border-primary text-white' : 'border-input bg-transparent'}`}>
+                    <div aria-hidden className={`w-4 h-4 rounded-sm border flex items-center justify-center peer-focus-visible:ring-2 peer-focus-visible:ring-ring ${selectedCategories.includes(cat.id.toString()) ? 'bg-primary border-primary text-white' : 'border-input bg-transparent'}`}>
                       {selectedCategories.includes(cat.id.toString()) && <svg width="10" height="10" viewBox="0 0 15 14" fill="none"><path d="M2 7L6 11L13 2" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                     </div>
                     <span className="text-xs font-medium">{cat.categoria_nombre}</span>

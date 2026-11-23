@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useState, useEffect, useMemo, useDeferredValue } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -133,10 +134,10 @@ function matchesDateRange(t: OdooTask, start: string, end: string): boolean {
 
 
 const STAGE_DOT_COLORS: Record<string, string> = {
-  'nueva solicitud': 'bg-blue-500',
-  'pre-operativo': 'bg-amber-500',
-  'en ruta': 'bg-orange-500',
-  'en cliente': 'bg-green-500',
+  'nueva solicitud': 'bg-info',
+  'pre-operativo': 'bg-warning',
+  'en ruta': 'bg-warning',
+  'en cliente': 'bg-success',
   'cargando': 'bg-yellow-400',
   'finalizó carga': 'bg-cyan-500',
   'finalizo carga': 'bg-cyan-500',
@@ -219,7 +220,7 @@ const COLUMNS: ColumnDef[] = [
     sortValue: (t) => (t.stage_id ? t.stage_id[1] : ''),
     render: (t) => {
       const stageName = t.stage_id ? t.stage_id[1] : ''
-      return stageName ? <span className={`inline-block w-3 h-3 rounded-full ${stageDotColor(stageName)}`} title={stageName} /> : '—'
+      return stageName ? <span className={`inline-block w-3 h-3 rounded-full ${stageDotColor(stageName)}`} title={stageName} role="img" aria-label={`Etapa: ${stageName}`} /> : '—'
     },
   },
   {
@@ -274,7 +275,7 @@ const COLUMNS: ColumnDef[] = [
     key: 'conductor', label: 'Conductor', headClass: 'min-w-[180px]',
     sortValue: (t) => m2oName(t.x_studio_conductor),
     render: (t) => faltaConductor(t) ? (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 text-[11px] font-semibold whitespace-nowrap dark:bg-red-950/50 dark:text-red-300 dark:border-red-900">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive-soft text-destructive-ink border border-destructive/30 text-xs font-semibold whitespace-nowrap dark:bg-red-950/50 dark:text-red-300 dark:border-red-900">
         <AlertTriangle className="h-3 w-3" />
         Falta asignar conductor
       </span>
@@ -299,7 +300,7 @@ const COLUMNS: ColumnDef[] = [
     key: 'almacenRetiro', label: 'Almacén Retiro', headClass: 'min-w-[200px]',
     sortValue: (t) => m2oName(t.x_studio_almacen_de_retiro),
     render: (t) => (
-      <span className="line-clamp-2 leading-snug text-[11px] max-w-[220px] block" title={m2oName(t.x_studio_almacen_de_retiro)}>
+      <span className="line-clamp-2 leading-snug text-xs max-w-[220px] block" title={m2oName(t.x_studio_almacen_de_retiro)}>
         {m2oName(t.x_studio_almacen_de_retiro)}
       </span>
     ),
@@ -308,7 +309,7 @@ const COLUMNS: ColumnDef[] = [
     key: 'almacenDestino', label: 'Almacén Destino', headClass: 'min-w-[200px]',
     sortValue: (t) => m2oName(t.x_studio_almacen_de_destino),
     render: (t) => (
-      <span className="line-clamp-2 leading-snug text-[11px] max-w-[220px] block" title={m2oName(t.x_studio_almacen_de_destino)}>
+      <span className="line-clamp-2 leading-snug text-xs max-w-[220px] block" title={m2oName(t.x_studio_almacen_de_destino)}>
         {m2oName(t.x_studio_almacen_de_destino)}
       </span>
     ),
@@ -727,7 +728,7 @@ export function ServiciosSection() {
           <AlertDialogAction
             onClick={handleConfirmReset}
             disabled={resetting || !resetTask || resetConfirmCode.trim().toUpperCase() !== servicioCodigo(resetTask).toUpperCase()}
-            className="bg-amber-600 hover:bg-amber-700"
+            className="bg-warning hover:bg-amber-700"
           >
             {resetting ? <span className="flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />Reiniciando...</span> : 'Sí, reiniciar'}
           </AlertDialogAction>
@@ -761,7 +762,7 @@ export function ServiciosSection() {
           <AlertDialogAction
             onClick={handleConfirmFinalize}
             disabled={finalizing || !finalizeTask || finalizeConfirmCode.trim().toUpperCase() !== servicioCodigo(finalizeTask).toUpperCase()}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-success hover:bg-emerald-700"
           >
             {finalizing ? <span className="flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" />Finalizando...</span> : 'Sí, finalizar'}
           </AlertDialogAction>
@@ -868,128 +869,122 @@ export function ServiciosSection() {
     </Dialog>
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Truck className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">Servicios de Transporte</h2>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-              Proyecto Odoo · {historico ? 'Histórico completo' : `Últimos ${DIAS_RECIENTES} días`} · {loading ? '...' : `${sorted.length} de ${tasks.length} registros`}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Móvil: botón para mostrar/ocultar los filtros */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setMobileFiltersOpen((v) => !v)}
-            className="h-8 gap-1.5 sm:hidden"
-          >
-            <Filter className="h-3.5 w-3.5" />
-            Filtros
-            {activeFilterCount > 0 && (
-              <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
-                {activeFilterCount}
-              </span>
-            )}
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5"
-            onClick={() => setResumenOpen(true)}
-            disabled={loading}
-            title="Reporte PDF de cumplimiento de conductores por semana o rango de fechas"
-          >
-            <FileText className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Exportar resumen</span>
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5" disabled={!!exportingFormat}>
-                {exportingFormat ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                <span className="hidden sm:inline">Exportar</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setCustomExportOpen(true)} disabled={!!exportingFormat} className="gap-2">
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                Personalizado (semana, conductor…)
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Exportar Excel por cliente</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {(Object.keys(EXPORT_FORMATS) as ExportClientFormat[]).map((key) => (
-                <DropdownMenuItem key={key} onClick={() => openExportDialog(key)} disabled={!!exportingFormat} className="gap-2">
-                  <FileSpreadsheet className="h-3.5 w-3.5" />
-                  Formato {EXPORT_FORMATS[key].label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5">
-                <Columns className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Columnas</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="max-h-[70vh] overflow-y-auto">
-              <DropdownMenuLabel>Mostrar/ocultar columnas</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {COLUMNS.map((c) => (
-                <DropdownMenuCheckboxItem
-                  key={c.key}
-                  checked={!hiddenColumns.has(c.key)}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={() => toggleColumn(c.key)}
-                >
-                  {c.label}
-                </DropdownMenuCheckboxItem>
-              ))}
-              {hiddenColumns.size > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <button
-                    onClick={() => setHiddenColumns(new Set())}
-                    className="w-full text-left px-2 py-1.5 text-xs text-primary hover:underline"
-                  >
-                    Mostrar todas
-                  </button>
-                </>
+      <PageHeader
+        icon={Truck}
+        title="Servicios de Transporte"
+        description={<>{historico ? 'Histórico completo' : `Últimos ${DIAS_RECIENTES} días`} · {loading ? '...' : `${sorted.length} de ${tasks.length} registros`}</>}
+        actions={
+          <>
+            {/* Móvil: botón para mostrar/ocultar los filtros */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMobileFiltersOpen((v) => !v)}
+              className="h-8 gap-1.5 sm:hidden"
+            >
+              <Filter className="h-3.5 w-3.5" />
+              Filtros
+              {activeFilterCount > 0 && (
+                <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary text-primary-foreground text-2xs font-bold">
+                  {activeFilterCount}
+                </span>
               )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </Button>
 
-          <Button
-            variant={historico ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => { setHistorico((v) => !v); setPage(1) }}
-            disabled={loading}
-            className="h-8 gap-1.5"
-            title={historico ? `Volver a mostrar solo los últimos ${DIAS_RECIENTES} días` : 'Cargar también los servicios más antiguos (tarda más)'}
-          >
-            <History className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{historico ? `Últimos ${DIAS_RECIENTES} días` : 'Ver histórico'}</span>
-          </Button>
+            <Button aria-label="Exportar resumen"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => setResumenOpen(true)}
+              disabled={loading}
+              title="Reporte PDF de cumplimiento de conductores por semana o rango de fechas"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Exportar resumen</span>
+            </Button>
 
-          <Button variant="outline" size="sm" onClick={fetchData} disabled={refrescando} className="h-8 gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${refrescando ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Actualizar</span>
-          </Button>
-        </div>
-      </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5" disabled={!!exportingFormat}>
+                  {exportingFormat ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                  <span className="hidden sm:inline">Exportar</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setCustomExportOpen(true)} disabled={!!exportingFormat} className="gap-2">
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  Personalizado (semana, conductor…)
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Exportar Excel por cliente</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {(Object.keys(EXPORT_FORMATS) as ExportClientFormat[]).map((key) => (
+                  <DropdownMenuItem key={key} onClick={() => openExportDialog(key)} disabled={!!exportingFormat} className="gap-2">
+                    <FileSpreadsheet className="h-3.5 w-3.5" />
+                    Formato {EXPORT_FORMATS[key].label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                  <Columns className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Columnas</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-[70vh] overflow-y-auto">
+                <DropdownMenuLabel>Mostrar/ocultar columnas</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {COLUMNS.map((c) => (
+                  <DropdownMenuCheckboxItem
+                    key={c.key}
+                    checked={!hiddenColumns.has(c.key)}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={() => toggleColumn(c.key)}
+                  >
+                    {c.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                {hiddenColumns.size > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <button
+                      onClick={() => setHiddenColumns(new Set())}
+                      className="w-full text-left px-2 py-1.5 text-xs text-primary hover:underline"
+                    >
+                      Mostrar todas
+                    </button>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button aria-label={historico ? `Últimos ${DIAS_RECIENTES} días` : 'Ver histórico'}
+              variant={historico ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => { setHistorico((v) => !v); setPage(1) }}
+              disabled={loading}
+              className="h-8 gap-1.5"
+              title={historico ? `Volver a mostrar solo los últimos ${DIAS_RECIENTES} días` : 'Cargar también los servicios más antiguos (tarda más)'}
+            >
+              <History className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{historico ? `Últimos ${DIAS_RECIENTES} días` : 'Ver histórico'}</span>
+            </Button>
+
+            <Button variant="outline" size="sm" onClick={fetchData} disabled={refrescando} className="h-8 gap-1.5">
+              <RefreshCw className={`h-3.5 w-3.5 ${refrescando ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Actualizar</span>
+            </Button>
+          </>
+        }
+      />
 
       {/* Buscador — siempre visible, es el control más usado */}
       <div className="flex items-center gap-1.5 bg-background border rounded-lg px-3 h-9 shadow-sm">
         <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <input
+        <input aria-label="Buscar código, cliente, conductor, contenedor"
           type="text"
           placeholder="Buscar código, cliente, conductor, contenedor..."
           value={search}
@@ -1062,7 +1057,7 @@ export function ServiciosSection() {
 
       {/* Aviso: subtareas de devolución/retiro sin conductor responsable */}
       {!loading && sinConductorCount > 0 && (
-        <div className="flex items-center justify-between gap-3 flex-wrap bg-red-50 border border-red-200 text-red-800 rounded-xl px-4 py-3 dark:bg-red-950/40 dark:border-red-900 dark:text-red-200">
+        <div className="flex items-center justify-between gap-3 flex-wrap bg-destructive-soft border border-destructive/30 text-destructive-ink rounded-xl px-4 py-3 dark:bg-red-950/40 dark:border-red-900 dark:text-red-200">
           <div className="flex items-center gap-2 text-sm">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             <span>
@@ -1072,7 +1067,7 @@ export function ServiciosSection() {
           <Button
             size="sm"
             variant={soloSinConductor ? 'default' : 'outline'}
-            className="h-8 border-red-300 dark:border-red-800"
+            className="h-8 border-destructive/30 dark:border-red-800"
             onClick={() => { setSoloSinConductor((v) => !v); setPage(1) }}
           >
             {soloSinConductor ? 'Ver todos los servicios' : 'Ver solo estas'}
@@ -1100,7 +1095,7 @@ export function ServiciosSection() {
         <>
           {/* Stage legend */}
           {stages.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 pb-1 text-[11px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 pb-1 text-xs text-muted-foreground">
               {stages.map((s) => (
                 <span key={s.id} className="flex items-center gap-1.5">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${stageDotColor(s.name)}`} />
@@ -1120,18 +1115,18 @@ export function ServiciosSection() {
                     {puedeEditar && <TableHead className="w-10" />}
                     {puedeEditar && <TableHead className="w-10" />}
                     <TableHead
-                      className="whitespace-nowrap font-bold text-xs min-w-[100px] cursor-pointer select-none hover:text-primary transition-colors"
-                      onClick={() => handleSort('codigo')}
+                      className="whitespace-nowrap font-bold text-xs min-w-[100px] select-none transition-colors"
+                      aria-sort={sortKey === 'codigo' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                     >
-                      <span className="inline-flex items-center gap-1">Código <SortIcon activo={sortKey === 'codigo'} dir={sortDir} /></span>
+                      <button type="button" onClick={() => handleSort('codigo')} className="inline-flex items-center gap-1 rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Código <SortIcon activo={sortKey === 'codigo'} dir={sortDir} /></button>
                     </TableHead>
                     {visibleColumns.map((c) => (
                       <TableHead
                         key={c.key}
-                        className={`whitespace-nowrap font-bold text-xs cursor-pointer select-none hover:text-primary transition-colors ${c.headClass || ''}`}
-                        onClick={() => handleSort(c.key)}
+                        className={`whitespace-nowrap font-bold text-xs select-none transition-colors ${c.headClass || ''}`}
+                        aria-sort={sortKey === c.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                       >
-                        <span className="inline-flex items-center gap-1">{c.label} <SortIcon activo={sortKey === c.key} dir={sortDir} /></span>
+                        <button type="button" onClick={() => handleSort(c.key)} className="inline-flex items-center gap-1 rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{c.label} <SortIcon activo={sortKey === c.key} dir={sortDir} /></button>
                       </TableHead>
                     ))}
                   </TableRow>
@@ -1150,7 +1145,7 @@ export function ServiciosSection() {
                         <TableRow key={task.id} className="hover:bg-muted/30 text-xs">
                           {puedeEditar && (
                           <TableCell className="p-1">
-                            <Button
+                            <Button aria-label="Editar"
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-muted-foreground hover:text-primary"
@@ -1166,7 +1161,7 @@ export function ServiciosSection() {
                               href={`/servicios/trailers/${task.id}`}
                               onClick={() => guardarListaNavegacion(sorted.map((t) => ({ id: t.id, codigo: servicioCodigo(t) })))}
                             >
-                              <Button
+                              <Button aria-label="Ver detalle"
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-muted-foreground hover:text-primary"
@@ -1178,10 +1173,10 @@ export function ServiciosSection() {
                           </TableCell>
                           {puedeEditar && (<>
                           <TableCell className="p-1">
-                            <Button
+                            <Button aria-label="Reiniciar servicio (borra las horas marcadas por el conductor)"
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-amber-600"
+                              className="h-7 w-7 text-muted-foreground hover:text-warning-ink"
                               onClick={() => { setResetTask(task); setResetConfirmCode('') }}
                               title="Reiniciar servicio (borra las horas marcadas por el conductor)"
                             >
@@ -1189,10 +1184,10 @@ export function ServiciosSection() {
                             </Button>
                           </TableCell>
                           <TableCell className="p-1">
-                            <Button
+                            <Button aria-label="Finalizar servicio directamente (sin pasar por el conductor)"
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-emerald-600"
+                              className="h-7 w-7 text-muted-foreground hover:text-success-ink"
                               onClick={() => { setFinalizeTask(task); setFinalizeConfirmCode('') }}
                               title="Finalizar servicio directamente (sin pasar por el conductor)"
                             >
@@ -1203,7 +1198,7 @@ export function ServiciosSection() {
                           <TableCell className="font-medium whitespace-nowrap" title={task.name}>
                             {code}
                             {task.parent_id && (
-                              <div className="flex items-center gap-1 text-[10px] font-normal text-amber-600" title={`Subtarea vinculada a ${code}`}>
+                              <div className="flex items-center gap-1 text-2xs font-normal text-warning-ink" title={`Subtarea vinculada a ${code}`}>
                                 <CornerDownRight className="h-2.5 w-2.5 shrink-0" />
                                 <span className="truncate max-w-[140px]">{task.name}</span>
                               </div>
@@ -1230,11 +1225,11 @@ export function ServiciosSection() {
                 Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} de {sorted.length}
               </span>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(1)} disabled={page === 1}>«</Button>
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(p => p - 1)} disabled={page === 1}>‹</Button>
+                <Button aria-label="Primera página" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(1)} disabled={page === 1}>«</Button>
+                <Button aria-label="Página anterior" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(p => p - 1)} disabled={page === 1}>‹</Button>
                 <span className="px-2 font-medium">{page} / {totalPages}</span>
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(p => p + 1)} disabled={page === totalPages}>›</Button>
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(totalPages)} disabled={page === totalPages}>»</Button>
+                <Button aria-label="Página siguiente" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(p => p + 1)} disabled={page === totalPages}>›</Button>
+                <Button aria-label="Última página" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => setPage(totalPages)} disabled={page === totalPages}>»</Button>
               </div>
             </div>
           )}

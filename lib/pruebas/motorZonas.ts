@@ -18,6 +18,14 @@
 //   D. «Provincia» no es Zona 0; nunca precio por nombre de depósito, GPS o
 //      tarifa genérica de zona.
 //
+// Desde VIGENCIA_REGLAS_NOV (respuesta de Margiory, nov. 2026):
+//   · Todos los distritos de una zona pagan igual por tipo de servicio, salvo
+//     excepción aprobada: Ate se unifica con San Juan de Lurigancho en S/90.
+//   · Distrito nuevo en una zona ya configurada: se propone la tarifa de la
+//     zona; Administración la valida (tabla pruebas_tarifas_distrito) y desde
+//     ahí se reutiliza para los siguientes servicios.
+//   · Lo anterior a esa fecha conserva las tarifas viejas.
+//
 // Acreditación de tramos (guía §2–§3): con hitos operativos de la app
 // (I08/I09 principal, I12 devolución, D10/D11 despacho). El cierre
 // administrativo (I13/D12, «Servicio finalizado») nunca acredita un pago.
@@ -25,7 +33,9 @@
 
 import { sumarDias } from '@/lib/fechas'
 import { CROSLAND_EXCLUIDOS, CROSLAND_ODOO_IDS, esPuerto } from './adicionalesConductores'
-import { servicioCodigo, type DevolucionPago, type ServicioPago } from './pagosConductores'
+import {
+  reglasNuevas, servicioCodigo, VIGENCIA_REGLAS_NOV, type DevolucionPago, type ServicioPago, type TarifaAprobada,
+} from './pagosConductores'
 
 export const VERSION_TARIFARIO = 'Tarifario v0.9 · 07/11/2026'
 /** Inicio de vigencia de las tarifas actuales: enero 2026 (confirmado por Margiory el 10/11/2026) */
@@ -56,18 +66,23 @@ export interface Regla {
   estadoFuente: string
   /** Alcance que el Excel marca «por confirmar»: simula, pero con alerta */
   alcancePorConfirmar: string | null
+  /** Importe antes de VIGENCIA_REGLAS_NOV si cambió con la unificación de zona; null si no cambió */
+  montoAnterior: number | null
 }
 
 // ── Catálogo · hoja 00_TARIFARIO_MICHAEL ────────────────────────────────
 
-/** [fila Excel, zona, distrito, alias, general, imo/iqbf, despacho] */
-const FILAS: [number, string, string, string[], number, number, number][] = [
+/** [fila Excel, zona, distrito, alias, general, imo/iqbf, despacho, importes antes de VIGENCIA_REGLAS_NOV si cambiaron] */
+type Fila = [number, string, string, string[], number, number, number, [number, number, number]?]
+
+const FILAS: Fila[] = [
   [6, 'Zona 1', 'Callao', [], 70, 70, 80],
   [7, 'Zona 2', 'Lima (Cercado)', ['Lima', 'Cercado de Lima'], 80, 80, 90],
   [8, 'Zona 3', 'Los Olivos', [], 80, 80, 90],
   [9, 'Zona 3', 'Puente Piedra', [], 80, 80, 90],
   [10, 'Zona 3', 'Ventanilla', [], 80, 80, 90],
-  [11, 'Zona 4', 'Ate', [], 80, 80, 90],
+  // Zona 4 unificada en S/90 (Margiory, nov. 2026): antes Ate pagaba 80/80/90
+  [11, 'Zona 4', 'Ate', [], 90, 90, 100, [80, 80, 90]],
   [12, 'Zona 4', 'San Juan de Lurigancho', [], 90, 90, 100],
   [13, 'Zona 5', 'Ancón', [], 90, 90, 100],
   [14, 'Zona 6', 'Chorrillos', [], 90, 90, 100],
@@ -84,21 +99,41 @@ function claveDistrito(d: string): string {
 }
 
 /** Importes que Margiory confirmó el 10/11/2026 como «lo que se viene pagando» */
-const CONFIRMADOS = ['Ate', 'San Juan de Lurigancho', 'Lurín']
+const CONFIRMADOS = ['San Juan de Lurigancho', 'Lurín']
+const UNIFICADOS = ['Ate']
 
-export const REGLAS_ORDINARIAS: Regla[] = FILAS.flatMap(([fila, zona, distrito, alias, general, imo, despacho]) => {
+export const REGLAS_ORDINARIAS: Regla[] = FILAS.flatMap(([fila, zona, distrito, alias, general, imo, despacho, antes]) => {
   const id = `${zona.replace('Zona ', 'Z')}-${claveDistrito(distrito)}`
   const base = {
     zona, distrito, alias,
     fuente: `${EXCEL} · 00_TARIFARIO_MICHAEL fila ${fila}`,
-    estadoFuente: CONFIRMADOS.includes(distrito) ? 'HISTÓRICA · CONFIRMADA POR MARGIORY (10/11/2026)' : 'HISTÓRICA · NO APROBADA',
+    estadoFuente: UNIFICADOS.includes(distrito)
+      ? `UNIFICADA CON SAN JUAN DE LURIGANCHO EN S/90 (MARGIORY, NOV. 2026) · ANTES S/${antes?.[0]}`
+      : CONFIRMADOS.includes(distrito) ? 'HISTÓRICA · CONFIRMADA POR MARGIORY (10/11/2026)' : 'HISTÓRICA · NO APROBADA',
   }
   return [
-    { ...base, id: `${id}-GEN`, operaciones: ['Importación', 'Exportación'], modalidades: CONTENEDOR, cargas: ['General'], monto: general, alcancePorConfirmar: ALCANCE_CONTENEDOR },
-    { ...base, id: `${id}-IMO`, operaciones: ['Importación', 'Exportación'], modalidades: CONTENEDOR, cargas: ['IMO', 'IQBF'], monto: imo, alcancePorConfirmar: ALCANCE_CONTENEDOR },
-    { ...base, id: `${id}-DES`, operaciones: ['Despacho'], modalidades: ['Carga Suelta'], cargas: TODAS, monto: despacho, alcancePorConfirmar: null },
+    { ...base, id: `${id}-GEN`, operaciones: ['Importación', 'Exportación'], modalidades: CONTENEDOR, cargas: ['General'], monto: general, alcancePorConfirmar: ALCANCE_CONTENEDOR, montoAnterior: antes?.[0] ?? null },
+    { ...base, id: `${id}-IMO`, operaciones: ['Importación', 'Exportación'], modalidades: CONTENEDOR, cargas: ['IMO', 'IQBF'], monto: imo, alcancePorConfirmar: ALCANCE_CONTENEDOR, montoAnterior: antes?.[1] ?? null },
+    { ...base, id: `${id}-DES`, operaciones: ['Despacho'], modalidades: ['Carga Suelta'], cargas: TODAS, monto: despacho, alcancePorConfirmar: null, montoAnterior: antes?.[2] ?? null },
   ] satisfies Regla[]
 })
+
+/** Importe de la regla para la fecha del servicio: lo anterior a VIGENCIA_REGLAS_NOV conserva la tarifa vieja */
+export function montoVigente(r: Regla, fecha: string | null): number {
+  return r.montoAnterior !== null && !reglasNuevas(fecha) ? r.montoAnterior : r.monto
+}
+
+/** Sufijo de producto de la regla (GEN, IMO, DES) */
+export function productoDe(r: Regla): TarifaAprobada['producto'] | null {
+  const suf = r.id.split('-').pop()
+  return suf === 'GEN' || suf === 'IMO' || suf === 'DES' ? suf : null
+}
+
+export const PRODUCTO_LABEL: Record<TarifaAprobada['producto'], string> = {
+  GEN: 'contenedor carga general',
+  IMO: 'contenedor IMO/IQBF',
+  DES: 'despacho carga suelta',
+}
 
 // ── Catálogo · hoja 02_RUTAS_Y_EXCEPCIONES ──────────────────────────────
 
@@ -106,7 +141,7 @@ function itk(id: string, fila: number, operacion: TipoServicioOdoo, monto: numbe
   return {
     id, zona: 'Zona 1', distrito: 'Callao', alias: [], operaciones: [operacion], modalidades: ['Isotanque'],
     cargas: TODAS, monto, fuente: `${EXCEL} · 02_RUTAS_Y_EXCEPCIONES fila ${fila}`,
-    estadoFuente: 'LITERAL HISTÓRICO · NO HOMOLOGADO', alcancePorConfirmar: null,
+    estadoFuente: 'LITERAL HISTÓRICO · NO HOMOLOGADO', alcancePorConfirmar: null, montoAnterior: null,
   }
 }
 
@@ -240,6 +275,16 @@ export interface PasoTraza {
   detalle: string
 }
 
+/** Tarifa de zona propuesta para un distrito sin importe propio, a validar por Administración */
+export interface PropuestaTarifa {
+  zona: string
+  distrito: string
+  producto: TarifaAprobada['producto']
+  monto: number
+  /** Reglas de la zona de donde sale el importe */
+  base: string[]
+}
+
 export interface ResultadoMotor {
   servicio: string
   origen: EntradaMotor['origen']
@@ -252,6 +297,8 @@ export interface ResultadoMotor {
   alertas: string[]
   candidatos: string[]
   traza: PasoTraza[]
+  /** Distrito nuevo: importe propuesto, aún sin validar */
+  propuesta: PropuestaTarifa | null
   /** Siempre false: no hay pagos, descuentos ni sincronización */
   efectoFinanciero: false
 }
@@ -333,6 +380,7 @@ class Corrida {
   traza: PasoTraza[] = []
   alertas: string[] = []
   candidatos: string[] = []
+  propuesta: PropuestaTarifa | null = null
   constructor(readonly e: EntradaMotor) {}
 
   paso(paso: PasoTraza['paso'], ok: boolean, detalle: string) {
@@ -364,12 +412,60 @@ class Corrida {
       estado: revision ? 'requiere_revision' : 'simulado',
       total: revision ? null : lineas.reduce((t, l) => t + l.monto!, 0),
       lineas, ruleIds: lineas.flatMap(l => l.ruleId ? [l.ruleId] : []),
-      motivos, alertas: this.alertas, candidatos: this.candidatos, traza: this.traza, efectoFinanciero: false,
+      motivos, alertas: this.alertas, candidatos: this.candidatos, traza: this.traza, propuesta: this.propuesta, efectoFinanciero: false,
     }
   }
 }
 
-export function simularTarifa(e: EntradaMotor): ResultadoMotor {
+/** ¿La regla cubre el producto del servicio? */
+function cubre(r: Regla, e: EntradaMotor): boolean {
+  return r.operaciones.includes(e.tipoServicio as TipoServicioOdoo)
+    && r.modalidades.includes(e.modalidad as ModalidadOdoo)
+    && r.cargas.includes(e.tipoCarga as CargaOdoo)
+}
+
+/** Clave de distrito para comparar aprobaciones (sin tildes ni mayúsculas) */
+export function claveAprobacion(zona: string, distrito: string, producto: string): string {
+  return `${normalizar(zona)}|${normalizar(distrito)}|${producto}`
+}
+
+/**
+ * Distrito sin importe propio en una zona ya configurada (desde VIGENCIA_REGLAS_NOV):
+ * se propone la tarifa de la zona; si Administración ya la validó, se reutiliza.
+ */
+function simularDistritoNuevo(c: Corrida, distrito: string, aprobadas: TarifaAprobada[]): ResultadoMotor {
+  const e = c.e
+  const deZona = REGLAS_ORDINARIAS.filter(r => r.zona === e.zona && cubre(r, e))
+  const producto = deZona.map(productoDe).find(Boolean) ?? null
+  const montos = Array.from(new Set(deZona.map(r => montoVigente(r, e.fecha))))
+  if (!producto || montos.length !== 1) {
+    const detalle = deZona.length === 0
+      ? `${e.zona} no tiene tarifa para ${e.tipoServicio} · ${e.modalidad} · ${e.tipoCarga}`
+      : `Los distritos de ${e.zona} no pagan lo mismo (${montos.map(m => `S/${m}`).join(', ')}): no se puede proponer una tarifa de zona`
+    c.paso('B', false, detalle)
+    return c.revision([`«${distrito}» no tiene importe propio en el tarifario. ${detalle}`])
+  }
+  const [monto] = montos
+  const id = `${e.zona!.replace('Zona ', 'Z')}-${claveDistrito(distrito)}-${producto}`
+  const aprobada = aprobadas.find(a => claveAprobacion(a.zona, a.distrito, a.producto) === claveAprobacion(e.zona!, distrito, producto))
+  if (!aprobada) {
+    c.propuesta = { zona: e.zona!, distrito, producto, monto, base: deZona.map(r => r.id) }
+    c.candidatos = deZona.map(r => r.id)
+    c.paso('B', false, `«${distrito}» sin importe propio: tarifa de ${e.zona} propuesta S/${monto} (${deZona.map(r => r.id).join(', ')}), pendiente de validar`)
+    return c.revision([`«${distrito}» es nuevo en ${e.zona}: se propone la tarifa de la zona (S/${monto}); Administración debe validarla antes de aplicarla`])
+  }
+  c.candidatos = [id]
+  c.paso('B', true, `«${distrito}» sin importe propio: tarifa validada por Administración S/${aprobada.monto}${aprobada.aprobadoPor ? ` (${aprobada.aprobadoPor})` : ''}`)
+  if (!e.principal.hito) {
+    c.paso('B', false, 'Tramo sin hito operativo marcado')
+    return c.revision(['Tramo del conductor sin hito operativo acreditado (el cierre administrativo no cuenta)'])
+  }
+  c.paso('B', true, `Tramo acreditado por ${e.principal.hito.codigo} ${e.principal.hito.momento}`)
+  c.alertas.push(`TARIFA DE ZONA VALIDADA POR ADMINISTRACIÓN${aprobada.aprobadoPor ? ` (${aprobada.aprobadoPor}, ${aprobada.aprobadoAt.slice(0, 10)})` : ''}. ${ALERTA_VIGENCIA}`)
+  return c.cerrar([c.linea('principal', e.principal, `Tarifa ${distrito} (zona)`, id, aprobada.monto, `Tarifa de ${e.zona} validada en Paybox · pruebas_tarifas_distrito`)])
+}
+
+export function simularTarifa(e: EntradaMotor, aprobadas: TarifaAprobada[] = []): ResultadoMotor {
   const c = new Corrida(e)
 
   // A · servicio, zona y cliente
@@ -417,6 +513,11 @@ export function simularTarifa(e: EntradaMotor): ResultadoMotor {
     return c.revision([`Destino «${e.destino.distrito}» no acreditado por Operaciones`])
   }
   const delDistrito = TARIFARIO.filter(r => coincideDistrito(r, e.destino!.distrito))
+  if (delDistrito.length === 0 && reglasNuevas(e.fecha)) {
+    c.paso('B', true, `Destino acreditado: ${e.destino.distrito} (${e.destino.fuente})`)
+    if (e.destino.alerta) c.alertas.push(e.destino.alerta)
+    return simularDistritoNuevo(c, e.destino.distrito, aprobadas)
+  }
   if (delDistrito.length === 0) {
     c.paso('B', false, `«${e.destino.distrito}» sin importe literal en el Excel`)
     return c.revision([`«${e.destino.distrito}» no tiene importe literal en el tarifario: no se extiende la tarifa de otro distrito de la zona`])
@@ -430,10 +531,7 @@ export function simularTarifa(e: EntradaMotor): ResultadoMotor {
   c.paso('B', true, `Destino acreditado: ${e.destino.distrito} (${e.destino.fuente})`)
   if (e.destino.alerta) c.alertas.push(e.destino.alerta)
 
-  const exactas = enZona.filter(r =>
-    r.operaciones.includes(e.tipoServicio as TipoServicioOdoo)
-    && r.modalidades.includes(e.modalidad as ModalidadOdoo)
-    && r.cargas.includes(e.tipoCarga as CargaOdoo))
+  const exactas = enZona.filter(r => cubre(r, e))
   if (exactas.length !== 1) {
     const detalle = exactas.length === 0
       ? `Ninguna regla de ${e.destino.distrito} cubre ${e.tipoServicio} · ${e.modalidad} · ${e.tipoCarga}`
@@ -455,9 +553,14 @@ export function simularTarifa(e: EntradaMotor): ResultadoMotor {
   }
   c.paso('B', true, `Tramo acreditado por ${e.principal.hito.codigo} ${e.principal.hito.momento}`)
 
-  c.alertas.push(`${regla.estadoFuente}. ${ALERTA_VIGENCIA}`)
+  const monto = montoVigente(regla, e.fecha)
+  if (regla.montoAnterior !== null && monto === regla.montoAnterior) {
+    c.alertas.push(`Servicio anterior al ${VIGENCIA_REGLAS_NOV.split('-').reverse().join('/')}: conserva la tarifa anterior S/${monto} (la unificada es S/${regla.monto})`)
+  } else {
+    c.alertas.push(`${regla.estadoFuente}. ${ALERTA_VIGENCIA}`)
+  }
   if (regla.alcancePorConfirmar) c.alertas.push(regla.alcancePorConfirmar)
-  return c.cerrar([c.linea('principal', e.principal, `Tarifa ${regla.distrito}`, regla.id, regla.monto, regla.fuente)])
+  return c.cerrar([c.linea('principal', e.principal, `Tarifa ${regla.distrito}`, regla.id, monto, regla.fuente)])
 }
 
 function simularRuta(c: Corrida, itinerario: string): ResultadoMotor {
@@ -602,16 +705,18 @@ export function entradaDesdeOdoo(s: ServicioPago, devoluciones: DevolucionPago[]
 
 // ── Casos de demostración (mock controlado, NO datos reales) ────────────
 
-const I08: HitoMarca = { codigo: 'I08', etiqueta: 'Fin descarga', momento: '2026-11-10 14:20' }
-const I12: HitoMarca = { codigo: 'I12', etiqueta: 'Contenedor vacío devuelto', momento: '2026-11-10 18:05' }
-const D10: HitoMarca = { codigo: 'D10', etiqueta: 'Fin descarga', momento: '2026-11-10 15:00' }
+/** Fecha de los casos mock: primer lunes con las reglas de VIGENCIA_REGLAS_NOV */
+const FECHA_MOCK = '2026-11-23'
+const I08: HitoMarca = { codigo: 'I08', etiqueta: 'Fin descarga', momento: `${FECHA_MOCK} 14:20` }
+const I12: HitoMarca = { codigo: 'I12', etiqueta: 'Contenedor vacío devuelto', momento: `${FECHA_MOCK} 18:05` }
+const D10: HitoMarca = { codigo: 'D10', etiqueta: 'Fin descarga', momento: `${FECHA_MOCK} 15:00` }
 
 const A = (hito: HitoMarca | null = I08): TramoEntrada => ({ conductorId: 101, conductor: 'Conductor A (mock)', hito })
 const B = (almacen: string | null, hito: HitoMarca | null = I12): TramoEntrada => ({ conductorId: 102, conductor: 'Conductor B (mock)', hito, almacen })
 
 const mock = (over: Partial<EntradaMotor> & Pick<EntradaMotor, 'servicio'>): EntradaMotor => ({
   taskId: null, clienteId: 9001, cliente: 'CLIENTE ORDINARIO (mock)', zona: 'Zona 4',
-  tipoServicio: 'Importación', modalidad: 'Contenedor 40', tipoCarga: 'General', fecha: '2026-11-10',
+  tipoServicio: 'Importación', modalidad: 'Contenedor 40', tipoCarga: 'General', fecha: FECHA_MOCK,
   principal: A(), retorno: null, destino: null, itinerario: null, origen: 'mock', ...over,
 })
 
@@ -683,7 +788,9 @@ const CASOS_BASE: CasoDemo[] = [
     entrada: mock({ servicio: 'S90003' }) },
   { grupo: 'control', etiqueta: 'Control', titulo: 'Tarea en Zona 1 con destino Lurín', esperado: 'REQUIERE REVISIÓN: zona y distrito no coinciden',
     entrada: mock({ servicio: 'S90031', zona: 'Zona 1', destino: acreditado('Lurín') }) },
-  { grupo: 'control', etiqueta: 'Control', titulo: 'Zona 7 · Pachacámac (sin tarifa propia)', esperado: 'REQUIERE REVISIÓN: Lurín no se extiende a toda la Zona 7',
+  { grupo: 'control', etiqueta: 'Control', titulo: 'Ate · servicio anterior a la unificación de la Zona 4', esperado: 'SIMULADO S/80: conserva la tarifa anterior',
+    entrada: mock({ servicio: 'S90004', fecha: '2026-11-13', destino: acreditado('Ate') }) },
+  { grupo: 'control', etiqueta: 'Control', titulo: 'Zona 7 · Pachacámac (distrito nuevo, sin tarifa propia)', esperado: 'REQUIERE REVISIÓN: propone S/100 de la Zona 7 hasta que Administración la valide',
     entrada: mock({ servicio: 'S90024', zona: 'Zona 7', destino: acreditado('Pachacamac') }) },
   { grupo: 'control', etiqueta: 'Control', titulo: 'Lurín · servicio de diciembre 2025', esperado: 'REQUIERE REVISIÓN: antes de la vigencia (enero 2026)',
     entrada: mock({ servicio: 'S90023', zona: 'Zona 7', fecha: '2025-12-15', destino: acreditado('Lurín') }) },

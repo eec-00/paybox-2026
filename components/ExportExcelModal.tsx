@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -125,7 +126,7 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
         setExporting(true)
         try {
             if (selectedCategories.length === 0) {
-                alert("Debe seleccionar al menos una categoría.")
+                toast.warning('Selecciona al menos una categoría para exportar')
                 setExporting(false)
                 return
             }
@@ -162,7 +163,7 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
             })
 
             if (registros.length === 0) {
-                alert("No hay registros para exportar con los filtros seleccionados.")
+                toast.info('No hay registros con esos filtros', { description: 'Amplía las fechas o quita filtros y vuelve a exportar.' })
                 setExporting(false)
                 return
             }
@@ -278,7 +279,7 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
 
         } catch (err: any) {
             console.error('Error exportando Excel:', err)
-            alert("Hubo un error al exportar: " + err.message)
+            toast.error('No se pudo exportar', { description: err.message })
         } finally {
             setExporting(false)
         }
@@ -411,15 +412,15 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
                                                 </div>
                                             </label>
 
-                                            <div className="mx-3 mt-2 mb-1 border rounded-lg bg-orange-50/50 border-orange-200/60 overflow-hidden">
-                                                <label className="flex items-start space-x-3 p-3 cursor-pointer hover:bg-orange-50 transition-colors">
-                                                    <Checkbox id="chk-images" checked={includeImages} onCheckedChange={(c) => setIncludeImages(!!c)} className="mt-0.5 border-orange-400 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500 text-white" />
+                                            <div className="mx-3 mt-2 mb-1 border rounded-lg bg-warning-soft/50 border-orange-200/60 overflow-hidden">
+                                                <label className="flex items-start space-x-3 p-3 cursor-pointer hover:bg-warning-soft transition-colors">
+                                                    <Checkbox id="chk-images" checked={includeImages} onCheckedChange={(c) => setIncludeImages(!!c)} className="mt-0.5 border-orange-400 data-[state=checked]:bg-warning data-[state=checked]:border-warning text-white" />
                                                     <div className="space-y-1.5">
-                                                        <span className="text-sm font-semibold text-orange-900 flex items-center gap-1.5">
+                                                        <span className="text-sm font-semibold text-warning-ink flex items-center gap-1.5">
                                                             <ImageIcon className="h-3.5 w-3.5" />
                                                             Incluir comprobantes / URLs de imágenes
                                                         </span>
-                                                        <p className="text-xs text-orange-700/90 leading-relaxed max-w-[95%]">
+                                                        <p className="text-xs text-warning-ink/90 leading-relaxed max-w-[95%]">
                                                             Precaución: Seleccionar esta opción puede hacer que el archivo resultante sea considerablemente más pesado si estás exportando muchos registros.
                                                         </p>
                                                     </div>
@@ -479,13 +480,13 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
                                         <div className="flex items-center space-x-1 bg-white rounded-md border border-border/50 p-0.5 shadow-sm">
                                             <button
                                                 onClick={() => handleSelectAllCategories(true)}
-                                                className={`text-[10px] font-medium px-2 py-1 rounded transition-colors ${selectedCategories.length === categories.length && categories.length > 0 ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-muted-foreground'}`}
+                                                className={`text-2xs font-medium px-2 py-1 rounded transition-colors ${selectedCategories.length === categories.length && categories.length > 0 ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-muted-foreground'}`}
                                             >
                                                 Todas
                                             </button>
                                             <button
                                                 onClick={() => handleSelectAllCategories(false)}
-                                                className={`text-[10px] font-medium px-2 py-1 rounded transition-colors ${selectedCategories.length === 0 ? 'bg-muted text-foreground' : 'hover:bg-muted text-muted-foreground'}`}
+                                                className={`text-2xs font-medium px-2 py-1 rounded transition-colors ${selectedCategories.length === 0 ? 'bg-muted text-foreground' : 'hover:bg-muted text-muted-foreground'}`}
                                             >
                                                 Ninguna
                                             </button>

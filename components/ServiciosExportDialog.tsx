@@ -368,7 +368,7 @@ export function ServiciosExportDialog({ open, onOpenChange, tasks, stages, progr
             </div>
             {(Object.keys(SECTION_LABELS) as (keyof typeof SECTION_LABELS)[]).map((section) => (
               <div key={section} className="space-y-1.5">
-                <p className="text-[11px] font-medium text-foreground/70">{SECTION_LABELS[section]}</p>
+                <p className="text-xs font-medium text-foreground/70">{SECTION_LABELS[section]}</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-1.5">
                   {GENERAL_COLUMNS.filter((c) => c.section === section).map((c) => (
                     <label key={c.key} className="flex items-center gap-2 text-xs cursor-pointer">

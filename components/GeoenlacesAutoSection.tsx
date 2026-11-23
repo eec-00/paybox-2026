@@ -73,9 +73,9 @@ export function GeoenlacesAutoSection() {
             >
               <span className="flex items-center gap-2">
                 {resultado.success ? (
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <CheckCircle2 className="h-4 w-4 text-success-ink" />
                 ) : (
-                  <XCircle className="h-4 w-4 text-red-600" />
+                  <XCircle className="h-4 w-4 text-destructive-ink" />
                 )}
                 {resultado.success ? 'Última ejecución' : `Error: ${resultado.error}`}
                 {lastRun && <span className="text-xs font-normal text-muted-foreground">({lastRun.toLocaleTimeString('es-PE')})</span>}
@@ -86,17 +86,17 @@ export function GeoenlacesAutoSection() {
             {expanded && (
               <div className="px-3 pb-3 space-y-3 text-sm">
                 <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700">
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-success-soft text-success-ink">
                     <CheckCircle2 className="h-3 w-3" /> {resultado.creados.length} creados
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700">
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-info-soft text-info-ink">
                     <CheckCircle2 className="h-3 w-3" /> {resultado.cerrados.length} cerrados
                   </span>
-                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800">
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-warning-soft text-warning-ink">
                     <MinusCircle className="h-3 w-3" /> {resultado.omitidos.length} omitidos
                   </span>
                   {resultado.errores.length > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700">
+                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-destructive-soft text-destructive-ink">
                       <XCircle className="h-3 w-3" /> {resultado.errores.length} errores
                     </span>
                   )}
@@ -105,7 +105,7 @@ export function GeoenlacesAutoSection() {
                 {(['creados', 'cerrados', 'omitidos', 'errores'] as const).map((grupo) =>
                   resultado[grupo].length > 0 ? (
                     <div key={grupo}>
-                      <p className={cn('text-xs font-semibold uppercase mb-1', grupo === 'errores' ? 'text-red-700' : 'text-muted-foreground')}>
+                      <p className={cn('text-xs font-semibold uppercase mb-1', grupo === 'errores' ? 'text-destructive-ink' : 'text-muted-foreground')}>
                         {grupo}
                       </p>
                       <ul className="text-xs space-y-0.5 text-muted-foreground list-disc list-inside">

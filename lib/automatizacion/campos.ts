@@ -135,12 +135,41 @@ export function getDaysUntil(dateStr: string | false | null): number | null {
   return Math.floor((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
+/**
+ * Días hasta la fecha contados en hora de Lima, para mostrar en pantalla.
+ * getDaysUntil (arriba) lo usa el servidor para las alertas y no se toca: en
+ * el navegador una fecha «YYYY-MM-DD» se leía como medianoche UTC, que en Lima
+ * es el día anterior, y «Hoy» salía como «Vencido (1d)».
+ */
+export function diasHastaLima(dateStr: string | false | null): number | null {
+  if (!dateStr || dateStr === 'false') return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateStr))
+  if (!m) return getDaysUntil(dateStr)
+  const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+  const [hy, hm, hd] = hoy.split('-').map(Number)
+  return Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(hy, hm - 1, hd)) / 86_400_000)
+}
+
+/**
+ * Escala única de vencimientos para toda la app. El verde queda solo para
+ * «está bien»; lo que vence pronto es ámbar, lo vencido es rojo.
+ *  - critico: desde hoy hasta `critico` días (por defecto 30)
+ *  - alerta: hasta `alerta` días (por defecto 90)
+ *  - ok: más allá (verde solo si `okVerde`, si no gris)
+ */
+export function tonoVencimiento(
+  days: number | null,
+  { critico = 30, alerta = 90, okVerde = true }: { critico?: number; alerta?: number; okVerde?: boolean } = {},
+): string {
+  if (days === null) return 'text-muted-foreground'
+  if (days < 0) return 'bg-destructive-soft text-destructive-ink font-semibold'
+  if (days <= critico) return 'bg-warning-soft text-warning-ink font-semibold'
+  if (days <= alerta) return 'bg-warning-soft/50 text-warning-ink'
+  return okVerde ? 'bg-success-soft text-success-ink' : 'text-muted-foreground'
+}
+
 export function getStatusColor(days: number | null): string {
-  if (days === null) return 'bg-muted/30 text-muted-foreground'
-  if (days < 0) return 'bg-red-100 text-red-800 font-semibold'
-  if (days <= 30) return 'bg-orange-100 text-orange-800 font-semibold'
-  if (days <= 90) return 'bg-yellow-100 text-yellow-800'
-  return 'bg-green-100 text-green-700'
+  return days === null ? 'bg-muted/30 text-muted-foreground' : tonoVencimiento(days)
 }
 
 export function getStatusLabel(days: number | null): string {

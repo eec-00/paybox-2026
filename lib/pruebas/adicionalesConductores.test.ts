@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { calcularAdicionales, integralidad, totalAdicionales, type Adicional } from './adicionalesConductores'
+import { VIGENCIA_REGLAS_NOV } from './pagosConductores'
 import type { AsistenciaPago, DevolucionPago, GastoPago, ServicioPago } from './pagosConductores'
 
 const H = (h: number, m = 0) => h * 60 + m
 
-const IMPORT_KEYS = ['inicio_ruta', 'ingreso_cliente', 'inicio_descarga', 'fin_descarga', 'salida_cliente',
+const IMPORT_KEYS = ['inicio_ruta', 'salida_almacen_retiro', 'ingreso_cliente', 'inicio_descarga', 'fin_descarga', 'salida_cliente',
   'llegada_devolucion', 'ingreso_devolucion', 'contenedor_devuelto', 'servicio_finalizado']
 const DESPACHO_KEYS = ['inicio_ruta', 'salida_origen', 'llegada_destino', 'ingreso_destino', 'fin_descarga', 'salida_destino', 'servicio_finalizado']
 
@@ -169,6 +170,8 @@ describe('06 · TDC fuera de Crosland', () => {
   it('B devuelve en DPW o APM → S/30', () => {
     expect(devB('DPW', H(16))).toMatchObject({ estado: 'simulado', monto: 30 })
     expect(devB('APMT CALLAO', H(16))).toMatchObject({ estado: 'simulado', monto: 30 })
+    expect(devB('APM TERMINALS CALLAO', H(16))).toMatchObject({ estado: 'simulado', monto: 30 })
+    expect(devB('DP World Callao', H(16))).toMatchObject({ estado: 'simulado', monto: 30 })
   })
 
   it('B devuelve en cualquier otro almacén → S/20', () => {
@@ -306,5 +309,117 @@ describe('total', () => {
     const lista = calc([servicio({ cliente: 'CROSLAND', clienteId: 308, horas: completo({ fin_descarga: H(24, 30), contenedor_devuelto: null }) })])
     expect(lista.every(a => a.monto === null || a.monto > 0)).toBe(true)
     expect(totalAdicionales(lista)).toBe(lista.filter(a => a.estado === 'simulado').reduce((t, a) => t + a.monto!, 0))
+  })
+})
+
+// ── Reglas desde la vigencia de noviembre (respuesta de Margiory) ───────
+
+describe('Reglas nuevas (desde VIGENCIA_REGLAS_NOV)', () => {
+  const NUEVA = '2026-11-23'
+  const nuevo = (horas: Record<string, number | null>, over: Partial<ServicioPago> = {}) =>
+    servicio({ fecha: NUEVA, horas: completo(horas), ...over })
+
+  it('la vigencia es posterior a los casos con reglas viejas', () => {
+    expect(VIGENCIA_REGLAS_NOV > '2026-11-10').toBe(true)
+    expect(NUEVA >= VIGENCIA_REGLAS_NOV).toBe(true)
+  })
+
+  describe('01 · Cena por devolución efectiva (I12 desde las 19:00)', () => {
+    it('I08 tarde ya no basta: decide I12', () => {
+      expect(de(calc([nuevo({ fin_descarga: H(19, 30), contenedor_devuelto: H(18, 50) })]), 'cena')).toHaveLength(0)
+    })
+
+    it('I12 a las 19:00 en punto → S/20', () => {
+      const [c] = de(calc([nuevo({ contenedor_devuelto: H(19) })]), 'cena')
+      expect(c).toMatchObject({ estado: 'simulado', monto: 20, hitos: ['I12'] })
+    })
+
+    it('sin I12 pero llegó al depósito después de las 19:00 → revisión', () => {
+      const [c] = de(calc([nuevo({ llegada_devolucion: H(19, 30), ingreso_devolucion: null, contenedor_devuelto: null })]), 'cena')
+      expect(c).toMatchObject({ estado: 'requiere_revision', monto: null })
+    })
+
+    describe('devolución por otro conductor (Margiory, 18/11)', () => {
+      const padre = nuevo({ fin_descarga: H(19, 30), contenedor_devuelto: null }, { devolucionOtroConductor: true })
+      const d: DevolucionPago = {
+        id: 97, name: 'Dev', etapa: 'Servicio Finalizado', conductorId: 2, conductor: 'B', almacen: 'NEPTUNIA', fecha: NUEVA,
+        padreId: padre.id, padreName: padre.name, padreConductorId: 1, padreConductor: 'A', devueltoMin: H(20),
+      }
+      const deB = (propios: ServicioPago[]) => calcularAdicionales({
+        servicios: propios, devoluciones: [d], todos: [padre, ...propios], conductorId: 2, asistencias: [], gastos: [],
+      })
+
+      it('A no cobra cena aunque descargue tarde', () => {
+        expect(de(calc([padre], { devoluciones: [d] }), 'cena')).toHaveLength(0)
+      })
+
+      it('B trabajó ese día en otro servicio → cena S/20 + TDC', () => {
+        const b = deB([nuevo({}, { conductorId: 2, conductor: 'B' })])
+        expect(de(b, 'cena')[0]).toMatchObject({ estado: 'simulado', monto: 20 })
+        expect(de(b, 'tdc')[0]).toMatchObject({ estado: 'simulado', monto: 20 })
+      })
+
+      it('B solo hizo la devolución ese día → revisión', () => {
+        expect(de(deB([]), 'cena')[0]).toMatchObject({ estado: 'requiere_revision', monto: null })
+      })
+
+      it('B ya tiene cena por su propio servicio → una sola cena', () => {
+        const b = deB([nuevo({ contenedor_devuelto: H(19, 30) }, { conductorId: 2, conductor: 'B' })])
+        expect(de(b, 'cena').map(c => c.estado)).toEqual(['simulado', 'requiere_revision'])
+      })
+
+      it('B devuelve antes de las 19:00 → no hay cena', () => {
+        const b = calcularAdicionales({
+          servicios: [], devoluciones: [{ ...d, devueltoMin: H(18) }], todos: [padre], conductorId: 2, asistencias: [], gastos: [],
+        })
+        expect(de(b, 'cena')).toHaveLength(0)
+      })
+    })
+
+    it('despacho: D10 desde las 19:00', () => {
+      const [c] = de(calc([servicio({ fecha: NUEVA, flujo: 'despacho', horas: { fin_descarga: H(19) } })]), 'cena')
+      expect(c).toMatchObject({ estado: 'simulado', hitos: ['D10'] })
+    })
+  })
+
+  describe('02 · Cena extraordinaria ADHT (retiro < 06:00, devolución tardía)', () => {
+    it('retiro 05:30 y devolución 19:40 → S/30 que reemplaza la cena (cualquier cliente)', () => {
+      const lista = calc([nuevo({ salida_almacen_retiro: H(5, 30), contenedor_devuelto: H(19, 40) })])
+      expect(lista.filter(a => a.estado === 'simulado').map(a => [a.concepto, a.monto])).toEqual([['adht', 30]])
+    })
+
+    it('ya no depende de la cita de devolución', () => {
+      const [a] = de(calc([nuevo({ salida_almacen_retiro: H(5), contenedor_devuelto: H(20) }, { citaDevolucion: H(10) })]), 'adht')
+      expect(a).toMatchObject({ estado: 'simulado', monto: 30, hitos: ['I04', 'I12'] })
+    })
+
+    it('retiro a las 06:00 o después → solo cena', () => {
+      const lista = calc([nuevo({ salida_almacen_retiro: H(6), contenedor_devuelto: H(20) })])
+      expect(de(lista, 'adht')).toHaveLength(0)
+      expect(de(lista, 'cena')[0]).toMatchObject({ estado: 'simulado', monto: 20 })
+    })
+
+    it('opción A: retiro 05:00 y devolución 17:00 en punto → S/30, sin cena', () => {
+      const lista = calc([nuevo({ salida_almacen_retiro: H(5), contenedor_devuelto: H(17) })])
+      expect(lista.filter(a => a.estado === 'simulado').map(a => [a.concepto, a.monto])).toEqual([['adht', 30]])
+    })
+
+    it('devolución 16:59 → no hay ADHT', () => {
+      expect(de(calc([nuevo({ salida_almacen_retiro: H(5), contenedor_devuelto: H(16, 59) })]), 'adht')).toHaveLength(0)
+    })
+
+    it('devolución tardía sin I04 → revisión', () => {
+      const [a] = de(calc([nuevo({ salida_almacen_retiro: null, contenedor_devuelto: H(20) })]), 'adht')
+      expect(a).toMatchObject({ estado: 'requiere_revision' })
+    })
+
+    it('devolución antes de las 17:00 → no hay ADHT', () => {
+      expect(de(calc([nuevo({ salida_almacen_retiro: H(5) })]), 'adht')).toHaveLength(0)
+    })
+
+    it('devolución por otro conductor → no hay ADHT', () => {
+      const s = nuevo({ salida_almacen_retiro: H(5), contenedor_devuelto: H(20) }, { devolucionOtroConductor: true })
+      expect(de(calc([s]), 'adht')).toHaveLength(0)
+    })
   })
 })

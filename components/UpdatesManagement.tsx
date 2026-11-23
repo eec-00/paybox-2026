@@ -1,5 +1,7 @@
 'use client'
 
+import { useConfirm } from '@/components/ui/confirm'
+import { toast } from 'sonner'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -126,8 +128,9 @@ export function UpdatesManagement() {
     }
   }
 
+  const confirmar = useConfirm()
   const handleDelete = async (updateId: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta actualización?')) return
+    if (!(await confirmar({ title: '¿Eliminar esta actualización?', description: 'Los usuarios dejarán de verla en el módulo de Actualizaciones. No se puede deshacer.', destructive: true }))) return
 
     try {
       const { error: deleteError } = await supabase
@@ -140,7 +143,7 @@ export function UpdatesManagement() {
       await loadUpdates()
     } catch (err) {
       console.error('Error deleting update:', err)
-      alert(`Error al eliminar: ${err instanceof Error ? err.message : 'Error desconocido'}`)
+      toast.error('No se pudo eliminar la actualización', { description: err instanceof Error ? err.message : undefined })
     }
   }
 
@@ -196,9 +199,9 @@ export function UpdatesManagement() {
   if (error) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
-          <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-          <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+        <div className="flex items-center gap-2 p-4 bg-destructive-soft dark:bg-red-950 border border-destructive/30 dark:border-red-800 rounded-lg">
+          <AlertCircle className="h-5 w-5 text-destructive-ink dark:text-red-400" />
+          <p className="text-sm text-destructive-ink dark:text-red-200">{error}</p>
         </div>
         <Button onClick={loadUpdates}>
           Reintentar
@@ -250,14 +253,14 @@ export function UpdatesManagement() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
+                        <Button aria-label="Editar actualización"
                           variant="outline"
                           size="sm"
                           onClick={() => handleOpenDialog(update)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button
+                        <Button aria-label="Eliminar actualización"
                           variant="destructive"
                           size="sm"
                           onClick={() => handleDelete(update.id)}
@@ -345,9 +348,9 @@ export function UpdatesManagement() {
             </div>
 
             {saveError && (
-              <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
-                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <p className="text-sm text-red-800 dark:text-red-200">{saveError}</p>
+              <div className="flex items-center gap-2 p-3 bg-destructive-soft dark:bg-red-950 border border-destructive/30 dark:border-red-800 rounded-lg">
+                <AlertCircle className="h-4 w-4 text-destructive-ink dark:text-red-400" />
+                <p className="text-sm text-destructive-ink dark:text-red-200">{saveError}</p>
               </div>
             )}
 

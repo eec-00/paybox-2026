@@ -1,12 +1,16 @@
 'use client'
 
+import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/confirm'
 import { Fragment, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, ShieldAlert } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, Loader2, Info, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
-  CASOS_DEMO, GRUPOS_CASO, VERSION_TARIFARIO, entradaDesdeOdoo, simularTarifa, type ResultadoMotor,
+  CASOS_DEMO, GRUPOS_CASO, PRODUCTO_LABEL, VERSION_TARIFARIO, entradaDesdeOdoo, simularTarifa,
+  type PropuestaTarifa, type ResultadoMotor,
 } from '@/lib/pruebas/motorZonas'
-import type { DevolucionPago, ServicioPago } from '@/lib/pruebas/pagosConductores'
+import type { DevolucionPago, ServicioPago, TarifaAprobada } from '@/lib/pruebas/pagosConductores'
 
 function soles(n: number): string {
   return `S/ ${n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -14,9 +18,9 @@ function soles(n: number): string {
 
 function EstadoBadge({ r }: { r: ResultadoMotor }) {
   if (r.estado === 'requiere_revision') {
-    return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-red-800">Requiere revisión</span>
+    return <span className="rounded-full bg-destructive-soft px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-destructive-ink">Requiere revisión</span>
   }
-  return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Simulado</span>
+  return <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-warning-ink">Simulado</span>
 }
 
 interface Fila {
@@ -29,7 +33,37 @@ interface Fila {
   r: ResultadoMotor
 }
 
-function TablaResultados({ filas }: { filas: Fila[] }) {
+/** Distrito nuevo: tarifa de zona propuesta, con botón para validarla (solo servicios reales) */
+function PropuestaBox({ p, onAprobar }: { p: PropuestaTarifa; onAprobar?: (p: PropuestaTarifa) => Promise<void> }) {
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const aprobar = async () => {
+    if (!onAprobar) return
+    setEnviando(true)
+    setError(null)
+    try { await onAprobar(p) } catch (e) { setError(e instanceof Error ? e.message : String(e)) } finally { setEnviando(false) }
+  }
+  return (
+    <div className="rounded border border-warning/40 bg-warning-soft px-3 py-2 text-warning-ink">
+      <p>
+        <span className="font-semibold">Tarifa de zona propuesta:</span> {soles(p.monto)} para «{p.distrito}» ({p.zona} ·{' '}
+        {PRODUCTO_LABEL[p.producto]}), igual que {p.base.join(', ')}. Una vez validada se usa para los siguientes servicios
+        de ese distrito con el mismo tipo de servicio.
+      </p>
+      {onAprobar && (
+        <div className="mt-1.5 flex items-center gap-2">
+          <Button size="sm" className="h-7 gap-1.5" onClick={e => { e.stopPropagation(); aprobar() }} disabled={enviando}>
+            {enviando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+            Validar {soles(p.monto)}
+          </Button>
+          {error && <span className="text-destructive-ink">{error}</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TablaResultados({ filas, onAprobar }: { filas: Fila[]; onAprobar?: (p: PropuestaTarifa) => Promise<void> }) {
   const [abiertos, setAbiertos] = useState<string[]>([])
   const toggle = (k: string) => setAbiertos(p => p.includes(k) ? p.filter(x => x !== k) : [...p, k])
 
@@ -51,19 +85,19 @@ function TablaResultados({ filas }: { filas: Fila[] }) {
           const abierto = abiertos.includes(key)
           return (
             <Fragment key={key}>
-              <TableRow className="cursor-pointer" onClick={() => toggle(key)}>
+              <TableRow className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" tabIndex={0} aria-expanded={abierto} onClick={() => toggle(key)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(key) } }}>
                 <TableCell>
                   {abierto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </TableCell>
                 <TableCell className="font-medium whitespace-nowrap">
-                  {prueba && <span className="mr-1 rounded bg-primary px-1.5 py-0.5 text-[11px] font-bold text-primary-foreground" title="Prueba obligatoria de la ficha de ejecución">{prueba}</span>}
-                  {etiqueta && <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-[11px] font-bold">{etiqueta}</span>}
+                  {prueba && <span className="mr-1 rounded bg-primary px-1.5 py-0.5 text-xs font-bold text-primary-foreground" title="Prueba obligatoria de la ficha de ejecución">{prueba}</span>}
+                  {etiqueta && <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-bold">{etiqueta}</span>}
                   {r.servicio}
-                  {r.origen === 'mock' && <span className="ml-1.5 text-[11px] text-muted-foreground">(mock)</span>}
+                  {r.origen === 'mock' && <span className="ml-1.5 text-xs text-muted-foreground">(mock)</span>}
                 </TableCell>
                 <TableCell className="text-sm whitespace-normal min-w-[220px]">
                   {titulo}
-                  {esperado && <p className="text-[11px] text-muted-foreground">Esperado: {esperado}</p>}
+                  {esperado && <p className="text-xs text-muted-foreground">Esperado: {esperado}</p>}
                 </TableCell>
                 <TableCell><EstadoBadge r={r} /></TableCell>
                 <TableCell className="text-right tabular-nums whitespace-nowrap">
@@ -72,9 +106,9 @@ function TablaResultados({ filas }: { filas: Fila[] }) {
                 <TableCell className="text-xs whitespace-nowrap">{r.ruleIds.length ? r.ruleIds.join(' + ') : '—'}</TableCell>
                 <TableCell className="text-xs whitespace-normal min-w-[260px] max-w-[420px]">
                   {r.motivos.length > 0
-                    ? <span className="text-red-800">{r.motivos[0]}</span>
+                    ? <span className="text-destructive-ink">{r.motivos[0]}</span>
                     : r.alertas.length > 0
-                      ? <span className="text-amber-800">{r.alertas[0]}{r.alertas.length > 1 && ` (+${r.alertas.length - 1} alertas)`}</span>
+                      ? <span className="text-warning-ink">{r.alertas[0]}{r.alertas.length > 1 && ` (+${r.alertas.length - 1} alertas)`}</span>
                       : '—'}
                 </TableCell>
               </TableRow>
@@ -99,6 +133,7 @@ function TablaResultados({ filas }: { filas: Fila[] }) {
                         ))}
                       </ul>
                     </div>
+                    {r.propuesta && <PropuestaBox p={r.propuesta} onAprobar={onAprobar} />}
                     {r.candidatos.length > 0 && <p><span className="font-semibold">Reglas candidatas:</span> {r.candidatos.join(', ')}</p>}
                     {r.motivos.length > 0 && <p><span className="font-semibold">Requiere revisión porque:</span> {r.motivos.join(' · ')}</p>}
                     {r.alertas.length > 0 && <p><span className="font-semibold">Alertas:</span> {r.alertas.join(' · ')}</p>}
@@ -106,7 +141,7 @@ function TablaResultados({ filas }: { filas: Fila[] }) {
                       <p className="font-semibold mb-1">Traza del motor (ficha §3, pasos A–D)</p>
                       <ol className="space-y-0.5">
                         {r.traza.map((t, i) => (
-                          <li key={i} className={t.ok ? '' : 'text-red-700'}>
+                          <li key={i} className={t.ok ? '' : 'text-destructive-ink'}>
                             <span className="font-mono">{t.paso}</span> {t.ok ? '✓' : '✗'} {t.detalle}
                           </li>
                         ))}
@@ -123,9 +158,46 @@ function TablaResultados({ filas }: { filas: Fila[] }) {
   )
 }
 
-export function MotorZonasPanel({ servicios, devoluciones }: { servicios: ServicioPago[]; devoluciones: DevolucionPago[] }) {
+interface PanelProps {
+  servicios: ServicioPago[]
+  devoluciones: DevolucionPago[]
+  /** Tarifas de distritos nuevos ya validadas (tabla pruebas_tarifas_distrito) */
+  aprobadas: TarifaAprobada[]
+  onAprobadas: (t: TarifaAprobada[]) => void
+}
+
+export function MotorZonasPanel({ servicios, devoluciones, aprobadas, onAprobadas }: PanelProps) {
   const [abierto, setAbierto] = useState(true)
   const [verSemana, setVerSemana] = useState(false)
+  const [errorQuitar, setErrorQuitar] = useState<string | null>(null)
+
+  const confirmar = useConfirm()
+  const aprobar = async (p: PropuestaTarifa) => {
+    const ok = await confirmar({
+      title: `¿Validar ${soles(p.monto)} para ${p.distrito}?`,
+      description: `${p.zona} · ${PRODUCTO_LABEL[p.producto]}. Desde ahora se usará esta tarifa en los próximos servicios de ese distrito con el mismo tipo de servicio.`,
+      confirmText: `Validar ${soles(p.monto)}`,
+    })
+    if (!ok) return
+    const res = await fetch('/api/pruebas/tarifas-distrito', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ zona: p.zona, distrito: p.distrito, producto: p.producto }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || 'No se pudo validar la tarifa')
+    const t = data.tarifa as TarifaAprobada
+    onAprobadas([...aprobadas.filter(a => a.id !== t.id), t])
+    toast.success(`Tarifa validada: ${t.distrito} · ${soles(t.monto)}`)
+  }
+
+  const quitar = async (t: TarifaAprobada) => {
+    if (!(await confirmar({ title: `¿Quitar la tarifa validada de ${t.distrito}?`, description: `${t.zona} · ${PRODUCTO_LABEL[t.producto]} · ${soles(t.monto)}. Sus servicios vuelven a quedar en «Requiere revisión».`, confirmText: 'Quitar tarifa', destructive: true }))) return
+    setErrorQuitar(null)
+    const res = await fetch(`/api/pruebas/tarifas-distrito?id=${t.id}`, { method: 'DELETE' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) { setErrorQuitar(data.error || 'No se pudo quitar la tarifa'); return }
+    onAprobadas(aprobadas.filter(a => a.id !== t.id))
+  }
 
   const demo = useMemo(() => (Object.keys(GRUPOS_CASO) as (keyof typeof GRUPOS_CASO)[]).map(grupo => ({
     grupo,
@@ -137,10 +209,10 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
   const reales: Fila[] = useMemo(() => servicios.map(s => {
     const a = s.atributos
     return {
-      key: `odoo-${s.id}`, etiqueta: null, esperado: null, r: simularTarifa(entradaDesdeOdoo(s, devoluciones)),
+      key: `odoo-${s.id}`, etiqueta: null, esperado: null, r: simularTarifa(entradaDesdeOdoo(s, devoluciones), aprobadas),
       titulo: `${s.cliente ?? 'Sin cliente'} · ${[a.zona, a.tipoServicio, a.modalidad, a.tipoCarga].filter(Boolean).join(' · ') || 'sin variante'}`,
     }
-  }), [servicios, devoluciones])
+  }), [servicios, devoluciones, aprobadas])
 
   const simulados = reales.filter(f => f.r.estado === 'simulado').length
 
@@ -154,12 +226,12 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
       >
         <ChevronDown className={`h-4 w-4 transition-transform ${abierto ? '' : '-rotate-90'}`} />
         Motor de tarifas · casos de prueba
-        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">Simulación</span>
+        <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-warning-ink">Simulación</span>
       </button>
       {abierto && (
         <div className="border-t border-primary/20 space-y-3 pb-3">
-          <div className="mx-4 mt-3 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
-            <ShieldAlert className="h-4 w-4 shrink-0" />
+          <div className="mx-4 mt-3 flex items-start gap-2.5 rounded-lg border border-info/30 bg-info-soft px-3 py-2 text-xs text-info-ink">
+            <Info className="h-4 w-4 shrink-0" />
             <p>
               <strong>No es monto de pago.</strong> Importes históricos del {VERSION_TARIFARIO}, vigentes desde enero 2026
               según Margiory; se simulan hasta el cierre del piloto (Rosario contrasta liquidaciones). No paga, no descuenta
@@ -176,6 +248,30 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
               <TablaResultados filas={filas} />
             </div>
           ))}
+
+          <div className="px-4 text-xs">
+            <p className="pb-1 font-semibold uppercase tracking-wider text-muted-foreground">
+              Distritos nuevos con tarifa de zona validada ({aprobadas.length})
+            </p>
+            {aprobadas.length === 0
+              ? <p className="text-muted-foreground">Ninguno todavía. Cuando un servicio real llega a un distrito sin tarifa propia, su detalle muestra la tarifa de la zona para validarla.</p>
+              : (
+                <ul className="space-y-1">
+                  {[...aprobadas].sort((a, b) => a.zona.localeCompare(b.zona) || a.distrito.localeCompare(b.distrito)).map(t => (
+                    <li key={t.id} className="flex flex-wrap items-center gap-2 rounded border border-border/50 bg-background/60 px-2 py-1">
+                      <span className="font-medium">{t.distrito}</span>
+                      <span className="text-muted-foreground">{t.zona} · {PRODUCTO_LABEL[t.producto]}</span>
+                      <span className="font-semibold">{soles(t.monto)}</span>
+                      <span className="text-muted-foreground">validada por {t.aprobadoPor ?? '—'} el {t.aprobadoAt.slice(0, 10).split('-').reverse().join('/')}</span>
+                      <button type="button" onClick={() => quitar(t)} className="ml-auto text-muted-foreground hover:text-destructive-ink" aria-label={`Quitar tarifa de ${t.distrito}`}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            {errorQuitar && <p className="mt-1 text-destructive-ink">{errorQuitar}</p>}
+          </div>
 
           <div className="overflow-x-auto">
             <button
@@ -196,7 +292,7 @@ export function MotorZonasPanel({ servicios, devoluciones }: { servicios: Servic
                   (I08/I09, I12, D10/D11), nunca con el cierre administrativo.
                 </p>
                 {reales.length > 0
-                  ? <TablaResultados filas={reales} />
+                  ? <TablaResultados filas={reales} onAprobar={aprobar} />
                   : <p className="px-4 py-4 text-sm text-muted-foreground">Sin servicios en la semana.</p>}
               </>
             )}

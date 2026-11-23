@@ -1,5 +1,9 @@
 'use client'
 
+import { useApp } from '@/lib/context/app-context'
+import { useConfirm } from '@/components/ui/confirm'
+import { formatMoney } from '@/lib/format'
+import { PageHeader } from '@/components/ui/page-header'
 import { useCallback, useMemo, useRef, useState } from 'react'
 // Solo tipos: la librería (~900 KB) se carga recién al exportar
 import type ExcelJS from 'exceljs'
@@ -17,6 +21,7 @@ import {
   FileWarning,
   Loader2,
   Trash2,
+  Scale,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -42,7 +47,7 @@ function normSearch(v: unknown): string {
 }
 
 function fmtMoney(n: number): string {
-  return n.toFixed(2)
+  return formatMoney(n, 'soles')
 }
 
 async function readWorkbookRows(file: File): Promise<SheetRow[]> {
@@ -68,7 +73,16 @@ function Dropzone({ label, title, hint, fileName, onFile }: DropzoneProps) {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`${title}: ${fileName ? `cargado ${fileName}. Cambiar archivo` : 'elegir archivo Excel'}`}
       onClick={() => inputRef.current?.click()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          inputRef.current?.click()
+        }
+      }}
       onDragOver={(e) => {
         e.preventDefault()
         setDragOver(true)
@@ -80,7 +94,7 @@ function Dropzone({ label, title, hint, fileName, onFile }: DropzoneProps) {
         if (e.dataTransfer.files?.[0]) onFile(e.dataTransfer.files[0])
       }}
       className={cn(
-        'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
+        'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         fileName ? 'border-secondary bg-secondary/10' : 'border-input hover:border-secondary hover:bg-secondary/5',
         dragOver && 'border-secondary bg-secondary/10'
       )}
@@ -94,7 +108,7 @@ function Dropzone({ label, title, hint, fileName, onFile }: DropzoneProps) {
           if (e.target.files?.[0]) onFile(e.target.files[0])
         }}
       />
-      <span className="inline-block text-[11px] uppercase tracking-wide font-semibold text-secondary-foreground bg-secondary/20 px-2 py-0.5 rounded-full mb-2">
+      <span className="inline-block text-xs uppercase tracking-wide font-semibold text-secondary-foreground bg-secondary/20 px-2 py-0.5 rounded-full mb-2">
         {label}
       </span>
       <div className="flex items-center justify-center gap-2">
@@ -119,9 +133,10 @@ function Stat({ value, label, tone }: StatProps) {
       <CardContent className="px-4">
         <div
           className={cn(
-            'text-2xl font-bold leading-none',
-            tone === 'ok' && 'text-primary',
-            tone === 'bad' && 'text-destructive'
+            'text-2xl font-bold leading-none tabular-nums',
+            tone === 'ok' && 'text-success-ink',
+            tone === 'bad' && (value > 0 ? 'text-destructive-ink' : 'text-primary'),
+            tone === 'neutral' && 'text-primary'
           )}
         >
           {value}
@@ -144,6 +159,8 @@ export function DetraccionesSection() {
   const [unDet, setUnDet] = useState<DetraccionRecord[]>([])
   const [unBn, setUnBn] = useState<BnRecord[]>([])
   const [debug, setDebug] = useState('')
+  const confirmar = useConfirm()
+  const { isDeveloper } = useApp()
   const [hasResults, setHasResults] = useState(false)
 
   const [qMatched, setQMatched] = useState('')
@@ -314,12 +331,11 @@ export function DetraccionesSection() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Detracciones — Conciliación con Banco de la Nación</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Cruza el reporte SUNAT de detracciones con el estado de cuenta del BN, por RUC del proveedor + monto depositado.
-        </p>
-      </div>
+      <PageHeader
+        icon={Scale}
+        title="Detracciones"
+        description="Conciliación del reporte SUNAT con el estado de cuenta del Banco de la Nación, por RUC del proveedor y monto depositado"
+      />
 
       <Card>
         <CardHeader className="pb-3">
@@ -361,7 +377,13 @@ export function DetraccionesSection() {
                 </>
               )}
             </Button>
-            <Button variant="outline" size="sm" onClick={reset}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (await confirmar({ title: '¿Quitar los archivos cargados?', description: 'Se borran los dos archivos y el resultado de la comparación. Tendrás que volver a cargarlos.', confirmText: 'Quitar archivos', destructive: true })) reset()
+              }}
+            >
               <Trash2 className="h-4 w-4 mr-2" />Limpiar
             </Button>
           </div>
@@ -412,7 +434,7 @@ export function DetraccionesSection() {
             rows={filteredUnBn.map((b) => [b.ruc, fmtMoney(b.monto), b.fecha, b.documento, b.trans])}
           />
 
-          {debug && <p className="text-xs text-muted-foreground font-mono">{debug}</p>}
+          {debug && isDeveloper && <p className="text-xs text-muted-foreground font-mono">{debug}</p>}
         </>
       )}
     </div>

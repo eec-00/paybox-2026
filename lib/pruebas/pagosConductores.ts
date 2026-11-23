@@ -109,6 +109,53 @@ export interface GastoPago {
   tipoCambio?: { valor: number; fecha: string } | null
 }
 
+/**
+ * Desde qué fecha de programación rigen las reglas de la respuesta de Margiory
+ * al correo de Mirella (nov. 2026): cena por devolución efectiva, ADHT con
+ * retiro antes de las 06:00, Zona 4 unificada en S/90 y tarifa de zona para
+ * distritos nuevos. Lo anterior conserva las reglas viejas.
+ * Desde la semana de pago del sábado 14/11/2026 (confirmado por Michael el
+ * 18/11/2026): lo programado antes conserva las reglas viejas.
+ */
+export const VIGENCIA_REGLAS_NOV = '2026-11-14'
+
+/** ¿El servicio se liquida con las reglas nuevas? (sin fecha → reglas viejas) */
+export function reglasNuevas(fecha: string | false | null | undefined): boolean {
+  return !!fecha && fecha >= VIGENCIA_REGLAS_NOV
+}
+
+/** Tarifa de un distrito nuevo validada por Administración (tabla pruebas_tarifas_distrito) */
+export interface TarifaAprobada {
+  id: string
+  zona: string
+  distrito: string
+  /** GEN contenedor carga general · IMO contenedor IMO/IQBF · DES despacho carga suelta */
+  producto: 'GEN' | 'IMO' | 'DES'
+  monto: number
+  aprobadoPor: string | null
+  aprobadoAt: string
+}
+
+/** Solicitud «Voy a pernoctar» de la app, revisada en Pruebas > Pernoctes (08 · S/40) */
+export interface PernoctePago {
+  id: string
+  /** Tarea de Odoo del servicio */
+  servicioId: number
+  servicio: string
+  /** Empleado de Odoo (x_studio_conductor) */
+  conductorId: number | null
+  conductor: string
+  /** Día en que empieza la noche (Lima, YYYY-MM-DD) */
+  noche: string
+  /** 'pendiente' | 'escalado' | 'aprobado' | 'rechazado' (las anuladas no llegan) */
+  estado: string
+  motivo: string
+  /** Exclusiones marcadas con «sí» por quien revisó */
+  exclusiones: string[]
+  revisadoPor: string | null
+  evidencias: number
+}
+
 /** Nombre del atributo en Odoo → clave en AtributosServicio */
 export const ATRIBUTOS_ODOO: Record<string, keyof AtributosServicio> = {
   'Tipo de Servicio': 'tipoServicio',

@@ -1,5 +1,6 @@
 'use client'
 
+import { PageHeader } from '@/components/ui/page-header'
 import { useApp } from '@/lib/context/app-context'
 import { UsersList } from '@/components/UsersList'
 import { NormalUserForm } from '@/components/UserManagement'
@@ -20,13 +21,7 @@ export default function AdminUsuariosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Shield className="h-6 w-6 text-secondary" />
-        <div>
-          <h2 className="text-2xl font-bold text-primary">Usuarios Core</h2>
-          <p className="text-muted-foreground">Equipo interno con acceso al dashboard</p>
-        </div>
-      </div>
+      <PageHeader icon={Shield} title="Usuarios" description="Equipo interno con acceso a PayBox" />
       <UsersList />
       <NormalUserForm />
     </div>
