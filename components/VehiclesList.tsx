@@ -1,5 +1,6 @@
 'use client'
 
+import { useConfirm } from '@/components/ui/confirm'
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -238,10 +239,11 @@ export function VehiclesList() {
   const toggleAllGeolinks = () =>
     setSelectedGeolinkIds(allGeolinksSelected ? new Set() : new Set(geolinks.map(g => g.id)))
 
+  const confirmar = useConfirm()
   const handleBulkDeleteGeolinks = async () => {
     const ids = Array.from(selectedGeolinkIds)
     if (ids.length === 0) return
-    if (!window.confirm(`¿Eliminar ${ids.length} geoenlace${ids.length !== 1 ? 's' : ''}?`)) return
+    if (!(await confirmar({ title: `¿Eliminar ${ids.length} geoenlace${ids.length !== 1 ? 's' : ''}?`, description: 'Los enlaces dejan de funcionar de inmediato, también para los clientes que los tengan abiertos.', destructive: true }))) return
     setBulkDeleting(true)
     setGeolinksError(null)
     const results = await Promise.all(ids.map(async id => {
@@ -268,6 +270,7 @@ export function VehiclesList() {
   }
 
   const handleDeleteGeolink = async (id: number) => {
+    if (!(await confirmar({ title: '¿Eliminar este geoenlace?', description: 'El enlace deja de funcionar de inmediato, también para el cliente que lo tenga abierto.', destructive: true }))) return
     setDeletingId(id)
     try {
       const response = await fetch('/api/navitel/geolink/delete', {

@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -73,7 +74,7 @@ export function ConductoresList() {
       setDeleteDialogOpen(false)
       setConductorToDelete(null)
     } catch (err: any) {
-      alert(`Error al eliminar conductor: ${err.message}`)
+      toast.error('No se pudo eliminar el conductor', { description: err.message })
     } finally {
       setDeleting(false)
     }

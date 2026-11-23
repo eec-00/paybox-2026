@@ -601,7 +601,7 @@ export function VacacionesSection() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={bajaSaving}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBaja} disabled={bajaSaving} className={bajaEmpleado?.activo ? 'bg-red-600 hover:bg-red-700' : ''}>
+            <AlertDialogAction onClick={handleBaja} disabled={bajaSaving} className={bajaEmpleado?.activo ? 'bg-destructive text-white hover:bg-destructive/90' : ''}>
               {bajaSaving ? 'Guardando...' : (bajaEmpleado?.activo ? 'Dar de baja' : 'Reactivar')}
             </AlertDialogAction>
           </AlertDialogFooter>

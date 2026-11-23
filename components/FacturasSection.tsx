@@ -1,5 +1,6 @@
 'use client'
 
+import { useConfirm } from '@/components/ui/confirm'
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -7,17 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import {
   AlertTriangle,
   Bell,
@@ -216,6 +206,7 @@ export function FacturasSection() {
     } finally { setSavingConfig(false) }
   }
 
+  const confirmar = useConfirm()
   const handlePreview = async () => {
     setPreviewing(true)
     setPreview(null)
@@ -233,7 +224,34 @@ export function FacturasSection() {
     finally { setPreviewing(false) }
   }
 
+  // Un solo camino para enviar (botón del encabezado o vista previa): siempre
+  // confirma y dice cuántos correos van a salir.
   const handleSendAlerts = async () => {
+    let cantidad = preview?.length ?? null
+    if (cantidad === null) {
+      try {
+        const r = await fetch('/api/automatizacion/facturas-alertas', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ soloPreview: true }),
+        })
+        const d = await r.json()
+        if (!r.ok || d.error) throw new Error(d.error || `El servidor respondió ${r.status}`)
+        cantidad = (d.detalle || []).length
+      } catch (err) {
+        toast.error('No se pudo calcular el envío', { description: err instanceof Error ? err.message : undefined })
+        return
+      }
+    }
+    if (cantidad === 0) {
+      toast.info('No hay correos pendientes de enviar', { description: 'Todo lo que vence ya fue notificado en su umbral.' })
+      return
+    }
+    const ok = await confirmar({
+      title: `¿Enviar ${cantidad} correo${cantidad !== 1 ? 's' : ''} ahora?`,
+      description: 'Correo consolidado con las facturas próximas a vencer. Solo se incluyen las que todavía no se notificaron en ese umbral.',
+      confirmText: 'Sí, enviar ahora',
+    })
+    if (!ok) return
     setSending(true)
     setSendResult(null)
     try {
@@ -243,6 +261,7 @@ export function FacturasSection() {
         body: JSON.stringify({ soloPreview: false }),
       })
       const data = await res.json()
+      if (!res.ok && data.error) throw new Error(data.error)
       setSendResult(data)
       setShowPreview(false)
     } catch (err: any) { setError(err.message) }
@@ -305,28 +324,10 @@ export function FacturasSection() {
             {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
             Vista previa
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button size="sm" disabled={sending || loading} className="gap-1.5 bg-primary hover:bg-primary/90">
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                Enviar correos
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Confirmar envío de correos?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Se enviará un correo consolidado a los destinatarios configurados con todas las facturas
-                  próximas a vencer según los umbrales configurados. Solo se enviarán facturas que aún no
-                  hayan sido notificadas en ese umbral.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleSendAlerts}>Sí, enviar ahora</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button size="sm" onClick={handleSendAlerts} disabled={sending || loading} className="gap-1.5">
+            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+            Enviar correos
+          </Button>
         </div>
       </div>
 

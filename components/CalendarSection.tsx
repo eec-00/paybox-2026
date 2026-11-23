@@ -819,7 +819,7 @@ export function CalendarSection() {
                                 </AlertDialogAction>
                             )}
                             <AlertDialogAction
-                                className="w-full sm:w-auto bg-primary hover:bg-primary/90"
+                                className="w-full sm:w-auto bg-destructive text-white hover:bg-destructive/90"
                                 onClick={() => confirmDelete(false)}
                             >
                                 {deleteConfig.isRecurring ? 'Eliminar solo este' : 'Eliminar'}

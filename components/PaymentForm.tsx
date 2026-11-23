@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -449,7 +450,7 @@ export function PaymentForm({ onSuccess, gastoInicialId }: PaymentFormProps) {
         if (!res?.ok) {
           const data = await res?.json().catch(() => null)
           console.error('No se pudo marcar gasto como pagado:', data?.error)
-          alert(`El pago se guardó, pero el gasto del conductor no se marcó como pagado: ${data?.error || 'error de conexión'}. Avisa a Sistemas antes de volver a pagarlo.`)
+          toast.warning('El pago se guardó, pero el gasto del conductor no se marcó como pagado', { description: `${data?.error || 'Error de conexión'}. Avisa a Sistemas antes de volver a pagarlo.`, duration: 15000 })
         }
       }
 

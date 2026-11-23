@@ -1,5 +1,7 @@
 'use client'
 
+import { useConfirm } from '@/components/ui/confirm'
+import { toast } from 'sonner'
 import { urlArchivo } from '@/lib/archivos'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
@@ -218,10 +220,11 @@ export default function ServicioDetailPage() {
   // se lee después de montar para no desalinear el render del servidor)
   const [volverHref, setVolverHref] = useState('/servicios/trailers')
   useEffect(() => { setVolverHref(urlListaTrailers()) }, [])
+  const confirmar = useConfirm()
   const cambiarEtapa = async (stage: { id: number; name: string }) => {
     if (!task) return
     const codigo = task.name.includes(' - ') ? task.name.split(' - ')[0] : task.name
-    if (!window.confirm(`¿Pasar ${codigo} a la etapa "${stage.name}"?`)) return
+    if (!(await confirmar({ title: `¿Pasar ${codigo} a «${stage.name}»?`, description: 'El cambio se guarda en Odoo y lo verán todos los que siguen este servicio.', confirmText: 'Cambiar etapa' }))) return
     setCambiandoEtapa(true)
     try {
       const res = await fetch('/api/servicios', {
@@ -233,7 +236,7 @@ export default function ServicioDetailPage() {
       if (!res.ok) throw new Error(data.error || 'No se pudo cambiar la etapa')
       setTask((prev) => prev ? { ...prev, stage_id: [stage.id, stage.name] } : prev)
     } catch (e: unknown) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      toast.error('No se pudo cambiar la etapa', { description: e instanceof Error ? e.message : String(e) })
     } finally {
       setCambiandoEtapa(false)
     }

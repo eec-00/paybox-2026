@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -125,7 +126,7 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
         setExporting(true)
         try {
             if (selectedCategories.length === 0) {
-                alert("Debe seleccionar al menos una categoría.")
+                toast.warning('Selecciona al menos una categoría para exportar')
                 setExporting(false)
                 return
             }
@@ -162,7 +163,7 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
             })
 
             if (registros.length === 0) {
-                alert("No hay registros para exportar con los filtros seleccionados.")
+                toast.info('No hay registros con esos filtros', { description: 'Amplía las fechas o quita filtros y vuelve a exportar.' })
                 setExporting(false)
                 return
             }
@@ -278,7 +279,7 @@ export function ExportExcelModal({ buttonVariant = "default", buttonSize = "sm",
 
         } catch (err: any) {
             console.error('Error exportando Excel:', err)
-            alert("Hubo un error al exportar: " + err.message)
+            toast.error('No se pudo exportar', { description: err.message })
         } finally {
             setExporting(false)
         }

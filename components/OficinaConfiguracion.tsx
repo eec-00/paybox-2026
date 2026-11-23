@@ -1,5 +1,6 @@
 'use client'
 
+import { useConfirm } from '@/components/ui/confirm'
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -255,8 +256,9 @@ function HorarioDialog({ trabajador, config, puedeBorrar, onClose, onGuardado }:
     onGuardado()
   }
 
+  const confirmar = useConfirm()
   const quitar = async () => {
-    if (!confirm(`¿Quitar a ${trabajador.nombre} del personal de oficina? Sus marcas anteriores se conservan.`)) return
+    if (!(await confirmar({ title: `¿Quitar a ${trabajador.nombre} del personal de oficina?`, description: 'Sus marcas anteriores se conservan.', confirmText: 'Quitar', destructive: true }))) return
     const { error } = await createClient().from('oficina_trabajadores').delete().eq('user_id', trabajador.user_id)
     if (error) { toast.error(error.message); return }
     onGuardado()
@@ -345,8 +347,9 @@ function Stickers({ permisos }: { permisos: PermisosOficina }) {
     cargar()
   }
 
+  const confirmar = useConfirm()
   const borrar = async (s: Sticker) => {
-    if (!confirm(`¿Eliminar el sticker "${s.nombre}"? Ya no se podrá marcar con él.`)) return
+    if (!(await confirmar({ title: `¿Eliminar el sticker «${s.nombre}»?`, description: 'Ya no se podrá marcar asistencia con él.', destructive: true }))) return
     const { error } = await supabase.from('oficina_stickers').delete().eq('uid', s.uid)
     if (error) { toast.error(error.message); return }
     cargar()

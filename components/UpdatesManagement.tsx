@@ -1,5 +1,7 @@
 'use client'
 
+import { useConfirm } from '@/components/ui/confirm'
+import { toast } from 'sonner'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -126,8 +128,9 @@ export function UpdatesManagement() {
     }
   }
 
+  const confirmar = useConfirm()
   const handleDelete = async (updateId: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta actualización?')) return
+    if (!(await confirmar({ title: '¿Eliminar esta actualización?', description: 'Los usuarios dejarán de verla en el módulo de Actualizaciones. No se puede deshacer.', destructive: true }))) return
 
     try {
       const { error: deleteError } = await supabase
@@ -140,7 +143,7 @@ export function UpdatesManagement() {
       await loadUpdates()
     } catch (err) {
       console.error('Error deleting update:', err)
-      alert(`Error al eliminar: ${err instanceof Error ? err.message : 'Error desconocido'}`)
+      toast.error('No se pudo eliminar la actualización', { description: err instanceof Error ? err.message : undefined })
     }
   }
 

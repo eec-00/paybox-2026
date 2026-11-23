@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -221,7 +222,7 @@ export function UsersList() {
 
     } catch (err: any) {
       console.error('Error deleting user:', err)
-      alert(`Error al eliminar usuario: ${err.message}`)
+      toast.error('No se pudo eliminar el usuario', { description: err.message })
     } finally {
       setDeleting(false)
     }

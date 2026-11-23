@@ -1,5 +1,7 @@
 'use client'
 
+import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/confirm'
 import { Fragment, useMemo, useState } from 'react'
 import { CheckCircle2, ChevronDown, ChevronRight, Loader2, ShieldAlert, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -169,19 +171,27 @@ export function MotorZonasPanel({ servicios, devoluciones, aprobadas, onAprobada
   const [verSemana, setVerSemana] = useState(false)
   const [errorQuitar, setErrorQuitar] = useState<string | null>(null)
 
+  const confirmar = useConfirm()
   const aprobar = async (p: PropuestaTarifa) => {
+    const ok = await confirmar({
+      title: `¿Validar ${soles(p.monto)} para ${p.distrito}?`,
+      description: `${p.zona} · ${PRODUCTO_LABEL[p.producto]}. Desde ahora se usará esta tarifa en los próximos servicios de ese distrito con el mismo tipo de servicio.`,
+      confirmText: `Validar ${soles(p.monto)}`,
+    })
+    if (!ok) return
     const res = await fetch('/api/pruebas/tarifas-distrito', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ zona: p.zona, distrito: p.distrito, producto: p.producto }),
     })
-    const data = await res.json()
+    const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data.error || 'No se pudo validar la tarifa')
     const t = data.tarifa as TarifaAprobada
     onAprobadas([...aprobadas.filter(a => a.id !== t.id), t])
+    toast.success(`Tarifa validada: ${t.distrito} · ${soles(t.monto)}`)
   }
 
   const quitar = async (t: TarifaAprobada) => {
-    if (!confirm(`¿Quitar la tarifa validada de ${t.distrito} (${t.zona} · ${PRODUCTO_LABEL[t.producto]})? Sus servicios vuelven a quedar en revisión.`)) return
+    if (!(await confirmar({ title: `¿Quitar la tarifa validada de ${t.distrito}?`, description: `${t.zona} · ${PRODUCTO_LABEL[t.producto]} · ${soles(t.monto)}. Sus servicios vuelven a quedar en «Requiere revisión».`, confirmText: 'Quitar tarifa', destructive: true }))) return
     setErrorQuitar(null)
     const res = await fetch(`/api/pruebas/tarifas-distrito?id=${t.id}`, { method: 'DELETE' })
     const data = await res.json().catch(() => ({}))

@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { urlArchivo } from '@/lib/archivos'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -90,7 +91,7 @@ export function GastosConductorSection() {
             fetchGastos()
         } catch (err) {
             console.error('Error al eliminar:', err)
-            alert(`Error al eliminar el gasto: ${err instanceof Error ? err.message : err}`)
+            toast.error('No se pudo eliminar el gasto', { description: err instanceof Error ? err.message : String(err) })
         } finally {
             setDeleting(false)
         }
@@ -123,7 +124,7 @@ export function GastosConductorSection() {
             fetchGastos()
         } catch (err) {
             console.error('Error al editar:', err)
-            alert('Error al guardar cambios.')
+            toast.error('No se guardaron los cambios', { description: 'Inténtalo de nuevo.' })
         } finally {
             setEditSaving(false)
         }

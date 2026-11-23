@@ -1,5 +1,6 @@
 'use client'
 
+import { useConfirm } from '@/components/ui/confirm'
 import { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -417,50 +418,55 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
     return displayVal // keep typed value if no match
   }
 
+  // Campos que cambiaron respecto de Odoo (lo único que se guarda)
+  const calcularCambios = (): Record<string, unknown> => {
+    const orig = {
+      stageId:      String(m2oId(task.stage_id) || ''),
+      programacion: (task[F.programacion] as string) || '',
+      horaCita:     floatToTime(task[F.horaCita]),
+      placaCamion:  getPlacaDisplay(task[F.placaCamion]),
+      placaCarreta: getPlacaDisplay(task[F.placaCarreta]),
+      conductorId:  String(m2oId(task[F.conductor]) || ''),
+      refBooking:   (task[F.refBooking] as string) || '',
+      agencia:      (task[F.agencia] as string) || '',
+      nContenedor:  (task[F.nContenedor] as string) || '',
+      esImport:     Boolean(task[F.esImport]),
+      tiempos: Object.fromEntries(hitos.map(h => [h.field, floatToTime(task[h.field])])) as Record<string, string>,
+    }
+
+    const fields: Record<string, unknown> = {}
+    if (stageId !== orig.stageId && stageId) fields.stage_id = parseInt(stageId)
+    if (programacion !== orig.programacion) fields[F.programacion] = programacion || false
+    if (horaCita !== orig.horaCita) fields[F.horaCita] = timeToFloat(horaCita)
+    if (placaCamion !== orig.placaCamion) fields[F.placaCamion] = resolveVehicleWrite(placaCamion, placaCamionIsM2o)
+    if (placaCarreta !== orig.placaCarreta) fields[F.placaCarreta] = resolveVehicleWrite(placaCarreta, placaCarretaIsM2o)
+    if (conductorId !== orig.conductorId && conductorId) fields[F.conductor] = parseInt(conductorId)
+    if (refBooking !== orig.refBooking) fields[F.refBooking] = refBooking || false
+    if (agencia !== orig.agencia) fields[F.agencia] = agencia || false
+    if (nContenedor !== orig.nContenedor) fields[F.nContenedor] = nContenedor || false
+    if (esImport !== orig.esImport) fields[F.esImport] = esImport
+    const partnerId = (p: Partner | false) => (p ? p.id : false)
+    if (partnerId(almRetiro) !== partnerId(m2oPartner(task[F.almRetiro]))) fields[F.almRetiro] = partnerId(almRetiro)
+    if (partnerId(almDestino) !== partnerId(m2oPartner(task[F.almDestino]))) fields[F.almDestino] = partnerId(almDestino)
+    if (devolucionEditable && partnerId(almDevolucion) !== partnerId(m2oPartner(task[F.almDevolucion]))) {
+      fields[F.almDevolucion] = partnerId(almDevolucion)
+    }
+    if (devolucionEditable && muestraFechaMaxDev && fechaMaxDev !== odooDatetimeToInput(task[F.fechaMaxDevolucion])) {
+      fields[F.fechaMaxDevolucion] = inputToOdooDatetime(fechaMaxDev)
+    }
+    if (muestraModalidad && modalidad && modalidad !== origModalidad) fields[MODALIDAD_DEVOLUCION_FIELD] = modalidad
+    for (const h of hitos) {
+      const val = tiempos[h.field] ?? ''
+      if (val !== (orig.tiempos[h.field] ?? '')) fields[h.field] = timeToFloat(val)
+    }
+    return fields
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setError(null)
     try {
-      const orig = {
-        stageId:      String(m2oId(task.stage_id) || ''),
-        programacion: (task[F.programacion] as string) || '',
-        horaCita:     floatToTime(task[F.horaCita]),
-        placaCamion:  getPlacaDisplay(task[F.placaCamion]),
-        placaCarreta: getPlacaDisplay(task[F.placaCarreta]),
-        conductorId:  String(m2oId(task[F.conductor]) || ''),
-        refBooking:   (task[F.refBooking] as string) || '',
-        agencia:      (task[F.agencia] as string) || '',
-        nContenedor:  (task[F.nContenedor] as string) || '',
-        esImport:     Boolean(task[F.esImport]),
-        tiempos: Object.fromEntries(hitos.map(h => [h.field, floatToTime(task[h.field])])) as Record<string, string>,
-      }
-
-      const fields: Record<string, unknown> = {}
-      if (stageId !== orig.stageId && stageId) fields.stage_id = parseInt(stageId)
-      if (programacion !== orig.programacion) fields[F.programacion] = programacion || false
-      if (horaCita !== orig.horaCita) fields[F.horaCita] = timeToFloat(horaCita)
-      if (placaCamion !== orig.placaCamion) fields[F.placaCamion] = resolveVehicleWrite(placaCamion, placaCamionIsM2o)
-      if (placaCarreta !== orig.placaCarreta) fields[F.placaCarreta] = resolveVehicleWrite(placaCarreta, placaCarretaIsM2o)
-      if (conductorId !== orig.conductorId && conductorId) fields[F.conductor] = parseInt(conductorId)
-      if (refBooking !== orig.refBooking) fields[F.refBooking] = refBooking || false
-      if (agencia !== orig.agencia) fields[F.agencia] = agencia || false
-      if (nContenedor !== orig.nContenedor) fields[F.nContenedor] = nContenedor || false
-      if (esImport !== orig.esImport) fields[F.esImport] = esImport
-      const partnerId = (p: Partner | false) => (p ? p.id : false)
-      if (partnerId(almRetiro) !== partnerId(m2oPartner(task[F.almRetiro]))) fields[F.almRetiro] = partnerId(almRetiro)
-      if (partnerId(almDestino) !== partnerId(m2oPartner(task[F.almDestino]))) fields[F.almDestino] = partnerId(almDestino)
-      if (devolucionEditable && partnerId(almDevolucion) !== partnerId(m2oPartner(task[F.almDevolucion]))) {
-        fields[F.almDevolucion] = partnerId(almDevolucion)
-      }
-      if (devolucionEditable && muestraFechaMaxDev && fechaMaxDev !== odooDatetimeToInput(task[F.fechaMaxDevolucion])) {
-        fields[F.fechaMaxDevolucion] = inputToOdooDatetime(fechaMaxDev)
-      }
-      if (muestraModalidad && modalidad && modalidad !== origModalidad) fields[MODALIDAD_DEVOLUCION_FIELD] = modalidad
-      for (const h of hitos) {
-        const val = tiempos[h.field] ?? ''
-        if (val !== (orig.tiempos[h.field] ?? '')) fields[h.field] = timeToFloat(val)
-      }
-
+      const fields = calcularCambios()
       if (Object.keys(fields).length === 0) { onClose(); return }
 
       const res = await fetch('/api/servicios', {
@@ -478,10 +484,27 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
     }
   }
 
+  const confirmar = useConfirm()
+  // Cerrar con Esc, clic afuera o «Cancelar» no tira los cambios sin avisar
+  const cerrar = async () => {
+    if (saving) return
+    if (Object.keys(calcularCambios()).length > 0) {
+      const ok = await confirmar({
+        title: '¿Salir sin guardar?',
+        description: 'Hay cambios en este servicio que todavía no se guardaron en Odoo.',
+        confirmText: 'Salir sin guardar',
+        cancelText: 'Seguir editando',
+        destructive: true,
+      })
+      if (!ok) return
+    }
+    onClose()
+  }
+
   const currentStage = stages.find(s => String(s.id) === stageId)
 
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open onOpenChange={abierto => { if (!abierto) cerrar() }}>
       <DialogContent className="w-[72vw]! max-w-[72vw]! max-h-[92vh] overflow-hidden flex flex-col p-0 gap-0">
         <DialogTitle className="sr-only">{task.name as string}</DialogTitle>
 
@@ -707,7 +730,7 @@ export function ServiciosEditModal({ task, validFields, stages, onClose, onSaved
         <div className="border-t px-5 py-3 flex items-center justify-between shrink-0 bg-background">
           <p className="text-xs text-muted-foreground">Solo campos modificados → Odoo</p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancelar</Button>
+            <Button variant="outline" size="sm" onClick={cerrar} disabled={saving}>Cancelar</Button>
             <Button size="sm" onClick={handleSave} disabled={saving || loadingLookups} className="gap-2 min-w-[130px]">
               {saving
                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Guardando...</>

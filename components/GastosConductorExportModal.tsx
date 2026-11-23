@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -220,7 +221,7 @@ export function GastosConductorExportModal({ gastos, datosServicio }: Props) {
             setOpen(false)
         } catch (err) {
             console.error('Error exportando gastos:', err)
-            alert('Hubo un error al exportar: ' + (err instanceof Error ? err.message : String(err)))
+            toast.error('No se pudo exportar', { description: err instanceof Error ? err.message : String(err) })
         } finally {
             setExporting(false)
         }

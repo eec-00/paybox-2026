@@ -374,7 +374,7 @@ export function VacacionEmpleadoDetalle({ empleado, open, onClose, onChanged, ca
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deletingRecord}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleEliminarRecord} disabled={deletingRecord} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction onClick={handleEliminarRecord} disabled={deletingRecord} className="bg-destructive text-white hover:bg-destructive/90">
               {deletingRecord ? 'Eliminando...' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>

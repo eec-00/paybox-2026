@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -181,7 +182,7 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
     e.preventDefault()
 
     if (!selectedCategoria) {
-      alert('Por favor selecciona una categoría')
+      toast.warning('Selecciona una categoría para continuar')
       return
     }
 
@@ -215,7 +216,7 @@ export default function EditPaymentForm({ registro, onSuccess, onCancel }: EditP
       onSuccess()
     } catch (error) {
       console.error('Error al actualizar registro:', error)
-      alert('Error al actualizar el registro')
+      toast.error('No se pudo actualizar el registro', { description: 'Revisa los datos e inténtalo de nuevo.' })
     } finally {
       setLoading(false)
     }
