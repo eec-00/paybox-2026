@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS } from '@/lib/servicios/hitos'
+import { ALL_HITO_FIELDS, TIPO_SERVICIO_BOOL_FIELDS, getHitosForTask } from '@/lib/servicios/hitos'
 import { finalizadoPorEtapa } from '@/lib/servicios/progreso'
 import { odooAuth, odooCall } from '@/lib/odoo'
 // Datos operativos en vivo (hitos, GPS, servicios recién creados como subtareas
@@ -201,6 +201,28 @@ export async function GET(req: NextRequest) {
     const servicioProgreso: Record<number, number> = {}
     for (const p of (progreso ?? []) as { servicio_id: number; step_actual: number }[]) {
       servicioProgreso[p.servicio_id] = p.step_actual
+    }
+
+    // Piso desde Odoo: la hora de cada hito se escribe en Odoo desde el
+    // servidor (y se espera la respuesta), pero el avance en Supabase lo
+    // guarda el celular aparte — con mala señal esa escritura se perdía y al
+    // volver a abrir la app el servicio aparecía en un hito ya marcado (o en
+    // "Iniciar"), y el conductor re-marcaba pisando las horas reales. Ahora el
+    // avance nunca queda por debajo del último hito con hora en Odoo. Solo
+    // sube, nunca baja: un hito marcado justo a medianoche (valor 0) cae al
+    // dato de Supabase como antes.
+    const completedSet = new Set(completedServiceIds)
+    for (const t of tasks as any[]) {
+      if (completedSet.has(t.id)) continue
+      const hitos = getHitosForTask(t)
+      let ultimoConHora = -1
+      hitos.forEach((h, i) => { if (Number(t[h.field]) > 0) ultimoConHora = i })
+      // Si hasta el último hito tiene hora pero el cierre no quedó guardado,
+      // se deja parado en el último para que lo confirme y cierre normal.
+      const piso = Math.min(ultimoConHora + 1, hitos.length - 1)
+      if (piso > 0 && (servicioProgreso[t.id] ?? -1) < piso) {
+        servicioProgreso[t.id] = piso
+      }
     }
 
     return NextResponse.json({ tasks, stats, month: monthParam, completedServiceIds, servicioProgreso })

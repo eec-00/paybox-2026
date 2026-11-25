@@ -428,9 +428,11 @@ export default function ConductorServiciosPage() {
   const [servicioGastosMap, setServicioGastosMap] = useState<Record<number, GastoExistente[]>>({})
   const [loadingGastosMap, setLoadingGastosMap] = useState<Record<number, boolean>>({})
 
-  const fetchServicios = useCallback(async (month: string) => {
-    setLoading(true)
-    setError(null)
+  const fetchServicios = useCallback(async (month: string, silent = false) => {
+    if (!silent) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const res = await fetch(`/api/conductor/servicios?month=${month}`)
       const data = await res.json()
@@ -452,9 +454,9 @@ export default function ConductorServiciosPage() {
         return next
       })
     } catch (e: any) {
-      setError(e.message)
+      if (!silent) setError(e.message)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -471,6 +473,47 @@ export default function ConductorServiciosPage() {
   }, [])
 
   useEffect(() => { fetchServicios(currentMonth) }, [currentMonth, fetchServicios])
+
+  // Id del conductor sin depender de que el getUser() del montaje ya haya
+  // respondido (con mala señal podía quedar en null y el avance no se guardaba).
+  const getConductorId = useCallback(async (): Promise<string | null> => {
+    if (conductorUserId) return conductorUserId
+    const { data } = await createClient().auth.getSession()
+    const id = data.session?.user.id ?? null
+    if (id) setConductorUserId(id)
+    return id
+  }, [conductorUserId])
+
+  // Escrituras de avance en fila (una tras otra) y con reintentos. Antes se
+  // disparaban sin esperar: con mala señal se perdían o llegaban
+  // desordenadas (el "paso 5" pisando al "paso 6"), y al reabrir la app el
+  // servicio volvía a un hito ya marcado.
+  const progresoQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const guardarProgreso = useCallback((write: (conductorId: string) => PromiseLike<{ error: unknown }>) => {
+    progresoQueueRef.current = progresoQueueRef.current.then(async () => {
+      for (let i = 0; i < 4; i++) {
+        try {
+          const id = await getConductorId()
+          if (id) {
+            const { error } = await write(id)
+            if (!error) return
+          }
+        } catch {}
+        await new Promise(r => setTimeout(r, 1500 * (i + 1)))
+      }
+    })
+  }, [getConductorId])
+
+  // Al volver a la app (desbloquear el celular, cambiar de pestaña) se
+  // refresca en silencio: si el avance se marcó desde otro dispositivo o
+  // pestaña, esta no se queda mostrando un hito viejo.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchServicios(currentMonth, true)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [currentMonth, fetchServicios])
 
   useEffect(() => {
     if (activeServiceId === null) return
@@ -590,19 +633,18 @@ export default function ConductorServiciosPage() {
     const stepsLen = stepsArr.length
     setServiceSteps(prev => ({ ...prev, [taskId]: nextStep }))
 
-    if (conductorUserId) {
-      const supabaseClient = createClient()
-      if (nextStep >= stepsLen) {
-        supabaseClient.from('conductor_servicios_progreso')
-          .delete().eq('conductor_id', conductorUserId).eq('servicio_id', taskId).then(() => {})
-        const codigo = task.name.includes(' - ') ? task.name.split(' - ')[0] : task.name
-        supabaseClient.from('conductor_servicios_completados')
-          .upsert({ conductor_id: conductorUserId, servicio_id: taskId, servicio_nombre: codigo }).then(() => {})
-      } else {
-        supabaseClient.from('conductor_servicios_progreso')
-          .upsert({ conductor_id: conductorUserId, servicio_id: taskId, step_actual: nextStep, updated_at: new Date().toISOString() })
-          .then(() => {})
-      }
+    const supabaseClient = createClient()
+    if (nextStep >= stepsLen) {
+      // Primero "completado" y recién después se borra el progreso: si se
+      // corta a la mitad, el servicio no puede quedar como "sin iniciar".
+      const codigo = task.name.includes(' - ') ? task.name.split(' - ')[0] : task.name
+      guardarProgreso(id => supabaseClient.from('conductor_servicios_completados')
+        .upsert({ conductor_id: id, servicio_id: taskId, servicio_nombre: codigo }))
+      guardarProgreso(id => supabaseClient.from('conductor_servicios_progreso')
+        .delete().eq('conductor_id', id).eq('servicio_id', taskId))
+    } else {
+      guardarProgreso(id => supabaseClient.from('conductor_servicios_progreso')
+        .upsert({ conductor_id: id, servicio_id: taskId, step_actual: nextStep, updated_at: new Date().toISOString() }))
     }
 
     // Acabada en PayBox ⇒ "Servicio Finalizado" en Odoo, siempre — también
@@ -668,10 +710,11 @@ export default function ConductorServiciosPage() {
         }).then(() => {})
       }
 
-      if (fotoUrls.length > 0 && conductorUserId) {
+      const fotoConductorId = fotoUrls.length > 0 ? await getConductorId() : null
+      if (fotoUrls.length > 0 && fotoConductorId) {
         createClient().from('conductor_servicio_hito_fotos').insert(
           fotoUrls.map(url => ({
-            conductor_id: conductorUserId,
+            conductor_id: fotoConductorId,
             servicio_id: taskId,
             tipo_servicio: detectTipoServicio(task),
             hito_key: hito.key,
@@ -767,11 +810,8 @@ export default function ConductorServiciosPage() {
       setServiceSteps(prev => ({ ...prev, [taskId]: 0 }))
       setActiveServiceId(taskId)
       setPendingConfirm(null)
-      if (conductorUserId) {
-        createClient().from('conductor_servicios_progreso')
-          .upsert({ conductor_id: conductorUserId, servicio_id: taskId, step_actual: 0, updated_at: new Date().toISOString() })
-          .then(() => {})
-      }
+      guardarProgreso(id => createClient().from('conductor_servicios_progreso')
+        .upsert({ conductor_id: id, servicio_id: taskId, step_actual: 0, updated_at: new Date().toISOString() }))
       return
     }
 
