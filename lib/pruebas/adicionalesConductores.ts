@@ -104,7 +104,7 @@ export const REGLAS: Record<ConceptoAdicional, string> = {
   tdc: 'Guía §3.06 · Otros clientes: el conductor B que devuelve el contenedor de otro cobra S/30 si lo devuelve en APM o DPW y S/20 en cualquier otro almacén (Rosario, 12/11/2026). Basta I12 en la subtarea asignada. Crosland va en la tarifa base (CR-03/CR-04).',
   pernocte: 'S/40 por cada noche efectiva en que el conductor duerme en su camión por la operación (Margiory, nov. 2026). Fuente: solicitud «Voy a pernoctar» de la app (motivo, hora, ubicación y evidencia) aprobada en Pruebas > Pernoctes; autoriza Charito si la evidencia es clara, si no Emerson. No corresponde si la unidad se quedó en el cliente y el conductor volvió a su casa, si se depositó hotel o movilidad de retorno, ni en viajes a provincia (ahí se paga hospedaje y, si la unidad no queda en el almacén del cliente, cochera — Rosario). No se activa por cruzar la medianoche. Pendiente: compatibilidad con cena y con retiro 03:00.',
   retiro_0300: 'Guía §3.07 · S/20. Cita original Odoo de RETIRO exactamente a las 03:00; contrastar I01 (Inicio ruta), I02/I03 y foto de salida de cochera. No aplica a cita 03:30 ni a I01 aislado. Revisar incompatibilidad con pernocte.',
-  maquina: 'Guía §3.09 · S/5 por día válido, máximo S/30 por semana (seis días). Fuente: módulo Asistencia de la app (entrada/salida) con servicio asignado ese día. No aplica a días sin servicio.',
+  maquina: 'Guía §3.09 · S/5 por día válido, máximo S/30 por semana (seis días). Día válido: servicio asignado ese día y entrada marcada en el módulo Asistencia de la app (la salida no es obligatoria). Si no marcó entrada pero inició un servicio ese día, el inicio del servicio cuenta como entrada. No aplica a días sin servicio.',
   bono: 'Guía §3.10 · S/100 semanal. Ocho Sxxxxx únicos y completos (sábado–viernes). Importación: I08/I09 + devolución propia I12. Despacho/exportación: flujo propio completo. Las entregas de isotanque lleno o vacío sí cuentan. NO son acumulables: traslados internos de isotanque (ITK), viajes a provincia (fuera de Lima) y devoluciones por terceros (Rosario, 11 y 12/11/2026).',
   viatico: 'Guía §3.11 · S/35. Despacho a provincia con D06/D07/D08/D11, destino físico Odoo, autorización previa y comprobante. Excluye Chancay. D07 solo no activa el viático.',
   gasto: 'Guía §3.12 · Importe realmente sustentado en el módulo Gastos de la app (comprobante). Diferenciar pendiente y pagado; no abonar dos veces lo ya desembolsado. Gastos en dólares: tipo de cambio venta de la SBS del día del gasto (Rosario, 12/11/2026), serie PD04640PD del BCRP; fin de semana o feriado: el último publicado.',
@@ -417,20 +417,29 @@ function diaAnterior(fecha: string): string {
 
 // ── 09 · Máquina ────────────────────────────────────────────────────────
 
+/** ¿El conductor inició el servicio? Marcó al menos un hito operativo
+ * (el cierre administrativo «Servicio finalizado» no cuenta). */
+function servicioIniciado(s: ServicioPago): boolean {
+  return s.horarios.linea.some(h => h.key !== 'servicio_finalizado' && h.min !== null)
+}
+
+/** Día válido: servicio asignado ese día + entrada en Asistencia (la salida
+ * no es obligatoria). Si no marcó entrada pero inició un servicio ese día, el
+ * inicio del servicio cuenta como su entrada. */
 function maquinaDe(servicios: ServicioPago[], asistencias: AsistenciaPago[]): Adicional | null {
   const conServicio = new Set(servicios.flatMap(s => s.fecha ? [s.fecha] : []))
-  const dias = Array.from(new Set(asistencias.map(a => a.fecha))).sort()
-  const validos = dias.filter(f => conServicio.has(f) && asistencias.some(a => a.fecha === f && a.salida))
-  const sinSalida = dias.filter(f => conServicio.has(f) && !validos.includes(f))
-  if (validos.length === 0 && sinSalida.length === 0) return null
+  const conEntrada = new Set(asistencias.map(a => a.fecha))
+  const iniciados = new Set(servicios.flatMap(s => s.fecha && servicioIniciado(s) ? [s.fecha] : []))
+  const validos = Array.from(conServicio).filter(f => conEntrada.has(f) || iniciados.has(f)).sort()
+  if (validos.length === 0) return null
   const contados = validos.slice(0, MAQUINA_DIAS_MAX)
-  const base = {
+  const porServicio = contados.filter(f => !conEntrada.has(f))
+  return sim({
     concepto: 'maquina' as const, fecha: null, servicio: null, regla: REGLAS.maquina, hitos: ['Asistencia'],
     servicioIds: servicios.filter(s => s.fecha && contados.includes(s.fecha)).map(s => s.id), claves: [],
-    detalle: `${contados.length} día(s) con entrada, salida y servicio${sinSalida.length ? ` · sin salida marcada: ${sinSalida.join(', ')}` : ''} · actividad efectiva por contrastar con Operaciones`,
-  }
-  if (contados.length === 0) return rev(base, 'Días con entrada y servicio pero sin salida en Asistencia')
-  return sim({ ...base, monto: contados.length * MAQUINA_DIA })
+    detalle: `${contados.length} día(s) con entrada y servicio${porServicio.length ? ` · entrada tomada del inicio del servicio: ${porServicio.join(', ')}` : ''} · actividad efectiva por contrastar con Operaciones`,
+    monto: contados.length * MAQUINA_DIA,
+  })
 }
 
 // ── 10 · Bono ───────────────────────────────────────────────────────────

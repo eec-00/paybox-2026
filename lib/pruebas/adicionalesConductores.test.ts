@@ -101,7 +101,7 @@ describe('02 · ADHT (regla de Margiory, confirmada 12/11)', () => {
   it('Crosland: el ADHT reemplaza a la cena', () => {
     const lista = calc([servicio({ cliente: 'CROSLAND MOTOS', clienteId: 308, citaDevolucion: H(18, 30),
       horas: completo({ ...tarde, fin_descarga: H(17), salida_cliente: H(17, 20) }) })])
-    expect(lista.filter(a => a.estado === 'simulado').map(a => [a.concepto, a.monto])).toEqual([['adht', 30]])
+    expect(lista.filter(a => a.estado === 'simulado' && a.concepto !== 'maquina').map(a => [a.concepto, a.monto])).toEqual([['adht', 30]])
   })
 })
 
@@ -127,7 +127,7 @@ describe('03/04/05 · Crosland', () => {
 
   it('Rosario 12/11: I08 21:30 → I12 23:20, la devolución va en la tarifa: solo cena S/20 (I10 14:00, sin ADHT)', () => {
     const lista = calc([crosland({ fin_descarga: H(21, 30), contenedor_devuelto: H(23, 20) })])
-    expect(lista.filter(a => a.estado === 'simulado').map(a => [a.concepto, a.monto])).toEqual([['cena', 20]])
+    expect(lista.filter(a => a.estado === 'simulado' && a.concepto !== 'maquina').map(a => [a.concepto, a.monto])).toEqual([['cena', 20]])
     expect(de(lista, 'adht')).toHaveLength(0)
   })
 
@@ -144,7 +144,7 @@ describe('03/04/05 · Crosland', () => {
 
   it('amanecida no suma la noche (Rosario 12/11)', () => {
     const lista = calc([crosland({ fin_descarga: H(24, 30), salida_cliente: H(24, 45) })])
-    expect(lista.filter(a => a.estado === 'simulado').map(a => a.concepto).sort()).toEqual(['cena', 'crosland_medianoche'])
+    expect(lista.filter(a => a.estado === 'simulado' && a.concepto !== 'maquina').map(a => a.concepto).sort()).toEqual(['cena', 'crosland_medianoche'])
   })
 
   it('Crosland Técnica (804) no es Crosland aunque lleve el nombre', () => {
@@ -219,7 +219,7 @@ describe('09 · Máquina', () => {
     const asistencias = dias.map(fecha => ({ conductorId: 1, fecha, salida: true }))
     expect(de(calc(servicios, { asistencias }), 'maquina')[0]).toMatchObject({ estado: 'simulado', monto: 30 })
   })
-  it('día sin servicio no cuenta; sin salida tampoco', () => {
+  it('día sin servicio no cuenta; la salida no es obligatoria', () => {
     const servicios = [servicio({ fecha: '2026-11-10', horas: completo() }), servicio({ fecha: '2026-11-11', horas: completo() })]
     const asistencias = [
       { conductorId: 1, fecha: '2026-11-09', salida: true },
@@ -227,8 +227,17 @@ describe('09 · Máquina', () => {
       { conductorId: 1, fecha: '2026-11-11', salida: false },
     ]
     const [m] = de(calc(servicios, { asistencias }), 'maquina')
-    expect(m).toMatchObject({ estado: 'simulado', monto: 5 })
-    expect(m.detalle).toMatch(/sin salida marcada: 2026-11-11/)
+    expect(m).toMatchObject({ estado: 'simulado', monto: 10 })
+  })
+  it('sin entrada pero inició el servicio → el inicio cuenta como entrada', () => {
+    const servicios = [servicio({ fecha: '2026-11-10', horas: { inicio_ruta: H(6) } }), servicio({ fecha: '2026-11-11', horas: completo() })]
+    const [m] = de(calc(servicios), 'maquina')
+    expect(m).toMatchObject({ estado: 'simulado', monto: 10 })
+    expect(m.detalle).toMatch(/inicio del servicio: 2026-11-10, 2026-11-11/)
+  })
+  it('sin entrada y sin iniciar el servicio (o solo cierre administrativo) → no hay máquina', () => {
+    const servicios = [servicio({ fecha: '2026-11-10' }), servicio({ fecha: '2026-11-11', horas: { servicio_finalizado: H(20) } })]
+    expect(de(calc(servicios), 'maquina')).toHaveLength(0)
   })
 })
 
@@ -385,7 +394,7 @@ describe('Reglas nuevas (desde VIGENCIA_REGLAS_NOV)', () => {
   describe('02 · Cena extraordinaria ADHT (retiro < 06:00, devolución tardía)', () => {
     it('retiro 05:30 y devolución 19:40 → S/30 que reemplaza la cena (cualquier cliente)', () => {
       const lista = calc([nuevo({ salida_almacen_retiro: H(5, 30), contenedor_devuelto: H(19, 40) })])
-      expect(lista.filter(a => a.estado === 'simulado').map(a => [a.concepto, a.monto])).toEqual([['adht', 30]])
+      expect(lista.filter(a => a.estado === 'simulado' && a.concepto !== 'maquina').map(a => [a.concepto, a.monto])).toEqual([['adht', 30]])
     })
 
     it('ya no depende de la cita de devolución', () => {
@@ -401,7 +410,7 @@ describe('Reglas nuevas (desde VIGENCIA_REGLAS_NOV)', () => {
 
     it('opción A: retiro 05:00 y devolución 17:00 en punto → S/30, sin cena', () => {
       const lista = calc([nuevo({ salida_almacen_retiro: H(5), contenedor_devuelto: H(17) })])
-      expect(lista.filter(a => a.estado === 'simulado').map(a => [a.concepto, a.monto])).toEqual([['adht', 30]])
+      expect(lista.filter(a => a.estado === 'simulado' && a.concepto !== 'maquina').map(a => [a.concepto, a.monto])).toEqual([['adht', 30]])
     })
 
     it('devolución 16:59 → no hay ADHT', () => {
